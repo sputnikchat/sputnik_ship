@@ -45,6 +45,18 @@
 
   const CARRIER_LABEL = { fedex: 'FedEx', ups: 'UPS', dhl: 'DHL', usps: 'USPS' };
 
+  // Heuristica simple por formato de numero de tracking, igual a lo que
+  // hacen ParcelsApp/17TRACK para no obligar a elegir el courier a mano.
+  function detectCarrier(raw) {
+    const t = (raw || '').replace(/\s+/g, '').toUpperCase();
+    if (!t) return null;
+    if (/^1Z[0-9A-Z]{16}$/.test(t)) return 'ups';
+    if (/^(94|93|92|82|EC|CP)\d{18,20}$/.test(t) || /^[A-Z]{2}\d{9}US$/.test(t)) return 'usps';
+    if (/^\d{10}$|^\d{11}$/.test(t)) return 'dhl';
+    if (/^\d{12}$|^\d{15}$|^96\d{20}$/.test(t)) return 'fedex';
+    return null;
+  }
+
   function fmtDate(iso) {
     if (!iso) return '—';
     const d = new Date(iso);
@@ -274,11 +286,20 @@
   function renderShipments() {
     renderGreeting();
     const list = $('#shipments-list');
+    const q = ($('#shipment-search').value || '').toLowerCase();
+    const items = state.shipments.filter((s) =>
+      !q || s.trackingNumber.toLowerCase().includes(q) || (s.label || '').toLowerCase().includes(q)
+    );
+
     if (!state.shipments.length) {
       list.innerHTML = `<div class="empty">Todavía no agregaste envíos.<br>Tocá "+ Nuevo envío" para empezar a hacer seguimiento.</div>`;
       return;
     }
-    list.innerHTML = state.shipments.map((s) => {
+    if (!items.length) {
+      list.innerHTML = `<div class="empty">Ningún envío coincide con "${escapeHtml(q)}".</div>`;
+      return;
+    }
+    list.innerHTML = items.map((s) => {
       const contact = state.contacts.find((c) => c.id === s.contactId);
       return `
         <div class="card" data-id="${s.id}">
@@ -302,12 +323,28 @@
     );
   }
 
+  $('#shipment-search').addEventListener('input', renderShipments);
+
   $('#add-shipment-btn').addEventListener('click', () => {
     renderShipmentContactOptions();
+    $('#shipment-form').reset();
+    $('#carrier-detect-hint').textContent = '';
     $('#shipment-modal').hidden = false;
   });
   $('#shipment-cancel').addEventListener('click', () => { $('#shipment-modal').hidden = true; });
   $('#shipment-modal').addEventListener('click', (e) => { if (e.target.id === 'shipment-modal') $('#shipment-modal').hidden = true; });
+
+  $('#shipment-form input[name="trackingNumber"]').addEventListener('input', (e) => {
+    const carrier = detectCarrier(e.target.value);
+    const hint = $('#carrier-detect-hint');
+    const select = $('#shipment-form select[name="carrier"]');
+    if (carrier) {
+      select.value = carrier;
+      hint.textContent = `Detectado: ${CARRIER_LABEL[carrier]}`;
+    } else {
+      hint.textContent = '';
+    }
+  });
 
   $('#shipment-form').addEventListener('submit', async (e) => {
     e.preventDefault();

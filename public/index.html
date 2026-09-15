@@ -94,6 +94,7 @@
         <button id="refresh-now-btn" class="btn-secondary small">Actualizar ahora</button>
         <button id="add-shipment-btn" class="btn-primary small">+ Nuevo envío</button>
       </div>
+      <input id="shipment-search" class="search" type="search" placeholder="Buscar por tracking o etiqueta…" />
       <div id="shipments-list" class="cards"></div>
     </section>
 
@@ -162,7 +163,10 @@
           <option value="usps">USPS</option>
         </select>
       </label>
-      <label>Número de tracking *<input type="text" name="trackingNumber" required /></label>
+      <label>Número de tracking *
+        <input type="text" name="trackingNumber" required autocomplete="off" />
+        <span class="field-hint" id="carrier-detect-hint"></span>
+      </label>
       <label>Contacto asociado
         <select name="contactId">
           <option value="">— Ninguno —</option>
