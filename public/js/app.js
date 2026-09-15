@@ -275,6 +275,9 @@
     const saludo = hour < 12 ? 'Buenos días' : hour < 20 ? 'Buenas tardes' : 'Buenas noches';
     const handle = state.user?.handle || '';
     $('#greeting-title').textContent = handle ? `${saludo}, @${handle}` : saludo;
+    const initial = handle ? handle[0].toUpperCase() : '?';
+    $('#greeting-avatar').textContent = initial;
+    $('#topbar-avatar').textContent = initial;
 
     const active = state.shipments.filter((s) => s.status !== 'delivered').length;
     $('#active-shipments-count').textContent = active;

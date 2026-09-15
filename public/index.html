@@ -8,6 +8,9 @@
 <link rel="manifest" href="/manifest.json" />
 <link rel="icon" href="/icons/icon-192.png" />
 <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <link rel="stylesheet" href="/css/style.css" />
 </head>
@@ -73,6 +76,7 @@
         🔔<span id="notif-dot" class="dot" hidden></span>
       </button>
       <button id="logout-btn" class="icon-btn" title="Salir">⎋</button>
+      <div class="avatar avatar-sm" id="topbar-avatar">?</div>
     </div>
   </header>
 
@@ -86,12 +90,19 @@
 
     <!-- Vista: Envíos -->
     <section id="view-shipments" class="view active">
+      <div class="greeting-glow"></div>
       <div class="greeting-row">
-        <div class="greeting">
-          <h1 id="greeting-title">Hola</h1>
-          <p id="greeting-sub">Se actualizan automáticamente cada 30 minutos.</p>
+        <div class="greeting-with-avatar">
+          <div class="avatar avatar-lg" id="greeting-avatar">?</div>
+          <div class="greeting">
+            <h1 id="greeting-title">Hola</h1>
+            <p id="greeting-sub">Se actualizan automáticamente cada 30 minutos.</p>
+          </div>
         </div>
-        <div class="stat-pill">🚚 <span class="stat-pill-num" id="active-shipments-count">0</span> en curso</div>
+        <div class="stat-pill">
+          <span class="stat-pill-icon">🚚</span>
+          <span class="stat-pill-text"><span class="stat-pill-num" id="active-shipments-count">0</span> en curso</span>
+        </div>
       </div>
       <div class="view-header">
         <button id="refresh-now-btn" class="btn-secondary small">Actualizar ahora</button>
