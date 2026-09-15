@@ -2,3 +2,10 @@ node_modules/
 .env
 data/db.json
 *.log
+
+# Skills CLI (npx skills) - symlinked agent skill directories, regenerated
+# from skills-lock.json via `npx skills experimental_install`
+.agents/
+.claude/skills/
+data/skills/
+agent/skills/

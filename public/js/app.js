@@ -3,8 +3,8 @@
 
   const API = '/api';
   let state = {
-    token: localStorage.getItem('shiptrack_token') || null,
-    user: JSON.parse(localStorage.getItem('shiptrack_user') || 'null'),
+    token: localStorage.getItem('sputnikship_token') || null,
+    user: JSON.parse(localStorage.getItem('sputnikship_user') || 'null'),
     contacts: [],
     shipments: [],
     notifications: [],
@@ -66,15 +66,15 @@
   function saveSession(token, user) {
     state.token = token;
     state.user = user;
-    localStorage.setItem('shiptrack_token', token);
-    localStorage.setItem('shiptrack_user', JSON.stringify(user));
+    localStorage.setItem('sputnikship_token', token);
+    localStorage.setItem('sputnikship_user', JSON.stringify(user));
   }
 
   function logout() {
     state.token = null;
     state.user = null;
-    localStorage.removeItem('shiptrack_token');
-    localStorage.removeItem('shiptrack_user');
+    localStorage.removeItem('sputnikship_token');
+    localStorage.removeItem('sputnikship_user');
     showAuth();
   }
 
@@ -256,8 +256,23 @@
     }
   });
 
+  // ---------------- greeting ----------------
+  function renderGreeting() {
+    const hour = new Date().getHours();
+    const saludo = hour < 12 ? 'Buenos días' : hour < 20 ? 'Buenas tardes' : 'Buenas noches';
+    const firstName = (state.user?.name || '').split(' ')[0] || '';
+    $('#greeting-title').textContent = firstName ? `${saludo}, ${firstName}` : saludo;
+
+    const active = state.shipments.filter((s) => s.status !== 'delivered').length;
+    $('#active-shipments-count').textContent = active;
+    $('#greeting-sub').textContent = active
+      ? `Tenés ${active} envío${active === 1 ? '' : 's'} en camino.`
+      : 'No tenés envíos en camino ahora mismo.';
+  }
+
   // ---------------- render: shipments ----------------
   function renderShipments() {
+    renderGreeting();
     const list = $('#shipments-list');
     if (!state.shipments.length) {
       list.innerHTML = `<div class="empty">Todavía no agregaste envíos.<br>Tocá "+ Nuevo envío" para empezar a hacer seguimiento.</div>`;
@@ -342,13 +357,21 @@
     const contact = state.contacts.find((c) => c.id === s.contactId);
 
     $('#shipment-detail-body').innerHTML = `
-      <h2 style="margin-bottom:4px;">${escapeHtml(s.label || s.trackingNumber)}</h2>
-      <p class="muted small" style="margin-top:0;">${escapeHtml(s.trackingNumber)} · <span class="carrier-chip">${CARRIER_LABEL[s.carrier] || s.carrier}</span></p>
-      <span class="badge status-${s.status}">${escapeHtml(s.statusLabel || s.status)}</span>
+      <div class="hero-top">
+        <div>
+          <h2>${escapeHtml(s.label || s.trackingNumber)}</h2>
+          <p class="muted small" style="margin:0;">${escapeHtml(s.trackingNumber)}</p>
+        </div>
+        <span class="carrier-chip">${CARRIER_LABEL[s.carrier] || s.carrier}</span>
+      </div>
+      <span class="badge status-${s.status}" style="margin-top:10px; display:inline-block;">${escapeHtml(s.statusLabel || s.status)}</span>
+      <div class="hero-eta">
+        <small>Entrega estimada</small>
+        ${fmtDate(s.estimatedDelivery)}
+      </div>
+      <p class="small muted" style="margin:2px 0 0;">Último chequeo: ${fmtDate(s.lastCheckedAt)}</p>
       ${contact ? `<p class="small" style="margin-top:10px;">📇 ${escapeHtml(contact.name)}</p>` : ''}
-      <p class="small muted">Entrega estimada: ${fmtDate(s.estimatedDelivery)}</p>
-      <p class="small muted">Último chequeo: ${fmtDate(s.lastCheckedAt)}</p>
-      <button class="btn-secondary small" id="delete-shipment-btn" style="margin-top:10px;">Eliminar envío</button>
+      <button class="btn-secondary small" id="delete-shipment-btn" style="margin-top:14px;">Eliminar envío</button>
     `;
 
     $('#delete-shipment-btn').addEventListener('click', async () => {
@@ -400,17 +423,17 @@
     const latlngs = route.map((p) => [p.lat, p.lng]);
     const doneIndex = shipment.checkpointIndex ?? -1;
 
-    L.polyline(latlngs, { color: '#93a1c2', weight: 3, dashArray: '6 6' }).addTo(state.map);
+    L.polyline(latlngs, { color: '#4b4b52', weight: 3, dashArray: '6 6' }).addTo(state.map);
     if (doneIndex >= 0) {
-      L.polyline(latlngs.slice(0, doneIndex + 1), { color: '#2563eb', weight: 4 }).addTo(state.map);
+      L.polyline(latlngs.slice(0, doneIndex + 1), { color: '#cfff52', weight: 4 }).addTo(state.map);
     }
 
     route.forEach((p, i) => {
       const isDone = i <= doneIndex;
       const marker = L.circleMarker([p.lat, p.lng], {
         radius: i === doneIndex ? 9 : 6,
-        color: isDone ? '#2563eb' : '#4b5a86',
-        fillColor: isDone ? '#3b82f6' : '#2b3860',
+        color: isDone ? '#cfff52' : '#4b4b52',
+        fillColor: isDone ? '#cfff52' : '#28282d',
         fillOpacity: 1,
         weight: 2,
       }).addTo(state.map);

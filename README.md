@@ -1,4 +1,4 @@
-# ShipTrack
+# Sputnik Ship
 
 App para guardar contactos y hacer seguimiento de envíos (FedEx, UPS, DHL, USPS) en un solo lugar:
 
@@ -17,7 +17,7 @@ Por defecto la app corre con **datos de tracking simulados** (`TRACKING_MODE=moc
 Necesitás [Node.js](https://nodejs.org/) 18 o más nuevo instalado.
 
 ```bash
-cd shiptrack
+cd sputnik-ship
 npm install
 cp .env.example .env
 # abrí .env y al menos cambiá JWT_SECRET por un texto largo random
@@ -39,7 +39,7 @@ Con datos simulados, cada refresh hace "avanzar" el envío un checkpoint más en
 ## Estructura del proyecto
 
 ```
-shiptrack/
+sputnik-ship/
   server.js                  Servidor Express (API + sirve el frontend)
   routes/
     auth.js                  Registro / login (JWT, sin KYC)

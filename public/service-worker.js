@@ -2,7 +2,7 @@
 // y sea instalable en el celular. Los datos (contactos, envios) siempre
 // se piden en vivo a /api/*, no se cachean.
 
-const CACHE_NAME = 'shiptrack-shell-v1';
+const CACHE_NAME = 'sputnikship-shell-v2';
 const SHELL_FILES = [
   '/',
   '/index.html',

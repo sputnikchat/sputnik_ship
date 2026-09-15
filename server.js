@@ -38,6 +38,6 @@ app.get('*', (req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`ShipTrack corriendo en http://localhost:${PORT}`);
+  console.log(`Sputnik Ship corriendo en http://localhost:${PORT}`);
   startScheduler();
 });

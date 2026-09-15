@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>ShipTrack — Contactos y envíos</title>
-<meta name="theme-color" content="#2563eb" />
+<title>Sputnik Ship — Contactos y envíos</title>
+<meta name="theme-color" content="#cfff52" />
 <link rel="manifest" href="/manifest.json" />
 <link rel="icon" href="/icons/icon-192.png" />
 <link rel="apple-touch-icon" href="/icons/icon-192.png" />
@@ -19,8 +19,8 @@
 <div id="auth-screen" class="auth-screen">
   <div class="auth-card">
     <div class="brand">
-      <div class="brand-badge">ST</div>
-      <h1>ShipTrack</h1>
+      <div class="brand-badge">🚀</div>
+      <h1>Sputnik Ship</h1>
     </div>
     <p class="muted">Contactos y seguimiento de envíos en un solo lugar.</p>
 
@@ -62,8 +62,8 @@
 <div id="app" class="app" hidden>
   <header class="topbar">
     <div class="brand-mini">
-      <div class="brand-badge">ST</div>
-      <span>ShipTrack</span>
+      <div class="brand-badge">🚀</div>
+      <span>Sputnik Ship</span>
     </div>
     <div class="topbar-actions">
       <button id="notif-btn" class="icon-btn" title="Notificaciones">
@@ -83,12 +83,17 @@
 
     <!-- Vista: Envíos -->
     <section id="view-shipments" class="view active">
+      <div class="greeting-row">
+        <div class="greeting">
+          <h1 id="greeting-title">Hola</h1>
+          <p id="greeting-sub">Se actualizan automáticamente cada 30 minutos.</p>
+        </div>
+        <div class="stat-pill">🚚 <span class="stat-pill-num" id="active-shipments-count">0</span> en curso</div>
+      </div>
       <div class="view-header">
-        <h2>Envíos</h2>
+        <button id="refresh-now-btn" class="btn-secondary small">Actualizar ahora</button>
         <button id="add-shipment-btn" class="btn-primary small">+ Nuevo envío</button>
       </div>
-      <p class="muted small" id="refresh-info">Se actualizan automáticamente cada 30 minutos.</p>
-      <button id="refresh-now-btn" class="btn-secondary small">Actualizar ahora</button>
       <div id="shipments-list" class="cards"></div>
     </section>
 
@@ -97,8 +102,8 @@
       <div class="view-header">
         <button class="btn-secondary small" id="back-to-shipments">← Volver</button>
       </div>
-      <div id="shipment-detail-body"></div>
       <div id="map" class="map"></div>
+      <div id="shipment-detail-body" class="shipment-hero"></div>
       <div id="checkpoints-list" class="checkpoints"></div>
     </section>
 

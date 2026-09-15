@@ -1,5 +1,5 @@
 {
-  "name": "shiptrack",
+  "name": "sputnik-ship",
   "version": "1.0.0",
   "description": "App para guardar contactos y hacer seguimiento de envios (FedEx, UPS, DHL, USPS) con actualizaciones automaticas, notificaciones y mapa de rutas.",
   "main": "server.js",
