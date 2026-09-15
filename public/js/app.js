@@ -273,8 +273,8 @@
   function renderGreeting() {
     const hour = new Date().getHours();
     const saludo = hour < 12 ? 'Buenos días' : hour < 20 ? 'Buenas tardes' : 'Buenas noches';
-    const firstName = (state.user?.name || '').split(' ')[0] || '';
-    $('#greeting-title').textContent = firstName ? `${saludo}, ${firstName}` : saludo;
+    const handle = state.user?.handle || '';
+    $('#greeting-title').textContent = handle ? `${saludo}, @${handle}` : saludo;
 
     const active = state.shipments.filter((s) => s.status !== 'delivered').length;
     $('#active-shipments-count').textContent = active;

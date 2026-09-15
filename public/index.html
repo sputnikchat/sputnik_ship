@@ -30,8 +30,11 @@
     </div>
 
     <form id="login-form" class="auth-form">
-      <label>Email
-        <input type="email" name="email" required autocomplete="username" />
+      <label>Usuario
+        <div class="handle-input">
+          <span>@</span>
+          <input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="tuusuario" />
+        </div>
       </label>
       <label>Contraseña
         <input type="password" name="password" required autocomplete="current-password" />
@@ -41,11 +44,11 @@
     </form>
 
     <form id="signup-form" class="auth-form" hidden>
-      <label>Nombre
-        <input type="text" name="name" required autocomplete="name" />
-      </label>
-      <label>Email
-        <input type="email" name="email" required autocomplete="username" />
+      <label>Usuario
+        <div class="handle-input">
+          <span>@</span>
+          <input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="tuusuario" />
+        </div>
       </label>
       <label>Contraseña
         <input type="password" name="password" required minlength="6" autocomplete="new-password" />
@@ -54,7 +57,7 @@
       <p class="error" id="signup-error" hidden></p>
     </form>
 
-    <p class="hint">Acceso simple con email y contraseña — sin verificación de identidad (KYC).</p>
+    <p class="hint">Acceso simple con usuario y contraseña — sin nombre real, sin email, sin verificación de identidad (KYC).</p>
   </div>
 </div>
 
