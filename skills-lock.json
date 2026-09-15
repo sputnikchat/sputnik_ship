@@ -19,6 +19,12 @@
       "skillPath": "skills/animation-vocabulary/SKILL.md",
       "computedHash": "5b01e1685a00d4776e62f334b265ba6405850869de3a230b17d9079dcaaf1df6"
     },
+    "app-store-screenshots": {
+      "source": "qu-skills/superpowers",
+      "sourceType": "github",
+      "skillPath": "guides/design/app-store-screenshots/SKILL.md",
+      "computedHash": "528a965bb79118a30c52f82c781cc45b4c27b7cfb9e37fa300c1a4f086cfcd1c"
+    },
     "apple-design": {
       "source": "emilkowalski/skills",
       "sourceType": "github",
@@ -30,6 +36,12 @@
       "sourceType": "github",
       "skillPath": "skills/ask-sonner/SKILL.md",
       "computedHash": "f2217bacea44863b74d31c5458ccc0f05d418a1d2360e25d8efab2cdd09ffb02"
+    },
+    "bencium-controlled-ux-designer": {
+      "source": "bencium/bencium-marketplace",
+      "sourceType": "github",
+      "skillPath": "bencium-controlled-ux-designer/skills/bencium-controlled-ux-designer/SKILL.md",
+      "computedHash": "4aacbb29e05d9e45600105fbdcb24b38fa7de40d29db025f05a1b121308afc5c"
     },
     "emil-design-eng": {
       "source": "emilkowalski/skills",
@@ -54,6 +66,12 @@
       "sourceType": "github",
       "skillPath": "skills/improve-animations/SKILL.md",
       "computedHash": "e197b2b2f576e9c7bb205694d3001242eb1846ba1bb8113bf17d6d38367abe76"
+    },
+    "magicpath": {
+      "source": "magicpathai/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/magicpath/SKILL.md",
+      "computedHash": "195d63c0373104676de40485b020e5a8f9aae8443f78a7c59f433281bbbad0dc"
     },
     "mobile-native": {
       "source": "emilkowalski/skills",
@@ -84,6 +102,18 @@
       "sourceType": "github",
       "skillPath": "productivity/skills/task-management/SKILL.md",
       "computedHash": "a1f9389c1f06bb9c630001875e0801eb209b08818ba217f0114bc62d149eb056"
+    },
+    "transitions-polish": {
+      "source": "jakubantalik/transitions.dev",
+      "sourceType": "github",
+      "skillPath": "skills/transitions-polish/SKILL.md",
+      "computedHash": "95aec18ac2c9fb2c545c2bf2e7419a8001b8e7f1fb640cdb89db0a543548d27f"
+    },
+    "web-artifacts-builder": {
+      "source": "nexu-io/open-design",
+      "sourceType": "github",
+      "skillPath": "skills/web-artifacts-builder/SKILL.md",
+      "computedHash": "9c1efa5aa784bfdf0a8c747bebf955bfafed73a8fcdf90a790d56840574da38e"
     },
     "write-swift": {
       "source": "emilkowalski/skills",
