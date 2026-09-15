@@ -95,45 +95,137 @@ function mockTrackingUpdate(carrier, trackingNumber, shipment) {
 }
 
 // ---------------------------------------------------------------------
-// MODO LIVE: stubs listos para completar con las APIs reales.
-// Todas devuelven una promesa con la MISMA forma que mockTrackingUpdate,
-// para que el resto de la app no tenga que cambiar nada.
+// MODO LIVE: en vez de integrar cada courier por separado (4 flujos de
+// OAuth distintos), usamos 17TRACK (https://api.17track.net) como
+// agregador: una sola API key cubre FedEx/UPS/DHL/USPS y +3400 couriers
+// mas, detectando el carrier automaticamente por el formato del numero.
+//
+// Flujo (documentado en https://api.17track.net/en/doc?version=v2.4):
+//   1) POST /track/v2.4/register  - una vez por numero de tracking
+//   2) POST /track/v2.4/gettrackinfo - en cada refresh, trae el estado actual
+//
+// Los couriers reales solo dan el nombre del lugar ("Memphis, TN, US"),
+// no coordenadas: geocodificamos cada checkpoint con Nominatim
+// (services/geocode.js) para poder seguir dibujando la ruta en el mapa.
+//
+// Nota: el schema exacto de la respuesta de 17TRACK no se pudo verificar
+// contra una llamada real (hace falta tu API key para eso). El parseo de
+// abajo es defensivo -a propósito- para no romper la app si algun campo
+// viene con otro nombre; si algo no calza probalo con TRACKING_MODE=live
+// y ajustá `parseTrack17Response()` mirando la respuesta real en los logs.
 // ---------------------------------------------------------------------
-const liveProviders = {
-  async fedex(trackingNumber /*, shipment */) {
-    // Docs: https://developer.fedex.com/api/en-us/catalog/track/v1.html
-    // Flujo tipico:
-    //   1) POST /oauth/token con FEDEX_CLIENT_ID / FEDEX_CLIENT_SECRET -> access_token
-    //   2) POST /track/v1/trackingnumbers con el trackingNumber y el access_token
-    //   3) Mapear la respuesta (scanEvents, ubicaciones, status) a la forma de arriba
-    throw new Error(
-      'Integracion real de FedEx no configurada todavia. Completa services/carrierProviders.js -> liveProviders.fedex()'
-    );
-  },
-  async ups(trackingNumber /*, shipment */) {
-    // Docs: https://developer.ups.com/api/reference?loc=en_US#tag/Track
-    // Flujo tipico: OAuth2 client_credentials con UPS_CLIENT_ID/SECRET,
-    // luego GET /api/track/v1/details/{trackingNumber}
-    throw new Error(
-      'Integracion real de UPS no configurada todavia. Completa services/carrierProviders.js -> liveProviders.ups()'
-    );
-  },
-  async dhl(trackingNumber /*, shipment */) {
-    // Docs: https://developer.dhl.com/api-reference/shipment-tracking
-    // Flujo tipico: GET https://api-eu.dhl.com/track/shipments?trackingNumber=...
-    // con el header DHL-API-Key: DHL_API_KEY
-    throw new Error(
-      'Integracion real de DHL no configurada todavia. Completa services/carrierProviders.js -> liveProviders.dhl()'
-    );
-  },
-  async usps(trackingNumber /*, shipment */) {
-    // Docs: https://www.usps.com/business/web-tools-apis/track-and-confirm-api.htm
-    // (USPS esta migrando a una API REST con OAuth2, revisar la doc actual)
-    throw new Error(
-      'Integracion real de USPS no configurada todavia. Completa services/carrierProviders.js -> liveProviders.usps()'
-    );
-  },
+const { geocodeLocation } = require('./geocode');
+
+const TRACK17_BASE = 'https://api.17track.net/track/v2.4';
+
+const TRACK17_STATUS_MAP = {
+  NotFound: 'label_created',
+  InfoReceived: 'label_created',
+  InTransit: 'in_transit',
+  Expired: 'exception',
+  AvailableForPickup: 'out_for_delivery',
+  OutForDelivery: 'out_for_delivery',
+  DeliveryFailure: 'exception',
+  Delivered: 'delivered',
+  Exception: 'exception',
 };
+
+async function track17Request(path, body) {
+  const apiKey = process.env.TRACK17_API_KEY;
+  if (!apiKey) {
+    throw new Error('Falta TRACK17_API_KEY en .env. Registrate en https://api.17track.net para conseguir una.');
+  }
+  const res = await fetch(`${TRACK17_BASE}/${path}`, {
+    method: 'POST',
+    headers: { '17token': apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(`17TRACK ${path} respondio ${res.status}: ${JSON.stringify(data).slice(0, 200)}`);
+  }
+  return data;
+}
+
+async function ensureRegistered(trackingNumber, shipment) {
+  if (shipment.track17Registered) return;
+  // No mandamos "carrier": 17TRACK autodetecta por el formato del numero,
+  // asi cubrimos FedEx/UPS/DHL/USPS (y el resto) con el mismo codigo.
+  await track17Request('register', [{ number: trackingNumber }]);
+}
+
+async function parseTrack17Response(data, trackingNumber) {
+  const entry =
+    data?.data?.accepted?.find((x) => x.number === trackingNumber) ||
+    data?.data?.accepted?.[0];
+  const trackInfo = entry?.track_info;
+  if (!trackInfo) {
+    // Todavia no hay datos (recien registrado, el courier no reporto nada aun).
+    return {
+      status: 'label_created',
+      statusLabel: STATUS_LABELS.label_created,
+      checkpointIndex: -1,
+      fullRoute: [],
+      checkpoints: [],
+      currentLocation: null,
+      estimatedDelivery: null,
+    };
+  }
+
+  const mainStatus = trackInfo.latest_status?.status || 'InfoReceived';
+  const status = TRACK17_STATUS_MAP[mainStatus] || 'in_transit';
+
+  const rawEvents = trackInfo.tracking?.providers?.[0]?.events || [];
+  const orderedEvents = [...rawEvents].reverse(); // 17TRACK los da mas nuevo -> mas viejo
+
+  const geocoded = [];
+  for (const ev of orderedEvents) {
+    const label = ev.description || ev.status_description || ev.location || 'Checkpoint';
+    const point = ev.location ? await geocodeLocation(ev.location) : null;
+    const timestamp = ev.time_iso || ev.time_utc || ev.time_raw?.date || new Date().toISOString();
+    geocoded.push({
+      label: ev.location ? `${label} · ${ev.location}` : label,
+      lat: point?.lat ?? null,
+      lng: point?.lng ?? null,
+      timestamp,
+    });
+  }
+
+  // El mapa necesita coordenadas: si alguna no se pudo geocodificar, la
+  // sacamos de la ruta (pero el checkpoint sigue listado en el timeline).
+  const fullRoute = geocoded.filter((p) => p.lat != null && p.lng != null);
+  const checkpoints = geocoded.map((p) => ({
+    label: p.label,
+    timestamp: p.timestamp,
+    status,
+  }));
+
+  return {
+    status,
+    statusLabel: STATUS_LABELS[status] || mainStatus,
+    checkpointIndex: fullRoute.length - 1,
+    fullRoute,
+    checkpoints,
+    currentLocation: fullRoute[fullRoute.length - 1] || null,
+    estimatedDelivery: trackInfo.time_metrics?.estimated_delivery_date?.from || null,
+    track17Registered: true,
+  };
+}
+
+const liveProviders = {
+  async fedex(trackingNumber, shipment) { return track17Provider(trackingNumber, shipment); },
+  async ups(trackingNumber, shipment) { return track17Provider(trackingNumber, shipment); },
+  async dhl(trackingNumber, shipment) { return track17Provider(trackingNumber, shipment); },
+  async usps(trackingNumber, shipment) { return track17Provider(trackingNumber, shipment); },
+};
+
+async function track17Provider(trackingNumber, shipment) {
+  await ensureRegistered(trackingNumber, shipment);
+  const data = await track17Request('gettrackinfo', [{ number: trackingNumber }]);
+  const result = await parseTrack17Response(data, trackingNumber);
+  result.track17Registered = true;
+  return result;
+}
 
 async function getTrackingUpdate(carrier, trackingNumber, shipment) {
   const mode = (process.env.TRACKING_MODE || 'mock').toLowerCase();

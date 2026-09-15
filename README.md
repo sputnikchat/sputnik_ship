@@ -55,19 +55,30 @@ sputnik-ship/
   public/                     Frontend (HTML/CSS/JS sin frameworks) + PWA (manifest, service worker)
 ```
 
-## Conectar las APIs reales de los couriers
+## Conectar tracking real (17TRACK)
 
-Cuando tengas cuenta de desarrollador en cada courier:
+En vez de crear una cuenta de developer separada en cada courier (FedEx, UPS,
+DHL, USPS — cada uno con su propio flujo de OAuth), la app usa
+[17TRACK](https://api.17track.net) como agregador: **una sola API key**
+cubre esos 4 y +3400 couriers más, detectando el carrier automáticamente
+por el formato del número.
 
-1. Completá las credenciales correspondientes en `.env` (ver `.env.example`):
-   - **FedEx**: `FEDEX_CLIENT_ID` / `FEDEX_CLIENT_SECRET` — [developer.fedex.com](https://developer.fedex.com/api/en-us/catalog/track/v1.html)
-   - **UPS**: `UPS_CLIENT_ID` / `UPS_CLIENT_SECRET` — [developer.ups.com](https://developer.ups.com/api/reference?loc=en_US#tag/Track)
-   - **DHL**: `DHL_API_KEY` — [developer.dhl.com](https://developer.dhl.com/api-reference/shipment-tracking)
-   - **USPS**: `USPS_USER_ID` — [usps.com/business/web-tools-apis](https://www.usps.com/business/web-tools-apis/track-and-confirm-api.htm)
-2. Abrí `services/carrierProviders.js` y completá las 4 funciones dentro de `liveProviders` (fedex, ups, dhl, usps). Cada una ya tiene comentado el flujo típico (OAuth2 + endpoint de tracking) y el link a la documentación oficial. Tienen que devolver el mismo formato de objeto que ya arma `mockTrackingUpdate` (status, statusLabel, checkpoints, fullRoute, currentLocation, estimatedDelivery).
-3. Cambiá `TRACKING_MODE=live` en `.env`.
+1. Registrate en [api.17track.net](https://api.17track.net) (plan gratis:
+   200 números de tracking de arranque).
+2. Pegá tu key en `.env`: `TRACK17_API_KEY=...`
+3. Cambiá `TRACKING_MODE=live` en `.env` y reiniciá el servidor.
 
-Importante: los couriers suelen pedir a **vos**, como negocio, datos de verificación para darte acceso a su API (esto es aparte de esta app — la app en sí no le pide ningún documento de identidad a quien la usa, solo email y contraseña).
+Los couriers reales solo informan el nombre del lugar de cada checkpoint
+("Memphis, TN, US"), no coordenadas — por eso, en modo `live`, la app
+geocodifica cada ubicación con Nominatim/OpenStreetMap (mismo proveedor que
+ya usa el mapa) para poder seguir dibujando la ruta. Eso agrega una demora
+chica la primera vez que aparece un lugar nuevo (después queda en caché).
+
+Nota técnica: el mapeo de la respuesta de 17TRACK en
+`services/carrierProviders.js` está escrito de forma defensiva porque no se
+pudo probar contra una llamada real sin una API key — si algún campo no
+coincide al activar `live`, revisá `parseTrack17Response()` ahí mismo
+mirando la respuesta real (se puede loguear temporalmente para inspeccionarla).
 
 ## Notificaciones por email (opcional)
 
