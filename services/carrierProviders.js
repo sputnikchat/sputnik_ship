@@ -116,8 +116,10 @@ const { geocodeLocation } = require('./geocode');
 
 const SHIP24_BASE = 'https://api.ship24.com/public/v1';
 
-// https://docs.ship24.com/status/#statusmilestone
+// Los 8 milestones oficiales (docs.ship24.com/status/#statusmilestone,
+// via el skill ship24-tracking-statuses instalado en este proyecto).
 const SHIP24_MILESTONE_MAP = {
+  pending: 'label_created',
   info_received: 'label_created',
   in_transit: 'in_transit',
   available_for_pickup: 'out_for_delivery',

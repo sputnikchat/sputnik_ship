@@ -391,6 +391,54 @@
       "skillPath": "skills/review-animations/SKILL.md",
       "computedHash": "ed81a8278c9cddd99f931b9026ecd17ba5fb9107adcf68a5197cb7d993b8f573"
     },
+    "ship24-couriers": {
+      "source": "ship24/ship24-ai-plugin",
+      "sourceType": "github",
+      "skillPath": "skills/ship24-couriers/SKILL.md",
+      "computedHash": "7dccf534b76b9b4777b10dad0b4903a1da8c918204aac342f67e1f75ab39657e"
+    },
+    "ship24-integration": {
+      "source": "ship24/ship24-ai-plugin",
+      "sourceType": "github",
+      "skillPath": "skills/ship24-integration/SKILL.md",
+      "computedHash": "4985ee36be2ba2a07eea89587e3a0549cee449889dc16f9b7d47a678abf80d59"
+    },
+    "ship24-node-sdk": {
+      "source": "ship24/ship24-ai-plugin",
+      "sourceType": "github",
+      "skillPath": "skills/ship24-node-sdk/SKILL.md",
+      "computedHash": "7e1fb78b02b67d3acaf783c4c60e01395b3e484315eead1ff1171b9476454b50"
+    },
+    "ship24-track": {
+      "source": "ship24/ship24-ai-plugin",
+      "sourceType": "github",
+      "skillPath": "skills/ship24-track/SKILL.md",
+      "computedHash": "d72ef9562571565a2fea60265313d094360f4bdaee2205fc083bd7824b01675e"
+    },
+    "ship24-tracking-statuses": {
+      "source": "ship24/ship24-ai-plugin",
+      "sourceType": "github",
+      "skillPath": "skills/ship24-tracking-statuses/SKILL.md",
+      "computedHash": "b8c4a485cd80ebbbd9a84fa442e00df7c54664564901b10bc2405899f8f5580d"
+    },
+    "ship24-troubleshooting": {
+      "source": "ship24/ship24-ai-plugin",
+      "sourceType": "github",
+      "skillPath": "skills/ship24-troubleshooting/SKILL.md",
+      "computedHash": "48fb27cca4cb6caf0c014b7b6ad921f69c920118d3df4bd57dcf016fe78d801d"
+    },
+    "ship24-webhook-test": {
+      "source": "ship24/ship24-ai-plugin",
+      "sourceType": "github",
+      "skillPath": "skills/ship24-webhook-test/SKILL.md",
+      "computedHash": "e9d8e585a805bcc0801aabeb1bc451359c129467224d71b7f25438d9fdee97c9"
+    },
+    "ship24-webhooks": {
+      "source": "ship24/ship24-ai-plugin",
+      "sourceType": "github",
+      "skillPath": "skills/ship24-webhooks/SKILL.md",
+      "computedHash": "2a957cf0718321e4774837633f0e18b1df83249a1cad1ea879e001aa352a39a7"
+    },
     "task-management": {
       "source": "anthropics/knowledge-work-plugins",
       "sourceType": "github",
