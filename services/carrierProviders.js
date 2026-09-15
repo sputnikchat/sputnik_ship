@@ -96,71 +96,58 @@ function mockTrackingUpdate(carrier, trackingNumber, shipment) {
 
 // ---------------------------------------------------------------------
 // MODO LIVE: en vez de integrar cada courier por separado (4 flujos de
-// OAuth distintos), usamos 17TRACK (https://api.17track.net) como
-// agregador: una sola API key cubre FedEx/UPS/DHL/USPS y +3400 couriers
-// mas, detectando el carrier automaticamente por el formato del numero.
+// OAuth distintos), usamos Ship24 (https://ship24.com) como agregador:
+// una sola API key cubre FedEx/UPS/DHL/USPS y +2500 couriers mas,
+// detectando el carrier automaticamente por el formato del numero.
 //
-// Flujo (documentado en https://api.17track.net/en/doc?version=v2.4):
-//   1) POST /track/v2.4/register  - una vez por numero de tracking
-//   2) POST /track/v2.4/gettrackinfo - en cada refresh, trae el estado actual
+// Flujo (documentado en https://docs.ship24.com, spec OpenAPI en
+// https://docs.ship24.com/assets/openapi/ship24-tracking-api.yaml):
+//   POST /public/v1/trackers/track  con { trackingNumber }
+//   Este endpoint es idempotente: crea el tracker la primera vez y
+//   despues siempre devuelve los resultados actuales - un solo llamado
+//   por refresh nos alcanza, sin pasos separados de registro/consulta.
 //
-// Los couriers reales solo dan el nombre del lugar ("Memphis, TN, US"),
-// no coordenadas: geocodificamos cada checkpoint con Nominatim
-// (services/geocode.js) para poder seguir dibujando la ruta en el mapa.
-//
-// Nota: el schema exacto de la respuesta de 17TRACK no se pudo verificar
-// contra una llamada real (hace falta tu API key para eso). El parseo de
-// abajo es defensivo -a propósito- para no romper la app si algun campo
-// viene con otro nombre; si algo no calza probalo con TRACKING_MODE=live
-// y ajustá `parseTrack17Response()` mirando la respuesta real en los logs.
+// Los couriers reales solo dan el nombre del lugar de cada evento
+// ("Memphis, TN, US"), no coordenadas: geocodificamos cada checkpoint
+// con Nominatim (services/geocode.js) para poder seguir dibujando la
+// ruta en el mapa.
 // ---------------------------------------------------------------------
 const { geocodeLocation } = require('./geocode');
 
-const TRACK17_BASE = 'https://api.17track.net/track/v2.4';
+const SHIP24_BASE = 'https://api.ship24.com/public/v1';
 
-const TRACK17_STATUS_MAP = {
-  NotFound: 'label_created',
-  InfoReceived: 'label_created',
-  InTransit: 'in_transit',
-  Expired: 'exception',
-  AvailableForPickup: 'out_for_delivery',
-  OutForDelivery: 'out_for_delivery',
-  DeliveryFailure: 'exception',
-  Delivered: 'delivered',
-  Exception: 'exception',
+// https://docs.ship24.com/status/#statusmilestone
+const SHIP24_MILESTONE_MAP = {
+  info_received: 'label_created',
+  in_transit: 'in_transit',
+  available_for_pickup: 'out_for_delivery',
+  out_for_delivery: 'out_for_delivery',
+  delivered: 'delivered',
+  failed_attempt: 'exception',
+  exception: 'exception',
 };
 
-async function track17Request(path, body) {
-  const apiKey = process.env.TRACK17_API_KEY;
+async function ship24Track(trackingNumber) {
+  const apiKey = process.env.SHIP24_API_KEY;
   if (!apiKey) {
-    throw new Error('Falta TRACK17_API_KEY en .env. Registrate en https://api.17track.net para conseguir una.');
+    throw new Error('Falta SHIP24_API_KEY en .env. Registrate en https://www.ship24.com/tracking-api para conseguir una.');
   }
-  const res = await fetch(`${TRACK17_BASE}/${path}`, {
+  const res = await fetch(`${SHIP24_BASE}/trackers/track`, {
     method: 'POST',
-    headers: { '17token': apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json; charset=utf-8' },
+    body: JSON.stringify({ trackingNumber }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(`17TRACK ${path} respondio ${res.status}: ${JSON.stringify(data).slice(0, 200)}`);
+    throw new Error(`Ship24 respondio ${res.status}: ${JSON.stringify(data).slice(0, 200)}`);
   }
   return data;
 }
 
-async function ensureRegistered(trackingNumber, shipment) {
-  if (shipment.track17Registered) return;
-  // No mandamos "carrier": 17TRACK autodetecta por el formato del numero,
-  // asi cubrimos FedEx/UPS/DHL/USPS (y el resto) con el mismo codigo.
-  await track17Request('register', [{ number: trackingNumber }]);
-}
-
-async function parseTrack17Response(data, trackingNumber) {
-  const entry =
-    data?.data?.accepted?.find((x) => x.number === trackingNumber) ||
-    data?.data?.accepted?.[0];
-  const trackInfo = entry?.track_info;
-  if (!trackInfo) {
-    // Todavia no hay datos (recien registrado, el courier no reporto nada aun).
+async function parseShip24Response(data) {
+  const tracking = data?.data?.trackings?.[0];
+  if (!tracking) {
+    // Recien creado, el courier todavia no reporto nada.
     return {
       status: 'label_created',
       statusLabel: STATUS_LABELS.label_created,
@@ -172,22 +159,23 @@ async function parseTrack17Response(data, trackingNumber) {
     };
   }
 
-  const mainStatus = trackInfo.latest_status?.status || 'InfoReceived';
-  const status = TRACK17_STATUS_MAP[mainStatus] || 'in_transit';
+  const milestone = tracking.shipment?.statusMilestone || 'info_received';
+  const status = SHIP24_MILESTONE_MAP[milestone] || 'in_transit';
 
-  const rawEvents = trackInfo.tracking?.providers?.[0]?.events || [];
-  const orderedEvents = [...rawEvents].reverse(); // 17TRACK los da mas nuevo -> mas viejo
+  const rawEvents = tracking.events || [];
+  const orderedEvents = [...rawEvents].sort(
+    (a, b) => new Date(a.occurrenceDatetime) - new Date(b.occurrenceDatetime)
+  );
 
   const geocoded = [];
   for (const ev of orderedEvents) {
-    const label = ev.description || ev.status_description || ev.location || 'Checkpoint';
+    const label = ev.status || ev.location || 'Checkpoint';
     const point = ev.location ? await geocodeLocation(ev.location) : null;
-    const timestamp = ev.time_iso || ev.time_utc || ev.time_raw?.date || new Date().toISOString();
     geocoded.push({
       label: ev.location ? `${label} · ${ev.location}` : label,
       lat: point?.lat ?? null,
       lng: point?.lng ?? null,
-      timestamp,
+      timestamp: ev.occurrenceDatetime || new Date().toISOString(),
     });
   }
 
@@ -200,32 +188,33 @@ async function parseTrack17Response(data, trackingNumber) {
     status,
   }));
 
+  const estimatedDelivery =
+    tracking.shipment?.delivery?.estimatedDeliveryDate ||
+    tracking.shipment?.delivery?.courierEstimatedDeliveryDate?.from ||
+    null;
+
   return {
     status,
-    statusLabel: STATUS_LABELS[status] || mainStatus,
+    statusLabel: STATUS_LABELS[status] || milestone,
     checkpointIndex: fullRoute.length - 1,
     fullRoute,
     checkpoints,
     currentLocation: fullRoute[fullRoute.length - 1] || null,
-    estimatedDelivery: trackInfo.time_metrics?.estimated_delivery_date?.from || null,
-    track17Registered: true,
+    estimatedDelivery,
   };
 }
 
-const liveProviders = {
-  async fedex(trackingNumber, shipment) { return track17Provider(trackingNumber, shipment); },
-  async ups(trackingNumber, shipment) { return track17Provider(trackingNumber, shipment); },
-  async dhl(trackingNumber, shipment) { return track17Provider(trackingNumber, shipment); },
-  async usps(trackingNumber, shipment) { return track17Provider(trackingNumber, shipment); },
-};
-
-async function track17Provider(trackingNumber, shipment) {
-  await ensureRegistered(trackingNumber, shipment);
-  const data = await track17Request('gettrackinfo', [{ number: trackingNumber }]);
-  const result = await parseTrack17Response(data, trackingNumber);
-  result.track17Registered = true;
-  return result;
+async function ship24Provider(trackingNumber) {
+  const data = await ship24Track(trackingNumber);
+  return parseShip24Response(data);
 }
+
+const liveProviders = {
+  async fedex(trackingNumber) { return ship24Provider(trackingNumber); },
+  async ups(trackingNumber) { return ship24Provider(trackingNumber); },
+  async dhl(trackingNumber) { return ship24Provider(trackingNumber); },
+  async usps(trackingNumber) { return ship24Provider(trackingNumber); },
+};
 
 async function getTrackingUpdate(carrier, trackingNumber, shipment) {
   const mode = (process.env.TRACKING_MODE || 'mock').toLowerCase();

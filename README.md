@@ -55,17 +55,17 @@ sputnik-ship/
   public/                     Frontend (HTML/CSS/JS sin frameworks) + PWA (manifest, service worker)
 ```
 
-## Conectar tracking real (17TRACK)
+## Conectar tracking real (Ship24)
 
 En vez de crear una cuenta de developer separada en cada courier (FedEx, UPS,
 DHL, USPS — cada uno con su propio flujo de OAuth), la app usa
-[17TRACK](https://api.17track.net) como agregador: **una sola API key**
-cubre esos 4 y +3400 couriers más, detectando el carrier automáticamente
-por el formato del número.
+[Ship24](https://www.ship24.com/tracking-api) como agregador: **una sola
+API key** cubre esos 4 y +2500 couriers más, detectando el carrier
+automáticamente por el formato del número.
 
-1. Registrate en [api.17track.net](https://api.17track.net) (plan gratis:
-   200 números de tracking de arranque).
-2. Pegá tu key en `.env`: `TRACK17_API_KEY=...`
+1. Registrate en [ship24.com/tracking-api](https://www.ship24.com/tracking-api)
+   (plan gratis: 10 envíos/mes, con bonus de 100 el primer mes).
+2. Pegá tu key en `.env`: `SHIP24_API_KEY=...`
 3. Cambiá `TRACKING_MODE=live` en `.env` y reiniciá el servidor.
 
 Los couriers reales solo informan el nombre del lugar de cada checkpoint
@@ -74,11 +74,11 @@ geocodifica cada ubicación con Nominatim/OpenStreetMap (mismo proveedor que
 ya usa el mapa) para poder seguir dibujando la ruta. Eso agrega una demora
 chica la primera vez que aparece un lugar nuevo (después queda en caché).
 
-Nota técnica: el mapeo de la respuesta de 17TRACK en
-`services/carrierProviders.js` está escrito de forma defensiva porque no se
-pudo probar contra una llamada real sin una API key — si algún campo no
-coincide al activar `live`, revisá `parseTrack17Response()` ahí mismo
-mirando la respuesta real (se puede loguear temporalmente para inspeccionarla).
+La integración está escrita contra la especificación oficial de Ship24
+([OpenAPI](https://docs.ship24.com/assets/openapi/ship24-tracking-api.yaml)),
+así que los nombres de campo en `parseShip24Response()`
+(`services/carrierProviders.js`) deberían coincidir con la respuesta real —
+igual conviene probarlo una vez que actives `live` con tu key.
 
 ## Notificaciones por email (opcional)
 
