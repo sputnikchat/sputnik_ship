@@ -1,0 +1,362 @@
+<title>Sputnik Ship Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Manrope:wght@500;600;700;800&family=Sora:wght@600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --page-bg:#f1efe9;
+    --page-ink:#1a1a17;
+    --page-muted:#7a7669;
+    --page-line:#ddd8cc;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --page-bg:#151412;
+      --page-ink:#f1efe6;
+      --page-muted:#9a968a;
+      --page-line:#2e2b25;
+    }
+  }
+  :root[data-theme="dark"]{
+    --page-bg:#151412;
+    --page-ink:#f1efe6;
+    --page-muted:#9a968a;
+    --page-line:#2e2b25;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--page-bg);
+    color:var(--page-ink);
+    font-family:"Manrope",-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  .wrap{ max-width:1220px; margin:0 auto; padding:48px 20px 80px; }
+
+  .head{ text-align:center; margin-bottom:48px; }
+  .eyebrow{
+    font-family:"Space Mono",monospace; font-size:0.72rem; letter-spacing:0.16em;
+    text-transform:uppercase; color:var(--page-muted); margin:0 0 10px;
+  }
+  h1.title{ font-size:clamp(1.8rem,4.5vw,2.6rem); font-weight:700; margin:0 0 10px; text-wrap:balance; }
+  .head p{ color:var(--page-muted); max-width:52ch; margin:0 auto; line-height:1.55; }
+
+  .row{
+    display:flex; flex-wrap:wrap; justify-content:center; gap:40px;
+    align-items:flex-start;
+  }
+  figure.col{ margin:0; display:flex; flex-direction:column; align-items:center; width:250px; }
+  .label{
+    margin-bottom:14px; text-align:center;
+  }
+  .label .letter{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:28px; height:28px; border-radius:50%; background:var(--page-ink); color:var(--page-bg);
+    font-family:"Space Mono",monospace; font-weight:700; font-size:0.85rem; margin-bottom:8px;
+  }
+  .label h2{ font-size:1rem; margin:0 0 3px; font-weight:700; }
+  .label p{ font-size:0.78rem; color:var(--page-muted); margin:0; max-width:220px; }
+
+  .phone{
+    width:246px; height:520px; background:#000; border-radius:38px; padding:8px;
+    box-shadow:0 24px 50px rgba(0,0,0,0.28);
+  }
+  .notch{
+    width:80px; height:18px; background:#000; border-radius:0 0 12px 12px;
+    margin:0 auto; position:relative; z-index:5;
+  }
+  .screen{
+    width:100%; height:100%; margin-top:-18px; border-radius:30px; overflow:hidden;
+    display:flex; flex-direction:column; position:relative; font-size:11px;
+  }
+
+  /* ============ shared component classes, themed via CSS vars set per .screen ============ */
+  .screen{
+    background:var(--bg); color:var(--ink); font-family:var(--body-font);
+  }
+  .statusbar{ display:flex; justify-content:space-between; padding:26px 16px 4px; font-size:10px; font-weight:700; }
+  .topbar{ display:flex; justify-content:space-between; align-items:center; padding:6px 14px 10px; }
+  .brand{ display:flex; align-items:center; gap:6px; font-family:var(--display-font); font-weight:700; font-size:11px; }
+  .brand .sq{ width:18px; height:18px; border-radius:6px; background:var(--accent); }
+  .topbar .icons{ display:flex; gap:6px; }
+  .topbar .icons span{
+    width:20px; height:20px; border-radius:7px; background:var(--surface-2);
+    display:flex; align-items:center; justify-content:center; font-size:9px; color:var(--muted);
+  }
+  .content{ flex:1; padding:12px 14px; overflow:hidden; }
+  .greet h1{
+    font-family:var(--display-font); font-weight:700; font-size:15px; margin:0 0 2px; color:var(--ink);
+  }
+  .greet p{ margin:0; color:var(--muted); font-size:9px; }
+  .greet-row{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; gap:8px; }
+  .stat{
+    flex-shrink:0; background:var(--surface); border:1px solid var(--line); border-radius:999px;
+    padding:4px 10px; font-size:8px; font-weight:700; color:var(--ink); white-space:nowrap;
+  }
+  .stat b{ color:var(--accent-strong); font-family:var(--display-font); }
+  .actions{ display:flex; gap:6px; margin-bottom:8px; }
+  .btn{ border:none; border-radius:999px; padding:5px 10px; font-size:8.5px; font-weight:700; }
+  .btn-primary{ background:var(--accent); color:var(--accent-ink); }
+  .btn-ghost{ background:var(--surface-2); color:var(--ink); border:1px solid var(--line); }
+  .search{
+    width:100%; padding:6px 10px; margin-bottom:8px; border-radius:999px; font-size:8.5px;
+    background:var(--surface-2); border:1px solid var(--line); color:var(--muted);
+  }
+  .card{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--card-radius);
+    padding:10px; margin-bottom:7px; box-shadow:var(--card-shadow);
+  }
+  .card-row{ display:flex; justify-content:space-between; align-items:flex-start; gap:6px; }
+  .card-title{ font-weight:700; margin:0 0 2px; font-size:10px; color:var(--ink); }
+  .card-sub{ color:var(--muted); font-size:8px; margin:0; }
+  .chip{
+    font-size:7px; font-weight:800; padding:2px 7px; border-radius:999px;
+    background:var(--surface-2); border:1px solid var(--line); color:var(--muted); flex-shrink:0;
+  }
+  .pill{
+    display:inline-block; margin-top:6px; padding:3px 9px; border-radius:999px; font-size:7.5px; font-weight:700;
+  }
+  .pill-delivered{ background:var(--accent); color:var(--accent-ink); }
+  .pill-transit{ background:var(--accent-2); color:var(--accent-2-ink); }
+  .pill-neutral{ background:var(--surface-2); color:var(--muted); border:1px solid var(--line); }
+  .foot{ margin-top:5px; color:var(--muted); font-size:7px; }
+  .navbar{ display:flex; gap:4px; padding:8px 10px 12px; border-top:1px solid var(--line); }
+  .nav-item{ flex:1; text-align:center; border-radius:999px; padding:5px 2px; font-size:11px; }
+  .nav-item span{ display:block; font-size:6.5px; font-weight:700; margin-top:1px; }
+  .nav-item.active{ background:var(--accent); color:var(--accent-ink); }
+  .nav-item:not(.active){ color:var(--muted); }
+
+  /* ---------- A: Daylight ---------- */
+  .v-daylight{
+    --bg:#f7f7f2; --surface:#ffffff; --surface-2:#eceae1; --line:#e2ded2;
+    --ink:#15140f; --muted:#726c5c; --accent:#0f6b5c; --accent-ink:#ffffff; --accent-strong:#0f6b5c;
+    --accent-2:#dfe7de; --accent-2-ink:#22452f;
+    --display-font:"Fraunces","Georgia",serif; --body-font:"Manrope",-apple-system,sans-serif;
+    --card-radius:14px; --card-shadow:0 4px 14px rgba(20,20,10,0.06);
+  }
+
+  /* ---------- B: Nightwatch ---------- */
+  .v-nightwatch{
+    --bg:#0a0f1c; --surface:rgba(255,255,255,0.055); --surface-2:rgba(255,255,255,0.09);
+    --line:rgba(255,255,255,0.1);
+    --ink:#eef2f9; --muted:#8b96ac; --accent:#5eead4; --accent-ink:#04231d; --accent-strong:#5eead4;
+    --accent-2:rgba(94,234,212,0.18); --accent-2-ink:#5eead4;
+    --display-font:"Manrope",-apple-system,sans-serif; --body-font:"Manrope",-apple-system,sans-serif;
+    --card-radius:16px; --card-shadow:0 10px 26px rgba(0,0,0,0.35);
+  }
+  .v-nightwatch .card{ backdrop-filter:blur(6px); }
+
+  /* ---------- C: Cargo Bright ---------- */
+  .v-cargo{
+    --bg:#ff6b45; --surface:#201b16; --surface-2:#2b241d; --line:#3a3128;
+    --ink:#f6f1e8; --muted:#b6ac9c; --accent:#ffd23f; --accent-ink:#241a02; --accent-strong:#ffe27a;
+    --accent-2:#3a3128; --accent-2-ink:#ffd23f;
+    --display-font:"Sora",-apple-system,sans-serif; --body-font:"Sora",-apple-system,sans-serif;
+    --card-radius:18px; --card-shadow:0 10px 24px rgba(0,0,0,0.28);
+  }
+  .v-cargo .greet h1, .v-cargo .stat{ color:#241a02; }
+  .v-cargo .greet-row .stat{ background:#241a02; color:#ffd23f; border-color:#241a02; }
+  .v-cargo .greet-row .stat b{ color:#ffd23f; }
+  .v-cargo > .topbar .brand{ color:#241a02; }
+  .v-cargo > .topbar .icons span{ background:rgba(36,26,2,0.12); color:#241a02; }
+  .v-cargo > .statusbar{ color:#241a02; }
+  .v-cargo .greet p{ color:rgba(36,26,2,0.65); }
+
+  footer.note{
+    max-width:520px; margin:56px auto 0; text-align:center; color:var(--page-muted);
+    font-size:0.82rem; line-height:1.6;
+  }
+</style>
+
+<div class="wrap">
+  <div class="head">
+    <p class="eyebrow">Sputnik Ship &middot; 3 direcciones, misma pantalla</p>
+    <h1 class="title">¿Cuál te gusta?</h1>
+    <p>Misma pantalla de Envíos, mismos datos reales — solo cambia paleta, tipografía y tratamiento de las tarjetas. Elegí una letra y seguimos con esa.</p>
+  </div>
+
+  <div class="row">
+
+    <!-- A -->
+    <figure class="col">
+      <div class="label">
+        <span class="letter">A</span>
+        <h2>Daylight</h2>
+        <p>Claro, editorial, serif con carácter — confianza tipo estudio de diseño.</p>
+      </div>
+      <div class="phone v-daylight">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="statusbar"><span>9:41</span><span>🔋</span></div>
+          <div class="topbar">
+            <div class="brand"><div class="sq"></div>Sputnik Ship</div>
+            <div class="icons"><span>🔔</span><span>C</span></div>
+          </div>
+          <div class="content">
+            <div class="greet-row">
+              <div class="greet">
+                <h1>Buenos días, @chef</h1>
+                <p>Tenés 4 envíos en camino.</p>
+              </div>
+              <div class="stat">🚚 <b>4</b> en curso</div>
+            </div>
+            <div class="actions">
+              <button class="btn btn-ghost">Actualizar</button>
+              <button class="btn btn-primary">+ Nuevo envío</button>
+            </div>
+            <input class="search" placeholder="Buscar…" disabled>
+            <div class="card">
+              <div class="card-row">
+                <div><p class="card-title">Muestras de tela</p><p class="card-sub">Marina Costa</p></div>
+                <span class="chip">FedEx</span>
+              </div>
+              <span class="pill pill-transit">En reparto</span>
+            </div>
+            <div class="card">
+              <div class="card-row">
+                <div><p class="card-title">Componentes electrónicos</p><p class="card-sub">Lucas Ferreira</p></div>
+                <span class="chip">UPS</span>
+              </div>
+              <span class="pill pill-transit">En tránsito</span>
+            </div>
+            <div class="card">
+              <div class="card-row">
+                <div><p class="card-title">Ingredientes especiales</p><p class="card-sub">DHL</p></div>
+                <span class="chip">DHL</span>
+              </div>
+              <span class="pill pill-delivered">Entregado</span>
+            </div>
+          </div>
+          <div class="navbar">
+            <div class="nav-item active">📦<span>Envíos</span></div>
+            <div class="nav-item">👤<span>Contactos</span></div>
+            <div class="nav-item">🔔<span>Avisos</span></div>
+          </div>
+        </div>
+      </div>
+    </figure>
+
+    <!-- B -->
+    <figure class="col">
+      <div class="label">
+        <span class="letter">B</span>
+        <h2>Nightwatch</h2>
+        <p>Azul noche profundo, vidrio esmerilado, menta — premium tipo fintech/seguros.</p>
+      </div>
+      <div class="phone v-nightwatch">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="statusbar"><span>9:41</span><span>🔋</span></div>
+          <div class="topbar">
+            <div class="brand"><div class="sq"></div>Sputnik Ship</div>
+            <div class="icons"><span>🔔</span><span>C</span></div>
+          </div>
+          <div class="content">
+            <div class="greet-row">
+              <div class="greet">
+                <h1>Buenos días, @chef</h1>
+                <p>Tenés 4 envíos en camino.</p>
+              </div>
+              <div class="stat">🚚 <b>4</b> en curso</div>
+            </div>
+            <div class="actions">
+              <button class="btn btn-ghost">Actualizar</button>
+              <button class="btn btn-primary">+ Nuevo envío</button>
+            </div>
+            <input class="search" placeholder="Buscar…" disabled>
+            <div class="card">
+              <div class="card-row">
+                <div><p class="card-title">Muestras de tela</p><p class="card-sub">Marina Costa</p></div>
+                <span class="chip">FedEx</span>
+              </div>
+              <span class="pill pill-transit">En reparto</span>
+            </div>
+            <div class="card">
+              <div class="card-row">
+                <div><p class="card-title">Componentes electrónicos</p><p class="card-sub">Lucas Ferreira</p></div>
+                <span class="chip">UPS</span>
+              </div>
+              <span class="pill pill-transit">En tránsito</span>
+            </div>
+            <div class="card">
+              <div class="card-row">
+                <div><p class="card-title">Ingredientes especiales</p><p class="card-sub">DHL</p></div>
+                <span class="chip">DHL</span>
+              </div>
+              <span class="pill pill-delivered">Entregado</span>
+            </div>
+          </div>
+          <div class="navbar">
+            <div class="nav-item active">📦<span>Envíos</span></div>
+            <div class="nav-item">👤<span>Contactos</span></div>
+            <div class="nav-item">🔔<span>Avisos</span></div>
+          </div>
+        </div>
+      </div>
+    </figure>
+
+    <!-- C -->
+    <figure class="col">
+      <div class="label">
+        <span class="letter">C</span>
+        <h2>Cargo Bright</h2>
+        <p>Naranja vívido + tarjetas oscuras — enérgico, amigable, con carácter.</p>
+      </div>
+      <div class="phone v-cargo">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="statusbar"><span>9:41</span><span>🔋</span></div>
+          <div class="topbar">
+            <div class="brand"><div class="sq"></div>Sputnik Ship</div>
+            <div class="icons"><span>🔔</span><span>C</span></div>
+          </div>
+          <div class="content">
+            <div class="greet-row">
+              <div class="greet">
+                <h1>Buenos días, @chef</h1>
+                <p>Tenés 4 envíos en camino.</p>
+              </div>
+              <div class="stat">🚚 <b>4</b> en curso</div>
+            </div>
+            <div class="actions">
+              <button class="btn btn-ghost">Actualizar</button>
+              <button class="btn btn-primary">+ Nuevo envío</button>
+            </div>
+            <input class="search" placeholder="Buscar…" disabled>
+            <div class="card">
+              <div class="card-row">
+                <div><p class="card-title">Muestras de tela</p><p class="card-sub">Marina Costa</p></div>
+                <span class="chip">FedEx</span>
+              </div>
+              <span class="pill pill-transit">En reparto</span>
+            </div>
+            <div class="card">
+              <div class="card-row">
+                <div><p class="card-title">Componentes electrónicos</p><p class="card-sub">Lucas Ferreira</p></div>
+                <span class="chip">UPS</span>
+              </div>
+              <span class="pill pill-transit">En tránsito</span>
+            </div>
+            <div class="card">
+              <div class="card-row">
+                <div><p class="card-title">Ingredientes especiales</p><p class="card-sub">DHL</p></div>
+                <span class="chip">DHL</span>
+              </div>
+              <span class="pill pill-delivered">Entregado</span>
+            </div>
+          </div>
+          <div class="navbar">
+            <div class="nav-item active">📦<span>Envíos</span></div>
+            <div class="nav-item">👤<span>Contactos</span></div>
+            <div class="nav-item">🔔<span>Avisos</span></div>
+          </div>
+        </div>
+      </div>
+    </figure>
+
+  </div>
+
+  <footer class="note">
+    Elegí A, B o C (o ninguna, si preferís seguir en otra dirección) y aplico esa paleta + tipografía a la app real.
+  </footer>
+</div>

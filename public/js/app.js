@@ -464,17 +464,17 @@
     const latlngs = route.map((p) => [p.lat, p.lng]);
     const doneIndex = shipment.checkpointIndex ?? -1;
 
-    L.polyline(latlngs, { color: '#4b4b52', weight: 3, dashArray: '6 6' }).addTo(state.map);
+    L.polyline(latlngs, { color: '#8a7460', weight: 3, dashArray: '6 6' }).addTo(state.map);
     if (doneIndex >= 0) {
-      L.polyline(latlngs.slice(0, doneIndex + 1), { color: '#cfff52', weight: 4 }).addTo(state.map);
+      L.polyline(latlngs.slice(0, doneIndex + 1), { color: '#ffd23f', weight: 4 }).addTo(state.map);
     }
 
     route.forEach((p, i) => {
       const isDone = i <= doneIndex;
       const marker = L.circleMarker([p.lat, p.lng], {
         radius: i === doneIndex ? 9 : 6,
-        color: isDone ? '#cfff52' : '#4b4b52',
-        fillColor: isDone ? '#cfff52' : '#28282d',
+        color: isDone ? '#ffd23f' : '#8a7460',
+        fillColor: isDone ? '#ffd23f' : '#2b241d',
         fillOpacity: 1,
         weight: 2,
       }).addTo(state.map);
