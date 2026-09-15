@@ -85,6 +85,28 @@ NOTIFY_EMAIL_TO=...
 
 Y agregá la dependencia: `npm install nodemailer`.
 
+## Notificaciones push del navegador (opcional)
+
+Además de la campanita dentro de la app, podés activar notificaciones push
+reales del navegador (avisan aunque tengas la app cerrada). Son opcionales:
+si no configurás nada, el resto de la app funciona igual.
+
+1. Generá las claves una sola vez: `npx web-push generate-vapid-keys`.
+2. Pegalas en tu `.env`:
+
+```
+VAPID_PUBLIC_KEY=...
+VAPID_PRIVATE_KEY=...
+VAPID_SUBJECT=mailto:tu-email@ejemplo.com
+```
+
+3. Reiniciá el servidor, entrá a la pestaña **Avisos** dentro de la app y
+   tocá **"Activar notificaciones"** — el navegador te va a pedir permiso.
+
+En `localhost` funciona bien para probar en Chrome. Para que ande para
+otras personas hace falta desplegar la app con HTTPS real (ver la sección
+de despliegue más abajo).
+
 ## Cambiar cada cuánto se actualiza
 
 En `.env`, `TRACKING_REFRESH_MINUTES=30` (podés bajarlo a 5 o 10 mientras probás, por ejemplo).

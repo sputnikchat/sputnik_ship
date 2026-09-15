@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const contactsRoutes = require('./routes/contacts');
 const shipmentsRoutes = require('./routes/shipments');
 const notificationsRoutes = require('./routes/notifications');
+const pushRoutes = require('./routes/push');
 const { startScheduler } = require('./services/scheduler');
 
 if (!process.env.JWT_SECRET) {
@@ -24,6 +25,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/contacts', contactsRoutes);
 app.use('/api/shipments', shipmentsRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/push', pushRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });

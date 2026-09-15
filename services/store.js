@@ -14,6 +14,7 @@ function defaultData() {
     contacts: [],
     shipments: [],
     notifications: [],
+    pushSubscriptions: [],
   };
 }
 

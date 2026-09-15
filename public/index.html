@@ -122,7 +122,10 @@
     <section id="view-notifications" class="view">
       <div class="view-header">
         <h2>Notificaciones</h2>
-        <button id="mark-all-read-btn" class="btn-secondary small">Marcar todo leído</button>
+        <div style="display:flex; gap:6px;">
+          <button id="push-toggle-btn" class="btn-secondary small" hidden>Activar notificaciones</button>
+          <button id="mark-all-read-btn" class="btn-secondary small">Marcar todo leído</button>
+        </div>
       </div>
       <div id="notifications-list" class="cards"></div>
     </section>

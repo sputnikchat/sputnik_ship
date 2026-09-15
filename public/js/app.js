@@ -73,6 +73,7 @@
     $('#auth-screen').hidden = true;
     $('#app').hidden = false;
     loadAll();
+    initPush();
   }
 
   function saveSession(token, user) {
@@ -531,6 +532,71 @@
   $('#mark-all-read-btn').addEventListener('click', async () => {
     await api('/notifications/read-all', { method: 'POST' });
     loadNotifications();
+  });
+
+  // ---------------- push notifications del navegador (opcional) ----------------
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(base64);
+    return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+  }
+
+  function pushSupported() {
+    return 'serviceWorker' in navigator && 'PushManager' in window;
+  }
+
+  async function initPush() {
+    const btn = $('#push-toggle-btn');
+    if (!pushSupported()) return;
+    btn.hidden = false;
+
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const existing = await reg.pushManager.getSubscription();
+      updatePushButton(Boolean(existing));
+    } catch (err) {
+      // si el service worker no esta listo todavia, dejamos el boton en su estado inicial
+    }
+  }
+
+  function updatePushButton(subscribed) {
+    const btn = $('#push-toggle-btn');
+    btn.textContent = subscribed ? 'Notificaciones activadas ✓' : 'Activar notificaciones';
+  }
+
+  $('#push-toggle-btn').addEventListener('click', async () => {
+    if (!pushSupported()) return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const existing = await reg.pushManager.getSubscription();
+      if (existing) {
+        toast('Las notificaciones ya están activadas en este navegador.');
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        toast('No se concedió el permiso de notificaciones.');
+        return;
+      }
+
+      const { publicKey } = await api('/push/vapid-public-key');
+      if (!publicKey) {
+        toast('El servidor todavía no tiene configuradas las notificaciones push.');
+        return;
+      }
+
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+      await api('/push/subscribe', { method: 'POST', body: sub.toJSON() });
+      updatePushButton(true);
+      toast('Notificaciones activadas');
+    } catch (err) {
+      toast('No se pudo activar las notificaciones: ' + err.message);
+    }
   });
 
   function escapeHtml(str) {
