@@ -1,0 +1,510 @@
+<title>Sputnik Ship Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#08080a;
+    --panel:#0a0a0c;
+    --surface:#141416;
+    --surface-2:#1c1c20;
+    --border:#26262b;
+    --text:#f5f5f0;
+    --muted:#8b8b93;
+    --accent:#cfff52;
+    --accent-ink:#0a0a0c;
+    --accent-2:#5ec8f8;
+    --danger:#f87171;
+  }
+
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse 900px 500px at 50% 18%, rgba(207,255,82,0.10), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+
+  .wrap{
+    max-width:1180px;
+    margin:0 auto;
+    padding:56px 20px 72px;
+  }
+
+  /* ---------- header ---------- */
+  .orbit{
+    position:relative;
+    width:100%;
+    display:flex;
+    justify-content:center;
+    margin-bottom:6px;
+  }
+  .orbit svg{ overflow:visible; }
+  .orbit-dot{
+    animation: spin 9s linear infinite;
+    transform-origin: 130px 130px;
+  }
+  @media (prefers-reduced-motion: reduce){ .orbit-dot{ animation:none; } }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+
+  .eyebrow{
+    font-family:"Space Mono",ui-monospace,monospace;
+    font-size:0.72rem;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    color:var(--accent-2);
+    text-align:center;
+    margin:0 0 14px;
+  }
+
+  h1.wordmark{
+    font-family:"Space Grotesk", system-ui, sans-serif;
+    font-weight:700;
+    font-size:clamp(2.4rem, 7vw, 4.6rem);
+    line-height:1;
+    letter-spacing:-0.02em;
+    text-align:center;
+    margin:0;
+    text-wrap:balance;
+  }
+  h1.wordmark .rocket{
+    display:inline-block;
+    transform:rotate(-6deg) translateY(-0.06em);
+  }
+  h1.wordmark .accent{ color:var(--accent); }
+
+  .subhead{
+    max-width:46ch;
+    margin:16px auto 0;
+    text-align:center;
+    color:var(--muted);
+    font-size:1rem;
+    line-height:1.55;
+  }
+
+  .badges{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:10px;
+    margin:28px 0 0;
+    padding:0;
+    list-style:none;
+  }
+  .badges li{
+    display:flex; align-items:center; gap:7px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:999px;
+    padding:8px 16px;
+    font-size:0.8rem;
+    font-weight:600;
+  }
+  .badges li b{ color:var(--accent); font-weight:700; }
+
+  /* ---------- phones ---------- */
+  .phones{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    align-items:flex-start;
+    gap:34px;
+    margin-top:64px;
+  }
+  figure.device{ margin:0; display:flex; flex-direction:column; align-items:center; }
+  @media (min-width:860px){
+    figure.device:nth-child(2){ transform:translateY(-26px); }
+    figure.device:nth-child(4){ transform:translateY(-26px); }
+  }
+
+  figcaption{
+    margin-top:16px;
+    font-family:"Space Mono",ui-monospace,monospace;
+    font-size:0.7rem;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+  figcaption b{ color:var(--text); }
+
+  .phone{
+    width:230px;
+    height:498px;
+    background:#000;
+    border-radius:38px;
+    padding:9px;
+    box-shadow:
+      0 30px 60px rgba(0,0,0,0.55),
+      0 0 0 1px rgba(255,255,255,0.04) inset;
+    position:relative;
+  }
+  .notch{
+    position:absolute;
+    top:9px; left:50%; transform:translateX(-50%);
+    width:84px; height:20px;
+    background:#000;
+    border-radius:0 0 14px 14px;
+    z-index:5;
+  }
+  .screen{
+    width:100%; height:100%;
+    background:var(--panel);
+    border-radius:29px;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    font-size:11.5px;
+    position:relative;
+  }
+  .statusbar{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:11px 18px 2px;
+    font-size:10.5px; font-weight:700;
+    font-variant-numeric:tabular-nums;
+    color:var(--text);
+    flex-shrink:0;
+  }
+  .statusbar .icons{ display:flex; gap:4px; align-items:center; color:var(--text); }
+
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:8px 14px 10px;
+    border-bottom:1px solid var(--border);
+    flex-shrink:0;
+  }
+  .brand-mini{ display:flex; align-items:center; gap:6px; font-weight:700; font-size:11px; }
+  .badge-sq{
+    width:20px; height:20px; border-radius:6px;
+    background:var(--accent);
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px;
+  }
+  .topbar-icons{ display:flex; gap:6px; }
+  .icon-btn{
+    width:22px; height:22px; border-radius:7px;
+    background:var(--surface-2); border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center;
+    font-size:10px; position:relative;
+  }
+  .icon-btn .dot{
+    position:absolute; top:2px; right:2px;
+    width:5px; height:5px; border-radius:50%; background:var(--danger);
+  }
+
+  .content{ flex:1; padding:12px 14px; overflow:hidden; position:relative; }
+
+  .greeting h2{ font-size:14px; margin:0 0 2px; line-height:1.2; }
+  .greeting p{ margin:0; color:var(--muted); font-size:9.5px; }
+  .greeting-row{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:10px; }
+  .stat-pill{
+    flex-shrink:0; background:var(--surface); border:1px solid var(--border); border-radius:999px;
+    padding:4px 9px; font-size:8.5px; font-weight:700; white-space:nowrap;
+  }
+  .stat-pill b{ color:var(--accent); }
+
+  .row-actions{ display:flex; gap:6px; margin-bottom:8px; }
+  .btn{ border:none; border-radius:999px; padding:5px 10px; font-size:8.8px; font-weight:700; }
+  .btn-primary{ background:var(--accent); color:var(--accent-ink); }
+  .btn-ghost{ background:var(--surface-2); color:var(--text); border:1px solid var(--border); }
+
+  .search{
+    width:100%; padding:7px 10px; margin-bottom:9px; border-radius:999px;
+    background:var(--surface-2); border:1px solid var(--border); color:var(--muted); font-size:9px;
+  }
+
+  .card{
+    background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    padding:11px; margin-bottom:8px;
+    box-shadow:0 6px 16px rgba(0,0,0,0.25);
+  }
+  .card-row{ display:flex; justify-content:space-between; align-items:flex-start; gap:6px; }
+  .card-title{ font-weight:700; margin:0 0 2px; font-size:10.5px; }
+  .card-sub{ color:var(--muted); font-size:8.5px; margin:0; }
+  .chip{
+    font-size:7.5px; font-weight:800; letter-spacing:0.02em;
+    padding:2px 7px; border-radius:999px; background:var(--surface-2); border:1px solid var(--border);
+    flex-shrink:0;
+  }
+  .pill-status{
+    display:inline-block; margin-top:7px;
+    padding:3px 9px; border-radius:999px; font-size:7.8px; font-weight:700;
+    background:var(--accent); color:var(--accent-ink);
+  }
+  .card-foot{ margin-top:6px; color:var(--muted); font-size:7.8px; }
+  .ghost-actions{ display:flex; gap:5px; margin-top:8px; }
+  .ghost-actions .btn{ font-size:7.8px; padding:4px 9px; }
+
+  /* map screen */
+  .map-box{
+    height:190px; border-radius:16px; overflow:hidden; position:relative;
+    background:
+      radial-gradient(circle at 30% 80%, rgba(94,200,248,0.10), transparent 55%),
+      var(--surface-2);
+    border:1px solid var(--border);
+  }
+  .map-box .zoom{
+    position:absolute; top:8px; left:8px; display:flex; flex-direction:column;
+    background:#fff; border-radius:4px; overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,0.3);
+  }
+  .map-box .zoom span{ width:16px; height:16px; display:flex; align-items:center; justify-content:center; color:#111; font-size:10px; border-bottom:1px solid #ddd; }
+  .map-label{ position:absolute; font-size:7px; color:#9aa; font-weight:600; }
+  .hero-card{
+    background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    box-shadow:0 12px 26px rgba(0,0,0,0.4);
+    padding:12px; margin:-34px 6px 0; position:relative; z-index:2;
+  }
+  .hero-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:6px; }
+  .hero-eta{ font-size:16px; font-weight:800; margin:8px 0 1px; }
+  .hero-eta small{ display:block; font-size:7.5px; font-weight:600; color:var(--muted); }
+  .back-pill{
+    display:inline-flex; align-items:center; gap:4px;
+    background:var(--surface-2); border:1px solid var(--border); border-radius:999px;
+    padding:4px 10px; font-size:8.5px; font-weight:700; margin-bottom:10px;
+  }
+
+  /* notifications */
+  .notif{ display:flex; gap:7px; align-items:flex-start; }
+  .notif .dotmark{ width:6px; height:6px; border-radius:50%; background:var(--accent-2); margin-top:4px; flex-shrink:0; }
+
+  .bottom-nav{
+    display:flex; gap:4px; padding:7px 8px 12px;
+    border-top:1px solid var(--border);
+    flex-shrink:0;
+  }
+  .nav-btn{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:1px;
+    border-radius:999px; padding:5px 4px; font-size:11px;
+  }
+  .nav-btn span{ font-size:6.8px; font-weight:700; }
+  .nav-btn.active{ background:var(--accent); color:var(--accent-ink); }
+  .nav-btn:not(.active){ color:var(--muted); }
+
+  footer.note{
+    max-width:520px; margin:64px auto 0; text-align:center;
+    color:var(--muted); font-size:0.82rem; line-height:1.6;
+  }
+  footer.note code{
+    font-family:"Space Mono",monospace; font-size:0.78rem;
+    background:var(--surface); border:1px solid var(--border);
+    padding:1px 6px; border-radius:6px; color:var(--accent-2);
+  }
+</style>
+
+<div class="wrap">
+
+  <div class="orbit">
+    <svg width="260" height="130" viewBox="0 0 260 130" aria-hidden="true">
+      <path d="M 10 130 A 120 120 0 0 1 250 130" fill="none" stroke="var(--border)" stroke-width="1" stroke-dasharray="2 6"/>
+      <g class="orbit-dot">
+        <circle cx="10" cy="130" r="3.5" fill="var(--accent)"/>
+      </g>
+    </svg>
+  </div>
+
+  <p class="eyebrow">Vista previa &middot; 4 pantallas centrales</p>
+  <h1 class="wordmark"><span class="rocket">🚀</span> Sputnik <span class="accent">Ship</span></h1>
+  <p class="subhead">Contactos y seguimiento de envíos en un solo lugar — recreación fiel de la interfaz real (mismos tokens de color, tipografía y componentes que corren en <code>localhost:3000</code>).</p>
+
+  <ul class="badges">
+    <li>🧭 <b>Auto-detección</b> de courier por formato de tracking</li>
+    <li>🗺️ <b>Mapa en vivo</b> con Leaflet + OpenStreetMap</li>
+    <li>🔔 <b>Push</b> del navegador (Web Push / VAPID)</li>
+  </ul>
+
+  <div class="phones">
+
+    <!-- 1. Envíos -->
+    <figure class="device">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="statusbar"><span>9:41</span><span class="icons">📶 🔋</span></div>
+          <div class="topbar">
+            <div class="brand-mini"><div class="badge-sq">🚀</div>Sputnik Ship</div>
+            <div class="topbar-icons">
+              <div class="icon-btn">🔔<span class="dot"></span></div>
+              <div class="icon-btn">⟳</div>
+            </div>
+          </div>
+          <div class="content">
+            <div class="greeting-row">
+              <div class="greeting">
+                <h2>Buenas tardes, Chef</h2>
+                <p>No tenés envíos en camino ahora mismo.</p>
+              </div>
+              <div class="stat-pill">📦 <b>0</b> en curso</div>
+            </div>
+            <div class="row-actions">
+              <button class="btn btn-ghost">Actualizar ahora</button>
+              <button class="btn btn-primary">+ Nuevo envío</button>
+            </div>
+            <input class="search" placeholder="Buscar por tracking o etiqueta…" disabled>
+            <div class="card">
+              <div class="card-row">
+                <div>
+                  <p class="card-title">794658392013</p>
+                  <p class="card-sub">794658392013 · Juan Pérez</p>
+                </div>
+                <span class="chip">FedEx</span>
+              </div>
+              <span class="pill-status">Entregado</span>
+              <p class="card-foot">Últ. chequeo: 15 sept, 15:33</p>
+            </div>
+          </div>
+          <div class="bottom-nav">
+            <div class="nav-btn active">📦<span>Envíos</span></div>
+            <div class="nav-btn">👤<span>Contactos</span></div>
+            <div class="nav-btn">🔔<span>Avisos</span></div>
+          </div>
+        </div>
+      </div>
+      <figcaption><b>01</b> — Envíos</figcaption>
+    </figure>
+
+    <!-- 2. Detalle + mapa -->
+    <figure class="device">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="statusbar"><span>9:41</span><span class="icons">📶 🔋</span></div>
+          <div class="topbar">
+            <div class="brand-mini"><div class="badge-sq">🚀</div>Sputnik Ship</div>
+            <div class="topbar-icons">
+              <div class="icon-btn">🔔<span class="dot"></span></div>
+              <div class="icon-btn">⟳</div>
+            </div>
+          </div>
+          <div class="content" style="padding-left:0; padding-right:0;">
+            <div style="padding:0 14px;"><span class="back-pill">← Volver</span></div>
+            <div class="map-box">
+              <div class="zoom"><span>+</span><span>−</span></div>
+              <svg width="100%" height="100%" viewBox="0 0 210 190" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M 30 165 C 55 150, 60 120, 95 95 C 120 78, 130 55, 128 30" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"/>
+                <circle cx="30" cy="165" r="4" fill="var(--accent)"/>
+                <circle cx="95" cy="95" r="3" fill="var(--accent)"/>
+                <circle cx="128" cy="30" r="4" fill="var(--accent)"/>
+              </svg>
+              <span class="map-label" style="left:132px; top:22px;">Paris</span>
+              <span class="map-label" style="left:22px; top:172px;">España</span>
+            </div>
+            <div class="hero-card">
+              <div class="hero-top">
+                <div>
+                  <p class="card-title" style="margin-bottom:1px;">794658392013</p>
+                  <p class="card-sub">794658392013</p>
+                </div>
+                <span class="chip">FedEx</span>
+              </div>
+              <span class="pill-status">Entregado</span>
+              <div class="hero-eta"><small>Entrega estimada</small>17 sept, 15:02</div>
+              <p class="card-foot" style="margin-top:2px;">Último chequeo: 15 sept, 16:46</p>
+            </div>
+          </div>
+          <div class="bottom-nav">
+            <div class="nav-btn active">📦<span>Envíos</span></div>
+            <div class="nav-btn">👤<span>Contactos</span></div>
+            <div class="nav-btn">🔔<span>Avisos</span></div>
+          </div>
+        </div>
+      </div>
+      <figcaption><b>02</b> — Detalle + mapa</figcaption>
+    </figure>
+
+    <!-- 3. Contactos -->
+    <figure class="device">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="statusbar"><span>9:41</span><span class="icons">📶 🔋</span></div>
+          <div class="topbar">
+            <div class="brand-mini"><div class="badge-sq">🚀</div>Sputnik Ship</div>
+            <div class="topbar-icons">
+              <div class="icon-btn">🔔<span class="dot"></span></div>
+              <div class="icon-btn">⟳</div>
+            </div>
+          </div>
+          <div class="content">
+            <div class="row-actions" style="justify-content:space-between; align-items:center;">
+              <h2 style="font-size:14px; margin:0;">Contactos</h2>
+              <button class="btn btn-primary">+ Nuevo contacto</button>
+            </div>
+            <input class="search" placeholder="Buscar contacto…" disabled style="margin-top:8px;">
+            <div class="card">
+              <p class="card-title">Juan Pérez</p>
+              <p class="card-sub">Acme SA</p>
+              <div class="ghost-actions">
+                <button class="btn btn-ghost">Editar</button>
+                <button class="btn btn-ghost">Eliminar</button>
+              </div>
+            </div>
+          </div>
+          <div class="bottom-nav">
+            <div class="nav-btn">📦<span>Envíos</span></div>
+            <div class="nav-btn active">👤<span>Contactos</span></div>
+            <div class="nav-btn">🔔<span>Avisos</span></div>
+          </div>
+        </div>
+      </div>
+      <figcaption><b>03</b> — Contactos</figcaption>
+    </figure>
+
+    <!-- 4. Avisos -->
+    <figure class="device">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="statusbar"><span>9:41</span><span class="icons">📶 🔋</span></div>
+          <div class="topbar">
+            <div class="brand-mini"><div class="badge-sq">🚀</div>Sputnik Ship</div>
+            <div class="topbar-icons">
+              <div class="icon-btn">🔔<span class="dot"></span></div>
+              <div class="icon-btn">⟳</div>
+            </div>
+          </div>
+          <div class="content">
+            <h2 style="font-size:14px; margin:0 0 8px;">Notificaciones</h2>
+            <div class="card notif">
+              <div class="dotmark"></div>
+              <div>
+                <p class="card-title">Envío 794658392013 (FEDEX)</p>
+                <p class="card-sub">Nuevo estado: Entregado</p>
+                <p class="card-sub">15 sept, 15:30</p>
+              </div>
+            </div>
+            <div class="card notif">
+              <div class="dotmark"></div>
+              <div>
+                <p class="card-title">Envío 794658392013 (FEDEX)</p>
+                <p class="card-sub">Nuevo estado: En tránsito</p>
+                <p class="card-sub">15 sept, 15:02</p>
+              </div>
+            </div>
+            <div class="card notif">
+              <div class="dotmark"></div>
+              <div>
+                <p class="card-title">Envío agregado: 794658392013</p>
+                <p class="card-sub">Estado inicial: Etiqueta creada</p>
+                <p class="card-sub">15 sept, 15:02</p>
+              </div>
+            </div>
+          </div>
+          <div class="bottom-nav">
+            <div class="nav-btn">📦<span>Envíos</span></div>
+            <div class="nav-btn">👤<span>Contactos</span></div>
+            <div class="nav-btn active">🔔<span>Avisos</span></div>
+          </div>
+        </div>
+      </div>
+      <figcaption><b>04</b> — Avisos</figcaption>
+    </figure>
+
+  </div>
+
+  <footer class="note">
+    Mockup estático para revisión — la app real corre en <code>localhost:3000</code>, con estas mismas 4 pantallas ya construidas y probadas end-to-end.
+  </footer>
+
+</div>
