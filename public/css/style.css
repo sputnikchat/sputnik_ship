@@ -1,0 +1,199 @@
+:root {
+  --bg: #0f172a;
+  --surface: #16213e;
+  --surface-2: #1e2a4a;
+  --border: #2b3860;
+  --text: #e8ecf6;
+  --muted: #93a1c2;
+  --accent: #2563eb;
+  --accent-2: #3b82f6;
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+
+/* El atributo [hidden] debe ganarle a cualquier "display" que le pongamos a
+   ese mismo elemento por clase (ej. ".modal { display:flex }"): si no,
+   un modal "hidden" igual queda visible tapando toda la pantalla. */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+button, input, select, textarea { font-family: inherit; }
+
+.muted { color: var(--muted); }
+.small { font-size: 0.85rem; }
+
+/* ---------- Auth screen ---------- */
+.auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+}
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.brand h1 { font-size: 1.4rem; margin: 0; }
+.brand-badge {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.8rem;
+}
+.tabs { display: flex; gap: 6px; margin: 18px 0 14px; background: var(--surface-2); border-radius: 10px; padding: 4px; }
+.tab { flex: 1; padding: 8px; border: none; background: transparent; color: var(--muted); border-radius: 8px; cursor: pointer; font-weight: 600; }
+.tab.active { background: var(--accent); color: white; }
+
+.auth-form { display: flex; flex-direction: column; gap: 12px; }
+.auth-form label { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--muted); }
+.auth-form input, .auth-form textarea, .auth-form select {
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  padding: 10px 12px; border-radius: 10px; font-size: 0.95rem;
+}
+.hint { font-size: 0.78rem; color: var(--muted); margin-top: 16px; text-align: center; }
+.error { color: #fca5a5; font-size: 0.85rem; margin: 0; }
+
+.btn-primary, .btn-secondary {
+  border: none; border-radius: 10px; padding: 11px 16px; font-weight: 600; cursor: pointer;
+}
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { background: var(--accent-2); }
+.btn-secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+.btn-primary.small, .btn-secondary.small { padding: 7px 12px; font-size: 0.85rem; }
+
+/* ---------- App shell ---------- */
+.app { min-height: 100vh; display: flex; flex-direction: column; padding-bottom: 70px; }
+
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.brand-mini { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.topbar-actions { display: flex; gap: 8px; }
+.icon-btn {
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  width: 38px; height: 38px; border-radius: 10px; cursor: pointer; position: relative; font-size: 1rem;
+}
+.dot { position: absolute; top: 4px; right: 6px; width: 8px; height: 8px; background: var(--danger); border-radius: 50%; }
+
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+  display: flex; background: var(--surface); border-top: 1px solid var(--border);
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+}
+.nav-btn {
+  flex: 1; background: none; border: none; color: var(--muted);
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px; border-radius: 10px; cursor: pointer; font-size: 1.1rem;
+}
+.nav-btn span { font-size: 0.7rem; font-weight: 600; }
+.nav-btn.active { color: var(--accent-2); background: var(--surface-2); }
+
+.content { flex: 1; padding: 16px; max-width: 720px; width: 100%; margin: 0 auto; }
+
+.view { display: none; }
+.view.active { display: block; }
+
+.view-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 10px; }
+.view-header h2 { margin: 0; font-size: 1.2rem; }
+
+.search {
+  width: 100%; padding: 10px 12px; margin: 10px 0; border-radius: 10px;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+}
+
+.cards { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px; cursor: pointer;
+}
+.card-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.card-title { font-weight: 700; margin: 0 0 4px; }
+.card-sub { color: var(--muted); font-size: 0.85rem; margin: 0; }
+.card-actions { display: flex; gap: 6px; margin-top: 10px; }
+.card-actions button { font-size: 0.78rem; padding: 6px 10px; }
+
+.badge {
+  display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 700;
+  background: var(--surface-2); color: var(--muted); border: 1px solid var(--border);
+}
+.badge.status-delivered { color: #86efac; border-color: var(--success); }
+.badge.status-in_transit, .badge.status-out_for_delivery { color: #93c5fd; border-color: var(--accent-2); }
+.badge.status-label_created, .badge.status-picked_up { color: var(--muted); }
+.badge.status-exception { color: #fca5a5; border-color: var(--danger); }
+
+.carrier-chip {
+  font-size: 0.7rem; font-weight: 800; letter-spacing: 0.03em;
+  padding: 2px 8px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--border);
+}
+
+.empty { text-align: center; color: var(--muted); padding: 40px 10px; }
+
+/* ---------- Shipment detail / map ---------- */
+.map { height: 280px; border-radius: var(--radius); overflow: hidden; margin: 14px 0; border: 1px solid var(--border); }
+.checkpoints { display: flex; flex-direction: column; gap: 0; }
+.checkpoint {
+  display: flex; gap: 12px; padding: 10px 0; border-left: 2px solid var(--border); margin-left: 6px; padding-left: 16px; position: relative;
+}
+.checkpoint::before {
+  content: ""; position: absolute; left: -7px; top: 14px; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--accent-2); border: 2px solid var(--bg);
+}
+.checkpoint:last-child { border-left: 2px solid transparent; }
+.checkpoint-time { font-size: 0.75rem; color: var(--muted); }
+.checkpoint-label { font-weight: 600; }
+
+/* ---------- Notifications ---------- */
+.notif-card { display: flex; gap: 10px; align-items: flex-start; }
+.notif-card.unread { border-color: var(--accent-2); }
+.notif-dotmark { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-2); margin-top: 6px; flex-shrink: 0; }
+.notif-dotmark.read { background: transparent; }
+
+/* ---------- Modal ---------- */
+.modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: flex-end;
+  justify-content: center; z-index: 50;
+}
+.modal-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 18px 18px 0 0;
+  padding: 20px; width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto;
+}
+@media (min-width: 640px) {
+  .modal { align-items: center; }
+  .modal-card { border-radius: var(--radius); }
+}
+.modal-card h3 { margin-top: 0; }
+#contact-form, #shipment-form { display: flex; flex-direction: column; gap: 12px; }
+#contact-form label, #shipment-form label { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--muted); }
+#contact-form input, #contact-form textarea, #contact-form select,
+#shipment-form input, #shipment-form select {
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  padding: 10px 12px; border-radius: 10px; font-size: 0.95rem;
+}
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%);
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  padding: 10px 16px; border-radius: 999px; font-size: 0.85rem; z-index: 100;
+}

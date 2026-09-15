@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>ShipTrack — Contactos y envíos</title>
+<meta name="theme-color" content="#2563eb" />
+<link rel="manifest" href="/manifest.json" />
+<link rel="icon" href="/icons/icon-192.png" />
+<link rel="apple-touch-icon" href="/icons/icon-192.png" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+<div id="toast" class="toast" hidden></div>
+
+<!-- Pantalla de login / registro -->
+<div id="auth-screen" class="auth-screen">
+  <div class="auth-card">
+    <div class="brand">
+      <div class="brand-badge">ST</div>
+      <h1>ShipTrack</h1>
+    </div>
+    <p class="muted">Contactos y seguimiento de envíos en un solo lugar.</p>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="login">Entrar</button>
+      <button class="tab" data-tab="signup">Crear cuenta</button>
+    </div>
+
+    <form id="login-form" class="auth-form">
+      <label>Email
+        <input type="email" name="email" required autocomplete="username" />
+      </label>
+      <label>Contraseña
+        <input type="password" name="password" required autocomplete="current-password" />
+      </label>
+      <button type="submit" class="btn-primary">Entrar</button>
+      <p class="error" id="login-error" hidden></p>
+    </form>
+
+    <form id="signup-form" class="auth-form" hidden>
+      <label>Nombre
+        <input type="text" name="name" required autocomplete="name" />
+      </label>
+      <label>Email
+        <input type="email" name="email" required autocomplete="username" />
+      </label>
+      <label>Contraseña
+        <input type="password" name="password" required minlength="6" autocomplete="new-password" />
+      </label>
+      <button type="submit" class="btn-primary">Crear cuenta</button>
+      <p class="error" id="signup-error" hidden></p>
+    </form>
+
+    <p class="hint">Acceso simple con email y contraseña — sin verificación de identidad (KYC).</p>
+  </div>
+</div>
+
+<!-- App principal -->
+<div id="app" class="app" hidden>
+  <header class="topbar">
+    <div class="brand-mini">
+      <div class="brand-badge">ST</div>
+      <span>ShipTrack</span>
+    </div>
+    <div class="topbar-actions">
+      <button id="notif-btn" class="icon-btn" title="Notificaciones">
+        🔔<span id="notif-dot" class="dot" hidden></span>
+      </button>
+      <button id="logout-btn" class="icon-btn" title="Salir">⎋</button>
+    </div>
+  </header>
+
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-view="shipments">📦<span>Envíos</span></button>
+    <button class="nav-btn" data-view="contacts">👤<span>Contactos</span></button>
+    <button class="nav-btn" data-view="notifications">🔔<span>Avisos</span></button>
+  </nav>
+
+  <main class="content">
+
+    <!-- Vista: Envíos -->
+    <section id="view-shipments" class="view active">
+      <div class="view-header">
+        <h2>Envíos</h2>
+        <button id="add-shipment-btn" class="btn-primary small">+ Nuevo envío</button>
+      </div>
+      <p class="muted small" id="refresh-info">Se actualizan automáticamente cada 30 minutos.</p>
+      <button id="refresh-now-btn" class="btn-secondary small">Actualizar ahora</button>
+      <div id="shipments-list" class="cards"></div>
+    </section>
+
+    <!-- Vista: Detalle de envío + mapa -->
+    <section id="view-shipment-detail" class="view">
+      <div class="view-header">
+        <button class="btn-secondary small" id="back-to-shipments">← Volver</button>
+      </div>
+      <div id="shipment-detail-body"></div>
+      <div id="map" class="map"></div>
+      <div id="checkpoints-list" class="checkpoints"></div>
+    </section>
+
+    <!-- Vista: Contactos -->
+    <section id="view-contacts" class="view">
+      <div class="view-header">
+        <h2>Contactos</h2>
+        <button id="add-contact-btn" class="btn-primary small">+ Nuevo contacto</button>
+      </div>
+      <input id="contact-search" class="search" type="search" placeholder="Buscar contacto…" />
+      <div id="contacts-list" class="cards"></div>
+    </section>
+
+    <!-- Vista: Notificaciones -->
+    <section id="view-notifications" class="view">
+      <div class="view-header">
+        <h2>Notificaciones</h2>
+        <button id="mark-all-read-btn" class="btn-secondary small">Marcar todo leído</button>
+      </div>
+      <div id="notifications-list" class="cards"></div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Modal: nuevo/editar contacto -->
+<div id="contact-modal" class="modal" hidden>
+  <div class="modal-card">
+    <h3 id="contact-modal-title">Nuevo contacto</h3>
+    <form id="contact-form">
+      <input type="hidden" name="id" />
+      <label>Nombre *<input type="text" name="name" required /></label>
+      <label>Teléfono<input type="tel" name="phone" /></label>
+      <label>Email<input type="email" name="email" /></label>
+      <label>Empresa<input type="text" name="company" /></label>
+      <label>Dirección<input type="text" name="address" /></label>
+      <label>Notas<textarea name="notes" rows="2"></textarea></label>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="contact-cancel">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: nuevo envío -->
+<div id="shipment-modal" class="modal" hidden>
+  <div class="modal-card">
+    <h3>Nuevo envío</h3>
+    <form id="shipment-form">
+      <label>Courier *
+        <select name="carrier" required>
+          <option value="fedex">FedEx</option>
+          <option value="ups">UPS</option>
+          <option value="dhl">DHL</option>
+          <option value="usps">USPS</option>
+        </select>
+      </label>
+      <label>Número de tracking *<input type="text" name="trackingNumber" required /></label>
+      <label>Contacto asociado
+        <select name="contactId">
+          <option value="">— Ninguno —</option>
+        </select>
+      </label>
+      <label>Etiqueta / descripción<input type="text" name="label" placeholder="Ej: Pedido de ingredientes" /></label>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="shipment-cancel">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>
