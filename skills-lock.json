@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "21st-cli-use": {
+      "source": "21st-dev/skill",
+      "sourceType": "github",
+      "skillPath": "skills/21st-cli-use/SKILL.md",
+      "computedHash": "7ef87a695824a4719a8f1f211b72bbe03952a1fa4d40e0fd4c472d4eb1cbee0a"
+    },
     "animate": {
       "source": "emilkowalski/skills",
       "sourceType": "github",
@@ -390,6 +396,12 @@
       "sourceType": "github",
       "skillPath": "skills/review-animations/SKILL.md",
       "computedHash": "ed81a8278c9cddd99f931b9026ecd17ba5fb9107adcf68a5197cb7d993b8f573"
+    },
+    "shadcn": {
+      "source": "vercel-labs/json-render",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn/SKILL.md",
+      "computedHash": "d6a9be8eeedea18343b5b15d6ac481a55436fe40db4b65d59858388072c239c4"
     },
     "ship24-couriers": {
       "source": "ship24/ship24-ai-plugin",
