@@ -12,15 +12,17 @@ if (VAPID_READY) {
   );
 }
 
-// Creates a notification in the database (saved inside the same `data`
-// object you're already modifying in a store.update(...)). `userId` is
-// the shipment's owner, but every co-owner in that user's space gets
-// their own independent copy - own read/unread state, own push - since
-// "get notified on every change" is the whole point of sharing a space.
-function pushNotification(data, { userId, shipmentId, title, message, level = 'info', excludeUserId = null }) {
-  const recipients = getSpaceUserIds(data, userId).filter((id) => id !== excludeUserId);
+// Creates one notification per recipient (saved inside the same `data`
+// object you're already modifying in a store.update(...)), skipping anyone
+// who has turned this `type` off in their own notification preferences.
+// `type` is one of 'status' | 'delay' | 'digest' | 'chat' - matches the
+// keys in a user's notifyPrefs - or null/omitted for a notification that
+// can't be turned off.
+function pushNotificationToUsers(data, { userIds, shipmentId, title, message, level = 'info', type = null }) {
   let first = null;
-  for (const recipientId of recipients) {
+  for (const recipientId of userIds) {
+    const recipient = data.users.find((u) => u.id === recipientId);
+    if (type && recipient?.notifyPrefs && recipient.notifyPrefs[type] === false) continue;
     const notification = {
       id: uuidv4(),
       userId: recipientId,
@@ -33,15 +35,24 @@ function pushNotification(data, { userId, shipmentId, title, message, level = 'i
     };
     data.notifications.unshift(notification);
     maybeSendWebPush(data, notification);
-    if (recipientId === userId) first = notification;
+    if (!first) first = notification;
   }
   // Keep at most 200 notifications total so this doesn't grow without limit.
   data.notifications = data.notifications.slice(0, 200);
 
   // Email (if enabled) is a single fixed address in .env, not per-user -
-  // send it once regardless of how many co-owners were notified.
+  // send it once regardless of how many people were notified.
   maybeSendEmail(first || { title, message });
   return first;
+}
+
+// `userId` is the shipment's owner, but every co-owner in that user's
+// space gets their own independent copy - own read/unread state, own
+// push - since "get notified on every change" is the whole point of
+// sharing a space.
+function pushNotification(data, { userId, shipmentId, title, message, level = 'info', excludeUserId = null, type = null }) {
+  const recipients = getSpaceUserIds(data, userId).filter((id) => id !== excludeUserId);
+  return pushNotificationToUsers(data, { userIds: recipients, shipmentId, title, message, level, type });
 }
 
 // Optional email delivery (disabled by default). Enable it in .env with
@@ -97,4 +108,4 @@ function maybeSendWebPush(data, notification) {
   });
 }
 
-module.exports = { pushNotification };
+module.exports = { pushNotification, pushNotificationToUsers };

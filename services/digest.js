@@ -37,6 +37,7 @@ async function sendDailyDigest() {
         title: 'Daily shipment summary',
         message: parts.join(', ') + '.',
         level: delayed.length ? 'warning' : 'info',
+        type: 'digest',
       });
     }
   });

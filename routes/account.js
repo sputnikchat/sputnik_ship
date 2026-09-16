@@ -92,4 +92,27 @@ router.post('/leave-space', async (req, res) => {
   res.status(204).end();
 });
 
+const NOTIFY_TYPES = ['status', 'delay', 'digest', 'chat'];
+const DEFAULT_NOTIFY_PREFS = { status: true, delay: true, digest: true, chat: true };
+
+router.get('/notify-prefs', async (req, res) => {
+  const db = await readDB();
+  const me = db.users.find((u) => u.id === req.user.id);
+  res.json({ ...DEFAULT_NOTIFY_PREFS, ...(me?.notifyPrefs || {}) });
+});
+
+router.put('/notify-prefs', async (req, res) => {
+  const body = req.body || {};
+  let prefs = null;
+  await update((data) => {
+    const me = data.users.find((u) => u.id === req.user.id);
+    me.notifyPrefs ||= { ...DEFAULT_NOTIFY_PREFS };
+    for (const type of NOTIFY_TYPES) {
+      if (typeof body[type] === 'boolean') me.notifyPrefs[type] = body[type];
+    }
+    prefs = { ...DEFAULT_NOTIFY_PREFS, ...me.notifyPrefs };
+  });
+  res.json(prefs);
+});
+
 module.exports = router;

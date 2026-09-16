@@ -33,6 +33,7 @@ async function refreshAllShipments() {
             title: `Shipment ${shipment.trackingNumber} (${shipment.carrier.toUpperCase()})`,
             message: `New status: ${result.statusLabel}`,
             level: result.status === 'delivered' ? 'success' : 'info',
+            type: 'status',
           });
         }
 
@@ -44,6 +45,7 @@ async function refreshAllShipments() {
             title: `Possible delay: ${shipment.trackingNumber} (${shipment.carrier.toUpperCase()})`,
             message: delayReason,
             level: 'warning',
+            type: 'delay',
           });
         }
       } catch (err) {

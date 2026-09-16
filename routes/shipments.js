@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const { readDB, update } = require('../services/store');
 const { requireAuth } = require('../middleware/auth');
 const { getTrackingUpdate, CARRIERS } = require('../services/carrierProviders');
-const { pushNotification } = require('../services/notify');
+const { pushNotification, pushNotificationToUsers } = require('../services/notify');
 const { refreshAllShipments } = require('../services/scheduler');
 const { getSpaceUserIds } = require('../services/space');
 const { checkDelay } = require('../services/delayDetector');
@@ -14,12 +14,27 @@ router.use(requireAuth);
 
 const CATEGORIES = ['electronics', 'documents', 'gifts', 'clothing', 'food', 'other'];
 
+// A follower (someone on a different account/space who joined via a share
+// link - see POST /follow) gets read access to a shipment plus its chat,
+// but never the owner's private fields: notes, cost, the linked contact,
+// or the attached photo. Same idea as routes/public.js's field allowlist,
+// just with messages/category/archived/delayFlagged added back in since
+// those aren't sensitive and following-along wants them.
+function sanitizeForFollower(shipment) {
+  const { notes, cost, currency, contactId, photo, userId, ...safe } = shipment;
+  return { ...safe, viewerRole: 'follower' };
+}
+
 router.get('/', async (req, res) => {
   const db = await readDB();
   const spaceUserIds = getSpaceUserIds(db, req.user.id);
-  const shipments = db.shipments
+  const owned = db.shipments
     .filter((s) => spaceUserIds.includes(s.userId))
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    .map((s) => ({ ...s, viewerRole: 'owner' }));
+  const followed = db.shipments
+    .filter((s) => !spaceUserIds.includes(s.userId) && (s.followers || []).includes(req.user.id))
+    .map(sanitizeForFollower);
+  const shipments = [...owned, ...followed].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   res.json(shipments);
 });
 
@@ -59,6 +74,7 @@ router.post('/', async (req, res) => {
     delayFlagged: false,
     archived: false,
     messages: [],
+    followers: [],
     createdAt: new Date().toISOString(),
   };
 
@@ -89,6 +105,7 @@ router.post('/', async (req, res) => {
         title: `Shipment added: ${s.trackingNumber} (${s.carrier.toUpperCase()})`,
         message: `Initial status: ${result.statusLabel}`,
         level: 'info',
+        type: 'status',
       });
     });
   } catch (err) {
@@ -96,15 +113,56 @@ router.post('/', async (req, res) => {
   }
 
   const db = await readDB();
-  res.status(201).json(db.shipments.find((s) => s.id === shipment.id));
+  res.status(201).json({ ...db.shipments.find((s) => s.id === shipment.id), viewerRole: 'owner' });
+});
+
+// Joins someone else's shared shipment (from its /s/:token public link) as
+// a follower: read-only access to the tracking info plus the chat, so two
+// different accounts - not co-owners, not the same space - can talk about
+// one shipment (e.g. a seller and a buyer).
+router.post('/follow', async (req, res) => {
+  const { shareToken } = req.body || {};
+  if (!shareToken) return res.status(400).json({ error: 'Share link is required.' });
+
+  const db = await readDB();
+  const shipment = db.shipments.find((s) => s.shareToken === shareToken);
+  if (!shipment) return res.status(404).json({ error: 'This share link is no longer valid.' });
+
+  const spaceUserIds = getSpaceUserIds(db, req.user.id);
+  if (spaceUserIds.includes(shipment.userId)) {
+    return res.status(400).json({ error: 'This is already one of your own shipments.' });
+  }
+
+  let updated = null;
+  await update((data) => {
+    const s = data.shipments.find((x) => x.id === shipment.id);
+    s.followers ||= [];
+    if (!s.followers.includes(req.user.id)) s.followers.push(req.user.id);
+    updated = s;
+  });
+  res.json(sanitizeForFollower(updated));
+});
+
+router.post('/:id/unfollow', async (req, res) => {
+  const db = await readDB();
+  const shipment = db.shipments.find((s) => s.id === req.params.id);
+  if (!shipment) return res.status(404).json({ error: 'Shipment not found.' });
+
+  await update((data) => {
+    const s = data.shipments.find((x) => x.id === shipment.id);
+    s.followers = (s.followers || []).filter((id) => id !== req.user.id);
+  });
+  res.status(204).end();
 });
 
 router.get('/:id', async (req, res) => {
   const db = await readDB();
   const spaceUserIds = getSpaceUserIds(db, req.user.id);
-  const shipment = db.shipments.find((s) => s.id === req.params.id && spaceUserIds.includes(s.userId));
+  const shipment = db.shipments.find((s) => s.id === req.params.id);
   if (!shipment) return res.status(404).json({ error: 'Shipment not found.' });
-  res.json(shipment);
+  if (spaceUserIds.includes(shipment.userId)) return res.json({ ...shipment, viewerRole: 'owner' });
+  if ((shipment.followers || []).includes(req.user.id)) return res.json(sanitizeForFollower(shipment));
+  return res.status(404).json({ error: 'Shipment not found.' });
 });
 
 // Force a manual refresh of ONE shipment (besides the automatic refresh every 30 min).
@@ -137,6 +195,7 @@ router.post('/:id/refresh', async (req, res) => {
           title: `Shipment ${s.trackingNumber} (${s.carrier.toUpperCase()})`,
           message: `New status: ${result.statusLabel}`,
           level: result.status === 'delivered' ? 'success' : 'info',
+          type: 'status',
         });
       }
       const delayReason = checkDelay(s);
@@ -147,11 +206,12 @@ router.post('/:id/refresh', async (req, res) => {
           title: `Possible delay: ${s.trackingNumber} (${s.carrier.toUpperCase()})`,
           message: delayReason,
           level: 'warning',
+          type: 'delay',
         });
       }
       updated = s;
     });
-    res.json(updated);
+    res.json({ ...updated, viewerRole: 'owner' });
   } catch (err) {
     res.status(502).json({ error: `Could not update tracking: ${err.message}` });
   }
@@ -192,20 +252,24 @@ router.post('/:id/archive', async (req, res) => {
     s.archived = !s.archived;
     updated = s;
   });
-  res.json(updated);
+  res.json({ ...updated, viewerRole: 'owner' });
 });
 
-// A per-shipment message thread, shared by everyone in the space (the
-// "communicator" feature: co-owners can leave notes for each other on a
-// specific shipment, e.g. "left it with the doorman").
+// A per-shipment message thread. Open to the owner's whole space AND to
+// anyone following the shipment via its share link (see POST /follow) -
+// this is the "communicator" feature: two different Sputnik Ship accounts
+// can talk about one shipment, e.g. "left it with the doorman".
 router.post('/:id/messages', async (req, res) => {
   const { text } = req.body || {};
   if (!text || !String(text).trim()) return res.status(400).json({ error: 'Message text is required.' });
 
   const db = await readDB();
   const spaceUserIds = getSpaceUserIds(db, req.user.id);
-  const shipment = db.shipments.find((s) => s.id === req.params.id && spaceUserIds.includes(s.userId));
+  const shipment = db.shipments.find((s) => s.id === req.params.id);
   if (!shipment) return res.status(404).json({ error: 'Shipment not found.' });
+  const isOwnerSide = spaceUserIds.includes(shipment.userId);
+  const isFollower = (shipment.followers || []).includes(req.user.id);
+  if (!isOwnerSide && !isFollower) return res.status(404).json({ error: 'Shipment not found.' });
 
   let updated = null;
   await update((data) => {
@@ -220,17 +284,36 @@ router.post('/:id/messages', async (req, res) => {
     };
     s.messages ||= [];
     s.messages.push(msg);
+
+    const title = `New message on ${s.label || s.trackingNumber}`;
+    const message = `@${msg.handle}: ${msg.text}`;
+    // The owner's space (everyone but the sender, if the sender is on that side).
     pushNotification(data, {
       userId: s.userId,
       shipmentId: s.id,
-      title: `New message on ${s.label || s.trackingNumber}`,
-      message: `@${msg.handle}: ${msg.text}`,
+      title,
+      message,
       level: 'info',
+      type: 'chat',
       excludeUserId: req.user.id,
     });
+    // Anyone else following along (everyone but the sender, if the sender
+    // is a follower) - a separate fan-out since followers aren't part of
+    // the owner's space.
+    const otherFollowers = (s.followers || []).filter((id) => id !== req.user.id);
+    if (otherFollowers.length) {
+      pushNotificationToUsers(data, {
+        userIds: otherFollowers,
+        shipmentId: s.id,
+        title,
+        message,
+        level: 'info',
+        type: 'chat',
+      });
+    }
     updated = s;
   });
-  res.json(updated);
+  res.json(isOwnerSide ? { ...updated, viewerRole: 'owner' } : sanitizeForFollower(updated));
 });
 
 router.delete('/:id', async (req, res) => {

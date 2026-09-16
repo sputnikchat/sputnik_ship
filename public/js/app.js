@@ -64,6 +64,7 @@
     phone: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h3l1.5 4-2 1.5a11 11 0 0 0 5.5 5.5l1.5-2 4 1.5v3a2 2 0 0 1-2.2 2A17 17 0 0 1 3 5.2 2 2 0 0 1 5 4Z"/></svg>',
     email: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>',
     building: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 8h.01M15 8h.01M9 12h.01M15 12h.01M9 16h.01M15 16h.01"/></svg>',
+    chat: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4V5Z"/></svg>',
   };
 
   // Official brand marks (Simple Icons, https://simpleicons.org) with each
@@ -125,11 +126,20 @@
     $('#app').hidden = true;
   }
 
-  function showApp() {
+  async function showApp() {
     $('#auth-screen').hidden = true;
     $('#app').hidden = false;
-    loadAll();
+    await loadAll();
     initPush();
+    // A "follow this shipment" redirect from the public /s/:token page
+    // (see renderSharedCta) lands here with ?openShipment=<id> - open it
+    // straight away instead of leaving the user to find it themselves.
+    const params = new URLSearchParams(location.search);
+    const openId = params.get('openShipment');
+    if (openId) {
+      history.replaceState({}, '', '/');
+      openShipmentDetail(openId);
+    }
   }
 
   function saveSession(token, user) {
@@ -410,7 +420,7 @@
     $('#greeting-avatar').textContent = initial;
     $('#topbar-avatar').textContent = initial;
 
-    const active = state.shipments.filter((s) => s.status !== 'delivered' && !s.archived).length;
+    const active = state.shipments.filter((s) => s.status !== 'delivered' && !s.archived && s.viewerRole !== 'follower').length;
     $('#active-shipments-count').textContent = active;
     $('#greeting-sub').textContent = active
       ? `You have ${active} shipment${active === 1 ? '' : 's'} on the way.`
@@ -423,6 +433,8 @@
     const list = $('#shipments-list');
     const q = ($('#shipment-search').value || '').toLowerCase();
     const byFilter = state.shipments.filter((s) => {
+      if (shipmentFilter === 'following') return s.viewerRole === 'follower';
+      if (s.viewerRole === 'follower') return false; // followed shipments only show under "Following"
       if (shipmentFilter === 'archived') return s.archived;
       if (s.archived) return false; // archived shipments only show under the "Archived" tab
       if (shipmentFilter === 'active') return s.status !== 'delivered';
@@ -444,13 +456,17 @@
       return;
     }
     list.innerHTML = items.map((s) => {
+      const isFollower = s.viewerRole === 'follower';
       const contact = state.contacts.find((c) => c.id === s.contactId);
       const costText = s.cost != null ? `${escapeHtml(s.currency || '')} ${s.cost.toFixed(2)}` : '';
+      const leadIcon = isFollower
+        ? `<div class="card-following-icon" title="Following">${ICONS.chat}</div>`
+        : `<div class="card-category-icon">${CATEGORY_ICON[s.category] || CATEGORY_ICON.other}</div>`;
       return `
         <div class="card ${s.archived ? 'archived' : ''}" data-id="${s.id}">
           <div class="card-row">
             <div class="card-row" style="gap:10px; align-items:flex-start;">
-              <div class="card-category-icon">${CATEGORY_ICON[s.category] || CATEGORY_ICON.other}</div>
+              ${leadIcon}
               <div>
                 <p class="card-title">${escapeHtml(s.label || s.trackingNumber)}</p>
                 <p class="card-sub">${escapeHtml(s.trackingNumber)}${contact ? ' · ' + escapeHtml(contact.name) : ''}</p>
@@ -462,6 +478,7 @@
             <span class="badge status-${s.status}">${escapeHtml(s.statusLabel || s.status)}</span>
             ${s.delayFlagged ? '<span class="badge badge-delay">Possible delay</span>' : ''}
             ${s.archived ? '<span class="badge">Archived</span>' : ''}
+            ${isFollower ? '<span class="badge">Following</span>' : ''}
             ${costText ? `<span class="badge">${costText}</span>` : ''}
             <span class="card-sub">Last checked: ${fmtDate(s.lastCheckedAt)}</span>
           </div>
@@ -773,13 +790,112 @@
     }
   });
 
+  // ---------------- calendar ----------------
+  let calendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  let calendarSelectedDay = null; // 'YYYY-MM-DD' or null
+
+  function dateKey(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  function renderCalendar() {
+    const year = calendarCursor.getFullYear();
+    const month = calendarCursor.getMonth();
+    $('#calendar-month-label').textContent = calendarCursor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    const byDay = {};
+    for (const s of state.shipments) {
+      if (!s.estimatedDelivery || s.archived) continue;
+      const key = dateKey(new Date(s.estimatedDelivery));
+      byDay[key] ||= { delay: false, items: [] };
+      if (s.delayFlagged) byDay[key].delay = true;
+      byDay[key].items.push(s);
+    }
+
+    const firstOfMonth = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const todayKey = dateKey(new Date());
+
+    const cells = [];
+    for (let i = 0; i < firstOfMonth.getDay(); i++) cells.push(null);
+    for (let day = 1; day <= daysInMonth; day++) cells.push(new Date(year, month, day));
+
+    $('#calendar-grid').innerHTML = cells.map((d) => {
+      if (!d) return '<div class="calendar-day outside"></div>';
+      const key = dateKey(d);
+      const info = byDay[key];
+      const classes = ['calendar-day'];
+      if (key === todayKey) classes.push('today');
+      if (key === calendarSelectedDay) classes.push('selected');
+      const dots = info
+        ? `<div class="calendar-day-dots">${info.items.slice(0, 4).map(() => `<span class="calendar-day-dot ${info.delay ? 'delay' : ''}"></span>`).join('')}</div>`
+        : '';
+      return `<div class="${classes.join(' ')}" data-date="${key}">${d.getDate()}${dots}</div>`;
+    }).join('');
+
+    $all('.calendar-day[data-date]').forEach((cell) => {
+      cell.addEventListener('click', () => {
+        calendarSelectedDay = calendarSelectedDay === cell.dataset.date ? null : cell.dataset.date;
+        renderCalendar();
+      });
+    });
+
+    renderCalendarDayList(byDay);
+  }
+
+  function renderCalendarDayList(byDay) {
+    const list = $('#calendar-day-list');
+    if (!calendarSelectedDay) { list.innerHTML = ''; return; }
+    const info = byDay[calendarSelectedDay];
+    if (!info || !info.items.length) {
+      list.innerHTML = '<div class="empty">No shipments expected this day.</div>';
+      return;
+    }
+    list.innerHTML = info.items.map((s) => `
+      <div class="card" data-id="${s.id}">
+        <div class="card-row">
+          <div>
+            <p class="card-title">${escapeHtml(s.label || s.trackingNumber)}</p>
+            <p class="card-sub">${escapeHtml(s.trackingNumber)}</p>
+          </div>
+          ${courierBadge(s.carrier)}
+        </div>
+        <div class="card-row" style="margin-top:8px; align-items:center; gap:6px;">
+          <span class="badge status-${s.status}">${escapeHtml(s.statusLabel || s.status)}</span>
+          ${s.delayFlagged ? '<span class="badge badge-delay">Possible delay</span>' : ''}
+        </div>
+      </div>
+    `).join('');
+    $all('.card', list).forEach((card) => card.addEventListener('click', () => openShipmentDetail(card.dataset.id)));
+  }
+
+  $('#calendar-prev').addEventListener('click', () => {
+    calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() - 1, 1);
+    renderCalendar();
+  });
+  $('#calendar-next').addEventListener('click', () => {
+    calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + 1, 1);
+    renderCalendar();
+  });
+
+  $all('.nav-btn').forEach((btn) => {
+    if (btn.dataset.view === 'calendar') {
+      btn.addEventListener('click', () => renderCalendar());
+    }
+  });
+
   // ---------------- shipment detail + map ----------------
   async function openShipmentDetail(id) {
     state.currentShipmentId = id;
     showView('shipment-detail');
     renderShipmentDetail();
     startChatPolling(id);
-    // Refresh this specific shipment on open, to show the latest status.
+    // Refresh this specific shipment on open, to show the latest status -
+    // owner-only (a follower's account doesn't own the tracking lookup),
+    // so skip it entirely for a followed shipment rather than making a
+    // call that's guaranteed to fail.
+    const current = state.shipments.find((s) => s.id === id);
+    if (current?.viewerRole === 'follower') return;
     try {
       const updated = await api(`/shipments/${id}/refresh`, { method: 'POST' });
       const idx = state.shipments.findIndex((s) => s.id === id);
@@ -817,6 +933,23 @@
     }
   }
 
+  // Uses a free public QR-image API rather than vendoring a QR-generation
+  // library - the encoded content is only the share link itself, already
+  // meant to be handed out to anyone.
+  async function showShipmentQr(id) {
+    try {
+      const { url } = await api(`/shipments/${id}/share`, { method: 'POST' });
+      const fullUrl = location.origin + url;
+      $('#qr-image').src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(fullUrl)}`;
+      $('#qr-url-display').textContent = fullUrl;
+      $('#qr-modal').hidden = false;
+    } catch (err) {
+      toast('Could not create a QR code: ' + err.message);
+    }
+  }
+  $('#qr-close-btn').addEventListener('click', () => { $('#qr-modal').hidden = true; });
+  $('#qr-modal').addEventListener('click', (e) => { if (e.target.id === 'qr-modal') $('#qr-modal').hidden = true; });
+
   function renderShipmentDetail() {
     const s = state.shipments.find((x) => x.id === state.currentShipmentId);
     if (!s) return;
@@ -850,30 +983,47 @@
       ${s.notes ? `<p class="small" style="margin-top:10px; white-space:pre-wrap;">${escapeHtml(s.notes)}</p>` : ''}
       ${s.photo ? `<img class="shipment-photo" src="${s.photo}" alt="Shipment photo" />` : ''}
       <div class="modal-actions" style="justify-content:flex-start; margin-top:14px; flex-wrap:wrap;">
-        <button class="btn-secondary small" id="share-shipment-btn">Share shipping</button>
-        <button class="btn-secondary small" id="archive-shipment-btn">${s.archived ? 'Unarchive' : 'Archive'}</button>
-        <button class="btn-secondary small" id="delete-shipment-btn">Delete shipment</button>
+        ${s.viewerRole === 'follower' ? `
+          <button class="btn-secondary small" id="unfollow-shipment-btn">Unfollow</button>
+        ` : `
+          <button class="btn-secondary small" id="share-shipment-btn">Share shipping</button>
+          <button class="btn-secondary small" id="qr-shipment-btn">QR code</button>
+          <button class="btn-secondary small" id="archive-shipment-btn">${s.archived ? 'Unarchive' : 'Archive'}</button>
+          <button class="btn-secondary small" id="delete-shipment-btn">Delete shipment</button>
+        `}
       </div>
     `;
 
-    $('#share-shipment-btn').addEventListener('click', () => shareShipment(s.id));
+    if (s.viewerRole === 'follower') {
+      $('#unfollow-shipment-btn').addEventListener('click', async () => {
+        if (!confirm('Stop following this shipment?')) return;
+        await api(`/shipments/${s.id}/unfollow`, { method: 'POST' });
+        toast('Unfollowed');
+        state.currentShipmentId = null;
+        showView('shipments');
+        loadShipments();
+      });
+    } else {
+      $('#share-shipment-btn').addEventListener('click', () => shareShipment(s.id));
+      $('#qr-shipment-btn').addEventListener('click', () => showShipmentQr(s.id));
 
-    $('#archive-shipment-btn').addEventListener('click', async () => {
-      const updated = await api(`/shipments/${s.id}/archive`, { method: 'POST' });
-      const idx = state.shipments.findIndex((x) => x.id === s.id);
-      if (idx >= 0) state.shipments[idx] = updated;
-      toast(updated.archived ? 'Shipment archived' : 'Shipment unarchived');
-      renderShipmentDetail();
-    });
+      $('#archive-shipment-btn').addEventListener('click', async () => {
+        const updated = await api(`/shipments/${s.id}/archive`, { method: 'POST' });
+        const idx = state.shipments.findIndex((x) => x.id === s.id);
+        if (idx >= 0) state.shipments[idx] = updated;
+        toast(updated.archived ? 'Shipment archived' : 'Shipment unarchived');
+        renderShipmentDetail();
+      });
 
-    $('#delete-shipment-btn').addEventListener('click', async () => {
-      if (!confirm('Delete this shipment?')) return;
-      await api(`/shipments/${s.id}`, { method: 'DELETE' });
-      toast('Shipment deleted');
-      state.currentShipmentId = null;
-      showView('shipments');
-      loadShipments();
-    });
+      $('#delete-shipment-btn').addEventListener('click', async () => {
+        if (!confirm('Delete this shipment?')) return;
+        await api(`/shipments/${s.id}`, { method: 'DELETE' });
+        toast('Shipment deleted');
+        state.currentShipmentId = null;
+        showView('shipments');
+        loadShipments();
+      });
+    }
 
     // The map depends on an external library (Leaflet); if it fails to
     // load for any reason (offline, a blocker, a restricted network) we
@@ -1051,6 +1201,47 @@
     loadNotifications();
   });
 
+  // ---------------- install app (Add to Home Screen) ----------------
+  let deferredInstallPrompt = null;
+  const isStandalone = () =>
+    window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    updateInstallBlock();
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    $('#install-app-block').hidden = true;
+    toast('App installed');
+  });
+
+  function updateInstallBlock() {
+    const block = $('#install-app-block');
+    if (isStandalone()) { block.hidden = true; return; }
+    if (deferredInstallPrompt) {
+      $('#install-app-hint').textContent = 'Install Sputnik Ship on this device for a faster, full-screen experience.';
+      $('#install-app-btn').hidden = false;
+      block.hidden = false;
+    } else if (isIos()) {
+      $('#install-app-hint').textContent = 'Tap the Share icon in Safari, then "Add to Home Screen".';
+      $('#install-app-btn').hidden = true;
+      block.hidden = false;
+    } else {
+      block.hidden = true; // not installable yet (browser hasn't offered the prompt) and not iOS
+    }
+  }
+
+  $('#install-app-btn').addEventListener('click', async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    updateInstallBlock();
+  });
+
   // ---------------- browser push notifications (optional) ----------------
   function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -1170,19 +1361,29 @@
       $('#shared-body').innerHTML = `<div class="empty">${escapeHtml(err.message)}</div>`;
     }
 
-    renderSharedCta();
+    renderSharedCta(token);
   }
 
-  function renderSharedCta() {
+  function renderSharedCta(token) {
     const cta = $('#shared-cta');
 
     if (state.token && state.user) {
       cta.innerHTML = `
         <div class="auth-card shared-auth-card">
           <p class="small muted" style="margin:0 0 14px;">Logged in as @${escapeHtml(state.user.handle)}</p>
-          <a href="/" class="btn-primary" style="display:block; text-align:center; text-decoration:none;">Go to my shipments</a>
+          <button type="button" class="btn-primary" id="shared-follow-btn" style="width:100%; margin-bottom:10px;">Follow &amp; chat about this shipment</button>
+          <a href="/" class="btn-secondary" style="display:block; text-align:center; text-decoration:none;">Go to my shipments</a>
         </div>
       `;
+      $('#shared-follow-btn').addEventListener('click', async () => {
+        try {
+          const followed = await api('/shipments/follow', { method: 'POST', body: { shareToken: token } });
+          toast('Now following this shipment');
+          location.href = `/?openShipment=${followed.id}`;
+        } catch (err) {
+          toast(err.message);
+        }
+      });
       return;
     }
 
@@ -1231,7 +1432,7 @@
         const data = await api('/auth/login', { method: 'POST', body: Object.fromEntries(fd) });
         saveSession(data.token, data.user);
         toast(`Welcome back, @${data.user.handle}`);
-        renderSharedCta(); // stays on this same page, now signed in
+        renderSharedCta(token); // stays on this same page, now signed in
       } catch (err) {
         errEl.textContent = err.message;
         errEl.hidden = false;
@@ -1247,7 +1448,7 @@
         const data = await api('/auth/signup', { method: 'POST', body: Object.fromEntries(fd) });
         saveSession(data.token, data.user);
         toast(`Welcome, @${data.user.handle}`);
-        renderSharedCta();
+        renderSharedCta(token);
       } catch (err) {
         errEl.textContent = err.message;
         errEl.hidden = false;
@@ -1267,7 +1468,34 @@
     $('#account-handle').textContent = state.user?.handle ? `@${state.user.handle}` : '@';
     $('#account-avatar').textContent = initial;
     renderCoOwners();
+    loadNotifyPrefs();
+    updateInstallBlock();
   }
+
+  // ---- notification preferences ----
+  const NOTIFY_TOGGLE_IDS = { status: 'notify-status', delay: 'notify-delay', digest: 'notify-digest', chat: 'notify-chat' };
+
+  async function loadNotifyPrefs() {
+    try {
+      const prefs = await api('/account/notify-prefs');
+      for (const [type, elId] of Object.entries(NOTIFY_TOGGLE_IDS)) {
+        $(`#${elId}`).checked = prefs[type] !== false;
+      }
+    } catch (err) {
+      // Non-critical - the toggles just keep their default (checked) state.
+    }
+  }
+
+  Object.entries(NOTIFY_TOGGLE_IDS).forEach(([type, elId]) => {
+    $(`#${elId}`).addEventListener('change', async (e) => {
+      try {
+        await api('/account/notify-prefs', { method: 'PUT', body: { [type]: e.target.checked } });
+      } catch (err) {
+        e.target.checked = !e.target.checked; // revert on failure
+        toast(err.message);
+      }
+    });
+  });
 
   async function renderCoOwners() {
     try {
