@@ -2,6 +2,8 @@ const cron = require('node-cron');
 const { update } = require('./store');
 const { getTrackingUpdate } = require('./carrierProviders');
 const { pushNotification } = require('./notify');
+const { checkDelay } = require('./delayDetector');
+const { sendDailyDigest } = require('./digest');
 
 // Refreshes tracking for all active (not-delivered) shipments and
 // generates a notification whenever the status changes.
@@ -33,6 +35,17 @@ async function refreshAllShipments() {
             level: result.status === 'delivered' ? 'success' : 'info',
           });
         }
+
+        const delayReason = checkDelay(shipment);
+        if (delayReason) {
+          pushNotification(data, {
+            userId: shipment.userId,
+            shipmentId: shipment.id,
+            title: `Possible delay: ${shipment.trackingNumber} (${shipment.carrier.toUpperCase()})`,
+            message: delayReason,
+            level: 'warning',
+          });
+        }
       } catch (err) {
         console.error(`Error updating shipment ${shipment.id}:`, err.message);
       }
@@ -46,6 +59,16 @@ function startScheduler() {
   console.log(`Tracking scheduler active: shipments refresh every ${minutes} minute(s).`);
   cron.schedule(cronExpr, () => {
     refreshAllShipments().catch((err) => console.error('Error in scheduled refresh:', err));
+  });
+
+  // Once a day. Runs in the server's own timezone (set TZ in the
+  // environment if that's not where most users are) - an honest limit
+  // of not knowing each user's actual timezone.
+  const digestTime = process.env.DIGEST_TIME || '08:00';
+  const [digestHour, digestMinute] = digestTime.split(':').map(Number);
+  console.log(`Daily digest active: runs at ${digestTime} server time.`);
+  cron.schedule(`${digestMinute} ${digestHour} * * *`, () => {
+    sendDailyDigest().catch((err) => console.error('Error sending daily digest:', err));
   });
 }
 

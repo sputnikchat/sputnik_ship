@@ -420,8 +420,9 @@
             </div>
             ${courierBadge(s.carrier)}
           </div>
-          <div class="card-row" style="margin-top:8px; align-items:center;">
+          <div class="card-row" style="margin-top:8px; align-items:center; flex-wrap:wrap; gap:6px;">
             <span class="badge status-${s.status}">${escapeHtml(s.statusLabel || s.status)}</span>
+            ${s.delayFlagged ? '<span class="badge badge-delay">Possible delay</span>' : ''}
             <span class="card-sub">Last checked: ${fmtDate(s.lastCheckedAt)}</span>
           </div>
         </div>

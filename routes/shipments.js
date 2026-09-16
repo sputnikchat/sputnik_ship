@@ -7,6 +7,7 @@ const { getTrackingUpdate, CARRIERS } = require('../services/carrierProviders');
 const { pushNotification } = require('../services/notify');
 const { refreshAllShipments } = require('../services/scheduler');
 const { getSpaceUserIds } = require('../services/space');
+const { checkDelay } = require('../services/delayDetector');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -43,6 +44,7 @@ router.post('/', async (req, res) => {
     estimatedDelivery: null,
     lastCheckedAt: null,
     shareToken: null,
+    delayFlagged: false,
     archived: false,
     createdAt: new Date().toISOString(),
   };
@@ -122,6 +124,16 @@ router.post('/:id/refresh', async (req, res) => {
           title: `Shipment ${s.trackingNumber} (${s.carrier.toUpperCase()})`,
           message: `New status: ${result.statusLabel}`,
           level: result.status === 'delivered' ? 'success' : 'info',
+        });
+      }
+      const delayReason = checkDelay(s);
+      if (delayReason) {
+        pushNotification(data, {
+          userId: s.userId,
+          shipmentId: s.id,
+          title: `Possible delay: ${s.trackingNumber} (${s.carrier.toUpperCase()})`,
+          message: delayReason,
+          level: 'warning',
         });
       }
       updated = s;
