@@ -2,7 +2,14 @@
 // installable on a phone. Data (contacts, shipments) is always fetched
 // live from /api/*, never cached.
 
-const CACHE_NAME = 'sputnikship-shell-v2';
+// v2 (cache-first for the app shell) turned out to be a trap: once a
+// browser had it installed, it kept serving that exact snapshot of
+// index.html/app.js/style.css forever, since nothing here ever changes
+// unless this very file's bytes change - a code update alone (without
+// touching this file) never got picked up. v3 fixes that at the root:
+// network-first for the shell, only falling back to cache when actually
+// offline, so a deploy is visible on the next reload instead of never.
+const CACHE_NAME = 'sputnikship-shell-v3';
 const SHELL_FILES = [
   '/',
   '/index.html',
@@ -32,7 +39,13 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api/')) return; // never cache the API
 
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
 
