@@ -9,3 +9,5 @@ data/db.json
 .claude/skills/
 data/skills/
 agent/skills/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/

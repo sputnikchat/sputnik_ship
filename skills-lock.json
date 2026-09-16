@@ -43,6 +43,12 @@
       "skillPath": "skills/ask-sonner/SKILL.md",
       "computedHash": "f2217bacea44863b74d31c5458ccc0f05d418a1d2360e25d8efab2cdd09ffb02"
     },
+    "awesome-design-md": {
+      "source": "wearescientist/awesome-design-md",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "13c11ef2913f40773e221ae0601762a0677ff8726f6dc1fa0f4af012d2a64161"
+    },
     "bencium-controlled-ux-designer": {
       "source": "bencium/bencium-marketplace",
       "sourceType": "github",
@@ -181,6 +187,12 @@
       "skillPath": "skills/config-codex-cli/SKILL.md",
       "computedHash": "331a102c0a453f313f7f1d99babcc22770f646f6081b323d7f9738935ef32cba"
     },
+    "design-taste-frontend": {
+      "source": "leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/taste-skill/SKILL.md",
+      "computedHash": "6d838b246d0e35d0b53f4f23f98ba7a1dd561937e64f7d0c7553b0928e376c3e"
+    },
     "emil-design-eng": {
       "source": "emilkowalski/skills",
       "sourceType": "github",
@@ -205,11 +217,23 @@
       "skillPath": "plugin/skills/how-it-works/SKILL.md",
       "computedHash": "121ff2926b3de14b8b1ffdb883b736004a3b25e3fcb3589ca386ecca5bff1900"
     },
-    "impeccable": {
-      "source": "podo/design-agent-skills",
+    "hyperframes": {
+      "source": "heygen-com/hyperframes",
       "sourceType": "github",
-      "skillPath": "skills/impeccable/SKILL.md",
-      "computedHash": "21b3ed7ac5aa729303b968a592f242287c565f60c87aa22279e5fd1a2e0b7168"
+      "skillPath": "skills/hyperframes/SKILL.md",
+      "computedHash": "30cea07e881cd0e671bc0af01a4ca4bad23243847a4fc8a699d58242d0f05710"
+    },
+    "img2threejs": {
+      "source": "img2threejs/img2threejs",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "91cec015dd9a70e558ee67abd479cc91ce49fd7134375b50bc6e6514c4db102e"
+    },
+    "impeccable": {
+      "source": "pbakaus/impeccable",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/impeccable/SKILL.md",
+      "computedHash": "d4cfdc3b7a18041ff02e1ad4b6377450e978e10928ba7e96377ff7d66994b490"
     },
     "improve-animations": {
       "source": "emilkowalski/skills",
