@@ -277,6 +277,58 @@ button, input, select, textarea { font-family: inherit; }
 .checkbox-label input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--accent); }
 .checkbox-label span { font-weight: 500; }
 
+/* ---------- Live camera scan ---------- */
+.scan-camera-view {
+  position: fixed; inset: 0; z-index: 60; background: #000;
+}
+.scan-video {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+}
+.scan-overlay {
+  position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 18%, transparent 72%, rgba(0,0,0,0.6) 100%);
+}
+.scan-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: calc(14px + env(safe-area-inset-top)) 16px 10px;
+}
+.scan-close-btn {
+  width: 36px; height: 36px; border-radius: 50%; border: none; cursor: pointer;
+  background: rgba(0,0,0,0.55); color: var(--text); font-size: 1rem;
+}
+.scan-status-pill {
+  background: rgba(0,0,0,0.55); color: var(--text); padding: 6px 14px;
+  border-radius: var(--radius-badge); font-size: 12px; font-weight: 500;
+}
+.scan-frame {
+  position: relative; margin: auto; width: 78%; max-width: 340px; aspect-ratio: 0.68;
+}
+.scan-frame-corner {
+  position: absolute; width: 26px; height: 26px; border: 3px solid var(--accent);
+}
+.scan-frame-corner.tl { top: 0; left: 0; border-right: none; border-bottom: none; border-radius: 8px 0 0 0; }
+.scan-frame-corner.tr { top: 0; right: 0; border-left: none; border-bottom: none; border-radius: 0 8px 0 0; }
+.scan-frame-corner.bl { bottom: 0; left: 0; border-right: none; border-top: none; border-radius: 0 0 0 8px; }
+.scan-frame-corner.br { bottom: 0; right: 0; border-left: none; border-top: none; border-radius: 0 0 8px 0; }
+.scan-bottom {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 10px 20px calc(22px + env(safe-area-inset-bottom));
+}
+.scan-hint {
+  color: var(--text); font-size: 12px; text-align: center; margin: 0;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+}
+.scan-camera-view.scan-success .scan-frame-corner { border-color: var(--accent); }
+.scan-flash {
+  position: absolute; inset: 0; z-index: 2; background: var(--accent);
+  opacity: 0; pointer-events: none;
+  animation: scanFlash 0.5s ease-out;
+}
+@keyframes scanFlash {
+  0% { opacity: 0.55; }
+  100% { opacity: 0; }
+}
+
 /* ---------- Toast ---------- */
 .toast {
   position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%);

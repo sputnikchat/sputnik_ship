@@ -373,8 +373,119 @@
   $('#shipment-cancel').addEventListener('click', () => { $('#shipment-modal').hidden = true; });
   $('#shipment-modal').addEventListener('click', (e) => { if (e.target.id === 'shipment-modal') $('#shipment-modal').hidden = true; });
 
-  // ---------------- scan label (camera + OCR/barcode) ----------------
-  $('#scan-label-btn').addEventListener('click', () => $('#scan-label-input').click());
+  // ---------------- scan label (live camera + OCR/barcode) ----------------
+
+  // Shared by both scan paths (live camera and the file-picker fallback):
+  // drops whatever was found into the existing form fields as an editable
+  // draft - never auto-saved, since OCR on a real label won't always be
+  // perfect.
+  function applyScanResult(result) {
+    let appliedTracking = false;
+    if (result.trackingNumber) {
+      const trackingInput = $('#shipment-form input[name="trackingNumber"]');
+      trackingInput.value = result.trackingNumber;
+      // Fire the existing input listener below so carrier auto-detection
+      // runs exactly as it does when someone types the number by hand.
+      trackingInput.dispatchEvent(new Event('input', { bubbles: true }));
+      appliedTracking = true;
+    }
+    if (result.recipientName) {
+      $('#scan-contact-block').hidden = false;
+      $('#scan-contact-name').textContent = result.recipientName;
+      $('#scan-contact-name-input').value = result.recipientName;
+      $('#scan-contact-address-input').value = result.address || '';
+      $('#scan-save-contact').checked = true;
+    }
+    return appliedTracking;
+  }
+
+  function vibrate(pattern) {
+    // No-op where unsupported (notably iOS Safari, which never shipped
+    // the Vibration API) - the flash + status text below still confirm
+    // the scan either way, so this is a bonus, not the only feedback.
+    if (navigator.vibrate) { try { navigator.vibrate(pattern); } catch (err) { /* ignore */ } }
+  }
+
+  let liveScan = null; // { stop() } while the camera view is open
+
+  async function closeScanCamera() {
+    const view = $('#scan-camera-view');
+    if (liveScan) { liveScan.stop(); liveScan = null; }
+    const video = $('#scan-video');
+    video.srcObject = null;
+    view.hidden = true;
+    view.classList.remove('scan-success');
+  }
+
+  async function openScanCamera() {
+    const view = $('#scan-camera-view');
+    const status = $('#scan-camera-status');
+    const video = $('#scan-video');
+    view.hidden = false;
+    status.textContent = 'Starting camera…';
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      // No live-camera support at all (e.g. an older browser, or a non-
+      // secure context) - fall back to the native camera/file picker
+      // instead of dead-ending the feature.
+      await closeScanCamera();
+      $('#scan-label-input').click();
+      return;
+    }
+
+    let ocrPassesDone = 0;
+    let finished = false;
+    const best = { trackingNumber: '', recipientName: '', address: '' };
+
+    async function finishScan() {
+      if (finished) return;
+      finished = true;
+      vibrate(80);
+      view.classList.add('scan-success');
+      status.textContent = '✓ Label detected';
+      const flash = document.createElement('div');
+      flash.className = 'scan-flash';
+      view.appendChild(flash);
+      applyScanResult(best);
+      setTimeout(() => { flash.remove(); closeScanCamera(); }, 550);
+    }
+
+    try {
+      liveScan = await LabelScanner.startLiveScan(video, {
+        onResult(partial) {
+          if (finished) return;
+          if (partial.trackingNumber) best.trackingNumber = partial.trackingNumber;
+          if (partial.recipientName) best.recipientName = partial.recipientName;
+          if (partial.address) best.address = partial.address;
+          if (partial.source === 'ocr') ocrPassesDone += 1;
+
+          if (best.trackingNumber) {
+            status.textContent = 'Tracking number found — reading the rest of the label…';
+            // Stop as soon as we have a tracking number AND OCR has had at
+            // least one real pass at the frame (so we don't close the
+            // instant a barcode hits, before we've had any chance at the
+            // recipient name/address too).
+            if (ocrPassesDone >= 1) finishScan();
+          } else if (ocrPassesDone >= 1) {
+            status.textContent = 'Looking for a tracking number…';
+          }
+        },
+        onError() { /* a single failed OCR pass isn't worth surfacing - it just tries again next interval */ },
+      });
+      if (!finished) status.textContent = 'Point the camera at the label';
+    } catch (err) {
+      // Camera permission denied, no camera present, insecure context, etc.
+      status.textContent = 'Could not open the camera — using photo picker instead…';
+      setTimeout(async () => {
+        await closeScanCamera();
+        $('#scan-label-input').click();
+      }, 900);
+    }
+  }
+
+  $('#scan-label-btn').addEventListener('click', openScanCamera);
+  $('#scan-camera-close').addEventListener('click', closeScanCamera);
+  $('#scan-camera-manual').addEventListener('click', closeScanCamera);
 
   $('#scan-label-input').addEventListener('change', async (e) => {
     const file = e.target.files[0];
@@ -387,25 +498,10 @@
 
     try {
       const result = await scanShippingLabel(file);
-
-      if (result.trackingNumber) {
-        const trackingInput = $('#shipment-form input[name="trackingNumber"]');
-        trackingInput.value = result.trackingNumber;
-        // Fire the existing input listener below so carrier auto-detection
-        // runs exactly as it does when someone types the number by hand.
-        trackingInput.dispatchEvent(new Event('input', { bubbles: true }));
-        status.textContent = 'Tracking number detected — double-check it below.';
-      } else {
-        status.textContent = "Couldn't find a tracking number in that photo. Try a clearer shot, or enter it manually.";
-      }
-
-      if (result.recipientName) {
-        $('#scan-contact-block').hidden = false;
-        $('#scan-contact-name').textContent = result.recipientName;
-        $('#scan-contact-name-input').value = result.recipientName;
-        $('#scan-contact-address-input').value = result.address || '';
-        $('#scan-save-contact').checked = true;
-      }
+      const found = applyScanResult(result);
+      status.textContent = found
+        ? 'Tracking number detected — double-check it below.'
+        : "Couldn't find a tracking number in that photo. Try a clearer shot, or enter it manually.";
     } catch (err) {
       status.textContent = "Couldn't read that photo: " + err.message;
     }

@@ -223,6 +223,27 @@
   </div>
 </div>
 
+<!-- Live camera scan: opens straight into the rear camera, no extra tap -->
+<div id="scan-camera-view" class="scan-camera-view" hidden>
+  <video id="scan-video" class="scan-video" autoplay playsinline muted></video>
+  <div class="scan-overlay">
+    <div class="scan-topbar">
+      <button type="button" class="scan-close-btn" id="scan-camera-close" aria-label="Close">✕</button>
+      <span class="scan-status-pill" id="scan-camera-status">Starting camera…</span>
+    </div>
+    <div class="scan-frame">
+      <div class="scan-frame-corner tl"></div>
+      <div class="scan-frame-corner tr"></div>
+      <div class="scan-frame-corner bl"></div>
+      <div class="scan-frame-corner br"></div>
+    </div>
+    <div class="scan-bottom">
+      <p class="scan-hint">Hold the label steady inside the frame</p>
+      <button type="button" class="btn-secondary" id="scan-camera-manual">Enter manually instead</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="/js/scan.js"></script>
 <script src="/js/app.js"></script>
