@@ -50,6 +50,9 @@
   // own inline copies of the same style.
   const ICONS = {
     contact: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="12" r="2"/><path d="M14 10h4M14 14h4M6.3 16.8c.5-1.7 1.8-2.4 2.7-2.4s2.2.7 2.7 2.4"/></svg>',
+    phone: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h3l1.5 4-2 1.5a11 11 0 0 0 5.5 5.5l1.5-2 4 1.5v3a2 2 0 0 1-2.2 2A17 17 0 0 1 3 5.2 2 2 0 0 1 5 4Z"/></svg>',
+    email: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>',
+    building: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 8h.01M15 8h.01M9 12h.01M15 12h.01M9 16h.01M15 16h.01"/></svg>',
   };
 
   // Official brand marks (Simple Icons, https://simpleicons.org) with each
@@ -287,20 +290,26 @@
       return;
     }
 
-    list.innerHTML = items.map((c) => `
-      <div class="card" data-id="${c.id}">
-        <div class="card-row">
-          <div>
-            <p class="card-title">${escapeHtml(c.name)}</p>
-            <p class="card-sub">${escapeHtml(c.company || c.phone || c.email || '')}</p>
-          </div>
+    list.innerHTML = items.map((c) => {
+      const methods = [
+        c.company ? `<span class="contact-method">${ICONS.building}${escapeHtml(c.company)}</span>` : '',
+        c.phone ? `<span class="contact-method">${ICONS.phone}${escapeHtml(c.phone)}</span>` : '',
+        c.email ? `<span class="contact-method">${ICONS.email}${escapeHtml(c.email)}</span>` : '',
+      ].filter(Boolean).join('');
+      return `
+      <div class="card contact-card" data-id="${c.id}">
+        <div class="contact-card-row">
+          <div class="avatar avatar-sm">${escapeHtml(c.name[0].toUpperCase())}</div>
+          <p class="card-title">${escapeHtml(c.name)}</p>
         </div>
+        ${methods ? `<div class="contact-methods">${methods}</div>` : ''}
         <div class="card-actions">
           <button class="btn-secondary edit-contact" data-id="${c.id}">Edit</button>
           <button class="btn-secondary delete-contact" data-id="${c.id}">Delete</button>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     $all('.edit-contact', list).forEach((btn) =>
       btn.addEventListener('click', (e) => { e.stopPropagation(); openContactModal(btn.dataset.id); })

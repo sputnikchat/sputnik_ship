@@ -393,6 +393,15 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   padding: 10px 16px; border-radius: var(--radius-sm); font-size: 12px; z-index: 100;
 }
 
+/* ---------- Contact card ---------- */
+.contact-card-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.contact-methods { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
+.contact-method {
+  display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.contact-method .icon { color: var(--placeholder); }
+
 /* ---------- Link-style button (forgot password, back to log in) ---------- */
 .link-btn {
   background: none; border: none; color: var(--accent); font-size: 12px; font-weight: 500;
