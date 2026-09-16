@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: sputnik-ship
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: TRACKING_REFRESH_MINUTES
+        value: 30
+      - key: TRACKING_MODE
+        value: live
+      - key: SHIP24_API_KEY
+        sync: false
+      - key: NOTIFY_EMAIL_ENABLED
+        value: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
