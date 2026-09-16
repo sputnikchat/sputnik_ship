@@ -358,7 +358,6 @@
       form.name.value = c.name;
       form.phone.value = c.phone || '';
       form.email.value = c.email || '';
-      form.company.value = c.company || '';
       form.address.value = c.address || '';
       form.notes.value = c.notes || '';
     } else {
