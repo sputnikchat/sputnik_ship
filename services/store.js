@@ -1,7 +1,7 @@
-// Almacenamiento simple en un archivo JSON local.
-// Suficiente para un usuario / uso personal. Si el proyecto crece,
-// esto se puede reemplazar por Postgres/Mongo sin cambiar mucho la API
-// de arriba (routes/*.js solo llaman a las funciones de este archivo).
+// Simple storage in a local JSON file.
+// Good enough for a single user / personal use. If the project grows,
+// this can be swapped for Postgres/Mongo without changing much of the
+// API above (routes/*.js only ever call the functions in this file).
 
 const fs = require('fs');
 const path = require('path');
@@ -31,7 +31,7 @@ function readDB() {
   try {
     return JSON.parse(raw);
   } catch (e) {
-    console.error('db.json esta corrupto, se reinicia con datos vacios.', e);
+    console.error('db.json is corrupted, resetting with empty data.', e);
     const fresh = defaultData();
     writeDB(fresh);
     return fresh;
@@ -42,9 +42,9 @@ function writeDB(data) {
   fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
 }
 
-// Pequeño helper para hacer una lectura-modificacion-escritura atomica
-// dentro de un mismo proceso (no hay concurrencia real de escritura aqui,
-// pero evita perder cambios si dos requests llegan casi al mismo tiempo).
+// Small helper for an atomic read-modify-write within a single process
+// (there's no real write concurrency here, but this avoids losing
+// changes if two requests arrive at nearly the same time).
 let queue = Promise.resolve();
 function update(fn) {
   queue = queue.then(async () => {

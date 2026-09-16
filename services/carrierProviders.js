@@ -1,13 +1,13 @@
-// Capa de "proveedores" de tracking.
+// Tracking "provider" layer.
 //
-// La app siempre llama a `getTrackingUpdate(carrier, trackingNumber, shipment)`.
-// Esta funcion decide, segun TRACKING_MODE, si devuelve datos simulados
-// (para poder probar la app sin cuentas de courier) o si llama a la API
-// real de cada courier (una vez que cargues las credenciales en .env).
+// The app always calls `getTrackingUpdate(carrier, trackingNumber, shipment)`.
+// This function decides, based on TRACKING_MODE, whether to return
+// simulated data (so you can test the app without courier accounts) or
+// call each courier's real API (once you've loaded credentials in .env).
 //
-// Para conectar una API real, completa la funcion correspondiente en
-// `liveProviders` (fedex, ups, dhl, usps). Cada una ya tiene un comentario
-// con el flujo general y el link a la documentacion oficial.
+// To connect a real API, fill in the corresponding function in
+// `liveProviders` (fedex, ups, dhl, usps). Each one already has a
+// comment with the general flow and a link to the official docs.
 
 const CARRIERS = ['fedex', 'ups', 'dhl', 'usps'];
 
@@ -20,18 +20,18 @@ const STATUS_FLOW = [
 ];
 
 const STATUS_LABELS = {
-  label_created: 'Etiqueta creada',
-  picked_up: 'Retirado por el courier',
-  in_transit: 'En transito',
-  out_for_delivery: 'En reparto',
-  delivered: 'Entregado',
-  exception: 'Incidencia',
+  label_created: 'Label created',
+  picked_up: 'Picked up by courier',
+  in_transit: 'In transit',
+  out_for_delivery: 'Out for delivery',
+  delivered: 'Delivered',
+  exception: 'Exception',
 };
 
 // ---------------------------------------------------------------------
-// MODO MOCK: simula el avance de un envio a traves de checkpoints con
-// coordenadas, para poder probar contactos + notificaciones + mapa sin
-// depender de ninguna cuenta de courier todavia.
+// MOCK MODE: simulates a shipment's progress through checkpoints with
+// coordinates, so you can test contacts + notifications + map without
+// depending on any courier account yet.
 // ---------------------------------------------------------------------
 function seededRandom(seed) {
   let h = 0;
@@ -44,24 +44,24 @@ function seededRandom(seed) {
   };
 }
 
-// Algunas rutas de ejemplo (origen -> destino) para que el mapa se vea bien.
+// A few sample routes (origin -> destination) so the map looks good.
 const SAMPLE_ROUTES = [
   [
-    { label: 'Origen: Barcelona, ES', lat: 41.3874, lng: 2.1686 },
-    { label: 'Centro de distribucion, Madrid, ES', lat: 40.4168, lng: -3.7038 },
-    { label: 'Hub internacional, Paris, FR', lat: 48.8566, lng: 2.3522 },
-    { label: 'Destino: Lisboa, PT', lat: 38.7223, lng: -9.1393 },
+    { label: 'Origin: Barcelona, ES', lat: 41.3874, lng: 2.1686 },
+    { label: 'Distribution center, Madrid, ES', lat: 40.4168, lng: -3.7038 },
+    { label: 'International hub, Paris, FR', lat: 48.8566, lng: 2.3522 },
+    { label: 'Destination: Lisbon, PT', lat: 38.7223, lng: -9.1393 },
   ],
   [
-    { label: 'Origen: Barcelona, ES', lat: 41.3874, lng: 2.1686 },
-    { label: 'Centro de distribucion, Valencia, ES', lat: 39.4699, lng: -0.3763 },
-    { label: 'Destino: Sevilla, ES', lat: 37.3891, lng: -5.9845 },
+    { label: 'Origin: Barcelona, ES', lat: 41.3874, lng: 2.1686 },
+    { label: 'Distribution center, Valencia, ES', lat: 39.4699, lng: -0.3763 },
+    { label: 'Destination: Seville, ES', lat: 37.3891, lng: -5.9845 },
   ],
   [
-    { label: 'Origen: Barcelona, ES', lat: 41.3874, lng: 2.1686 },
+    { label: 'Origin: Barcelona, ES', lat: 41.3874, lng: 2.1686 },
     { label: 'Hub, Frankfurt, DE', lat: 50.1109, lng: 8.6821 },
-    { label: 'Hub, Londres, UK', lat: 51.5074, lng: -0.1278 },
-    { label: 'Destino: Dublin, IE', lat: 53.3498, lng: -6.2603 },
+    { label: 'Hub, London, UK', lat: 51.5074, lng: -0.1278 },
+    { label: 'Destination: Dublin, IE', lat: 53.3498, lng: -6.2603 },
   ],
 ];
 
@@ -69,8 +69,9 @@ function mockTrackingUpdate(carrier, trackingNumber, shipment) {
   const rand = seededRandom(carrier + trackingNumber);
   const route = SAMPLE_ROUTES[Math.floor(rand() * SAMPLE_ROUTES.length) % SAMPLE_ROUTES.length];
 
-  // El envio "avanza" un checkpoint cada vez que se refresca, hasta llegar
-  // a destino. Guardamos el progreso en el propio shipment (checkpointIndex).
+  // The shipment "advances" one checkpoint every time it's refreshed,
+  // until it reaches the destination. Progress is stored on the shipment
+  // itself (checkpointIndex).
   const prevIndex = typeof shipment.checkpointIndex === 'number' ? shipment.checkpointIndex : -1;
   const nextIndex = Math.min(prevIndex + 1, route.length - 1);
 
@@ -95,29 +96,29 @@ function mockTrackingUpdate(carrier, trackingNumber, shipment) {
 }
 
 // ---------------------------------------------------------------------
-// MODO LIVE: en vez de integrar cada courier por separado (4 flujos de
-// OAuth distintos), usamos Ship24 (https://ship24.com) como agregador:
-// una sola API key cubre FedEx/UPS/DHL/USPS y +2500 couriers mas,
-// detectando el carrier automaticamente por el formato del numero.
+// LIVE MODE: instead of integrating each courier separately (4 different
+// OAuth flows), we use Ship24 (https://ship24.com) as an aggregator: one
+// API key covers FedEx/UPS/DHL/USPS and 2500+ more couriers, auto-detecting
+// the carrier from the tracking number's format.
 //
-// Flujo (documentado en https://docs.ship24.com, spec OpenAPI en
+// Flow (documented at https://docs.ship24.com, OpenAPI spec at
 // https://docs.ship24.com/assets/openapi/ship24-tracking-api.yaml):
-//   POST /public/v1/trackers/track  con { trackingNumber }
-//   Este endpoint es idempotente: crea el tracker la primera vez y
-//   despues siempre devuelve los resultados actuales - un solo llamado
-//   por refresh nos alcanza, sin pasos separados de registro/consulta.
+//   POST /public/v1/trackers/track  with { trackingNumber }
+//   This endpoint is idempotent: it creates the tracker on the first
+//   call and always returns the current results afterwards - a single
+//   call per refresh is enough, no separate register/query steps.
 //
-// Los couriers reales solo dan el nombre del lugar de cada evento
-// ("Memphis, TN, US"), no coordenadas: geocodificamos cada checkpoint
-// con Nominatim (services/geocode.js) para poder seguir dibujando la
-// ruta en el mapa.
+// Real couriers only give the place name for each event
+// ("Memphis, TN, US"), not coordinates: we geocode each checkpoint with
+// Nominatim (services/geocode.js) so we can keep drawing the route on
+// the map.
 // ---------------------------------------------------------------------
 const { geocodeLocation } = require('./geocode');
 
 const SHIP24_BASE = 'https://api.ship24.com/public/v1';
 
-// Los 8 milestones oficiales (docs.ship24.com/status/#statusmilestone,
-// via el skill ship24-tracking-statuses instalado en este proyecto).
+// The 8 official milestones (docs.ship24.com/status/#statusmilestone,
+// via the ship24-tracking-statuses skill installed in this project).
 const SHIP24_MILESTONE_MAP = {
   pending: 'label_created',
   info_received: 'label_created',
@@ -132,7 +133,7 @@ const SHIP24_MILESTONE_MAP = {
 async function ship24Track(trackingNumber) {
   const apiKey = process.env.SHIP24_API_KEY;
   if (!apiKey) {
-    throw new Error('Falta SHIP24_API_KEY en .env. Registrate en https://www.ship24.com/tracking-api para conseguir una.');
+    throw new Error('Missing SHIP24_API_KEY in .env. Sign up at https://www.ship24.com/tracking-api to get one.');
   }
   const res = await fetch(`${SHIP24_BASE}/trackers/track`, {
     method: 'POST',
@@ -141,7 +142,7 @@ async function ship24Track(trackingNumber) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(`Ship24 respondio ${res.status}: ${JSON.stringify(data).slice(0, 200)}`);
+    throw new Error(`Ship24 responded ${res.status}: ${JSON.stringify(data).slice(0, 200)}`);
   }
   return data;
 }
@@ -149,7 +150,7 @@ async function ship24Track(trackingNumber) {
 async function parseShip24Response(data) {
   const tracking = data?.data?.trackings?.[0];
   if (!tracking) {
-    // Recien creado, el courier todavia no reporto nada.
+    // Just created, the courier hasn't reported anything yet.
     return {
       status: 'label_created',
       statusLabel: STATUS_LABELS.label_created,
@@ -181,8 +182,8 @@ async function parseShip24Response(data) {
     });
   }
 
-  // El mapa necesita coordenadas: si alguna no se pudo geocodificar, la
-  // sacamos de la ruta (pero el checkpoint sigue listado en el timeline).
+  // The map needs coordinates: if any couldn't be geocoded, we drop it
+  // from the route (but the checkpoint still shows up in the timeline).
   const fullRoute = geocoded.filter((p) => p.lat != null && p.lng != null);
   const checkpoints = geocoded.map((p) => ({
     label: p.label,

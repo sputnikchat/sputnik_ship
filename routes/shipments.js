@@ -20,9 +20,9 @@ router.get('/', (req, res) => {
 router.post('/', async (req, res) => {
   const { carrier, trackingNumber, contactId, label } = req.body || {};
   if (!carrier || !CARRIERS.includes(String(carrier).toLowerCase())) {
-    return res.status(400).json({ error: `El courier debe ser uno de: ${CARRIERS.join(', ')}` });
+    return res.status(400).json({ error: `Courier must be one of: ${CARRIERS.join(', ')}` });
   }
-  if (!trackingNumber) return res.status(400).json({ error: 'El numero de tracking es obligatorio.' });
+  if (!trackingNumber) return res.status(400).json({ error: 'Tracking number is required.' });
 
   const shipment = {
     id: uuidv4(),
@@ -32,7 +32,7 @@ router.post('/', async (req, res) => {
     contactId: contactId || null,
     label: label || '',
     status: 'label_created',
-    statusLabel: 'Etiqueta creada',
+    statusLabel: 'Label created',
     checkpointIndex: -1,
     checkpoints: [],
     fullRoute: [],
@@ -47,8 +47,8 @@ router.post('/', async (req, res) => {
     data.shipments.push(shipment);
   });
 
-  // Primera consulta de tracking inmediata, para que el envio no aparezca
-  // vacio hasta el proximo ciclo del scheduler (cada 30 min por defecto).
+  // Fetch tracking immediately so the shipment doesn't sit empty until
+  // the next scheduler cycle (every 30 min by default).
   try {
     const result = await getTrackingUpdate(shipment.carrier, shipment.trackingNumber, shipment);
     await update((data) => {
@@ -67,13 +67,13 @@ router.post('/', async (req, res) => {
       pushNotification(data, {
         userId: s.userId,
         shipmentId: s.id,
-        title: `Envio agregado: ${s.trackingNumber} (${s.carrier.toUpperCase()})`,
-        message: `Estado inicial: ${result.statusLabel}`,
+        title: `Shipment added: ${s.trackingNumber} (${s.carrier.toUpperCase()})`,
+        message: `Initial status: ${result.statusLabel}`,
         level: 'info',
       });
     });
   } catch (err) {
-    console.error('No se pudo obtener el tracking inicial:', err.message);
+    console.error('Could not fetch initial tracking:', err.message);
   }
 
   const db = readDB();
@@ -83,15 +83,15 @@ router.post('/', async (req, res) => {
 router.get('/:id', (req, res) => {
   const db = readDB();
   const shipment = db.shipments.find((s) => s.id === req.params.id && s.userId === req.user.id);
-  if (!shipment) return res.status(404).json({ error: 'Envio no encontrado.' });
+  if (!shipment) return res.status(404).json({ error: 'Shipment not found.' });
   res.json(shipment);
 });
 
-// Forzar una actualizacion manual de UN envio (ademas del refresh automatico cada 30 min).
+// Force a manual refresh of ONE shipment (besides the automatic refresh every 30 min).
 router.post('/:id/refresh', async (req, res) => {
   const db = readDB();
   const shipment = db.shipments.find((s) => s.id === req.params.id && s.userId === req.user.id);
-  if (!shipment) return res.status(404).json({ error: 'Envio no encontrado.' });
+  if (!shipment) return res.status(404).json({ error: 'Shipment not found.' });
 
   try {
     const result = await getTrackingUpdate(shipment.carrier, shipment.trackingNumber, shipment);
@@ -113,8 +113,8 @@ router.post('/:id/refresh', async (req, res) => {
         pushNotification(data, {
           userId: s.userId,
           shipmentId: s.id,
-          title: `Envio ${s.trackingNumber} (${s.carrier.toUpperCase()})`,
-          message: `Nuevo estado: ${result.statusLabel}`,
+          title: `Shipment ${s.trackingNumber} (${s.carrier.toUpperCase()})`,
+          message: `New status: ${result.statusLabel}`,
           level: result.status === 'delivered' ? 'success' : 'info',
         });
       }
@@ -122,7 +122,7 @@ router.post('/:id/refresh', async (req, res) => {
     });
     res.json(updated);
   } catch (err) {
-    res.status(502).json({ error: `No se pudo actualizar el tracking: ${err.message}` });
+    res.status(502).json({ error: `Could not update tracking: ${err.message}` });
   }
 });
 
@@ -134,12 +134,12 @@ router.delete('/:id', async (req, res) => {
     data.shipments = data.shipments.filter((s) => !(s.id === id && s.userId === req.user.id));
     found = data.shipments.length < before;
   });
-  if (!found) return res.status(404).json({ error: 'Envio no encontrado.' });
+  if (!found) return res.status(404).json({ error: 'Shipment not found.' });
   res.status(204).end();
 });
 
-// Dispara manualmente el ciclo de refresh de TODOS los envios (lo mismo
-// que hace el scheduler cada 30 min). Util para probar sin esperar.
+// Manually triggers the refresh cycle for ALL shipments (the same thing
+// the scheduler does every 30 min). Useful for testing without waiting.
 router.post('/refresh-all/now', async (req, res) => {
   await refreshAllShipments();
   const db = readDB();

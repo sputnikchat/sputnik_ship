@@ -35,18 +35,18 @@
     });
     if (res.status === 401) {
       logout();
-      throw new Error('Sesión vencida, entrá de nuevo.');
+      throw new Error('Session expired, please log in again.');
     }
     if (res.status === 204) return null;
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'Error de red');
+    if (!res.ok) throw new Error(data.error || 'Network error');
     return data;
   }
 
   const CARRIER_LABEL = { fedex: 'FedEx', ups: 'UPS', dhl: 'DHL', usps: 'USPS' };
 
-  // Heuristica simple por formato de numero de tracking, igual a lo que
-  // hacen ParcelsApp/17TRACK para no obligar a elegir el courier a mano.
+  // Simple heuristic based on tracking number format, same approach
+  // ParcelsApp/17TRACK use so people don't have to pick the courier by hand.
   function detectCarrier(raw) {
     const t = (raw || '').replace(/\s+/g, '').toUpperCase();
     if (!t) return null;
@@ -60,7 +60,7 @@
   function fmtDate(iso) {
     if (!iso) return '—';
     const d = new Date(iso);
-    return d.toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleString('en-US', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
   }
 
   // ---------------- auth ----------------
@@ -184,7 +184,7 @@
     );
 
     if (!items.length) {
-      list.innerHTML = `<div class="empty">Todavía no agregaste contactos.<br>Tocá "+ Nuevo contacto" para empezar.</div>`;
+      list.innerHTML = `<div class="empty">You haven't added any contacts yet.<br>Tap "+ New contact" to get started.</div>`;
       return;
     }
 
@@ -197,8 +197,8 @@
           </div>
         </div>
         <div class="card-actions">
-          <button class="btn-secondary edit-contact" data-id="${c.id}">Editar</button>
-          <button class="btn-secondary delete-contact" data-id="${c.id}">Eliminar</button>
+          <button class="btn-secondary edit-contact" data-id="${c.id}">Edit</button>
+          <button class="btn-secondary delete-contact" data-id="${c.id}">Delete</button>
         </div>
       </div>
     `).join('');
@@ -209,9 +209,9 @@
     $all('.delete-contact', list).forEach((btn) =>
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (!confirm('¿Eliminar este contacto?')) return;
+        if (!confirm('Delete this contact?')) return;
         await api(`/contacts/${btn.dataset.id}`, { method: 'DELETE' });
-        toast('Contacto eliminado');
+        toast('Contact deleted');
         loadContacts();
       })
     );
@@ -222,7 +222,7 @@
   function renderShipmentContactOptions() {
     const select = $('#shipment-form select[name="contactId"]');
     const current = select.value;
-    select.innerHTML = '<option value="">— Ninguno —</option>' +
+    select.innerHTML = '<option value="">— None —</option>' +
       state.contacts.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
     select.value = current;
   }
@@ -233,7 +233,7 @@
     form.reset();
     if (id) {
       const c = state.contacts.find((x) => x.id === id);
-      $('#contact-modal-title').textContent = 'Editar contacto';
+      $('#contact-modal-title').textContent = 'Edit contact';
       form.id.value = c.id;
       form.name.value = c.name;
       form.phone.value = c.phone || '';
@@ -242,7 +242,7 @@
       form.address.value = c.address || '';
       form.notes.value = c.notes || '';
     } else {
-      $('#contact-modal-title').textContent = 'Nuevo contacto';
+      $('#contact-modal-title').textContent = 'New contact';
       form.id.value = '';
     }
     $('#contact-modal').hidden = false;
@@ -262,7 +262,7 @@
         await api('/contacts', { method: 'POST', body: fd });
       }
       $('#contact-modal').hidden = true;
-      toast('Contacto guardado');
+      toast('Contact saved');
       loadContacts();
     } catch (err) {
       toast(err.message);
@@ -271,10 +271,8 @@
 
   // ---------------- greeting ----------------
   function renderGreeting() {
-    const hour = new Date().getHours();
-    const saludo = hour < 12 ? 'Buenos días' : hour < 20 ? 'Buenas tardes' : 'Buenas noches';
     const handle = state.user?.handle || '';
-    $('#greeting-title').textContent = handle ? `${saludo}, @${handle}` : saludo;
+    $('#greeting-title').textContent = handle ? `@${handle}` : 'Hi';
     const initial = handle ? handle[0].toUpperCase() : '?';
     $('#greeting-avatar').textContent = initial;
     $('#topbar-avatar').textContent = initial;
@@ -282,8 +280,8 @@
     const active = state.shipments.filter((s) => s.status !== 'delivered').length;
     $('#active-shipments-count').textContent = active;
     $('#greeting-sub').textContent = active
-      ? `Tenés ${active} envío${active === 1 ? '' : 's'} en camino.`
-      : 'No tenés envíos en camino ahora mismo.';
+      ? `You have ${active} shipment${active === 1 ? '' : 's'} on the way.`
+      : 'No shipments on the way right now.';
   }
 
   // ---------------- render: shipments ----------------
@@ -296,11 +294,11 @@
     );
 
     if (!state.shipments.length) {
-      list.innerHTML = `<div class="empty">Todavía no agregaste envíos.<br>Tocá "+ Nuevo envío" para empezar a hacer seguimiento.</div>`;
+      list.innerHTML = `<div class="empty">You haven't added any shipments yet.<br>Tap "+ New shipment" to start tracking.</div>`;
       return;
     }
     if (!items.length) {
-      list.innerHTML = `<div class="empty">Ningún envío coincide con "${escapeHtml(q)}".</div>`;
+      list.innerHTML = `<div class="empty">No shipment matches "${escapeHtml(q)}".</div>`;
       return;
     }
     list.innerHTML = items.map((s) => {
@@ -316,7 +314,7 @@
           </div>
           <div class="card-row" style="margin-top:8px; align-items:center;">
             <span class="badge status-${s.status}">${escapeHtml(s.statusLabel || s.status)}</span>
-            <span class="card-sub">Últ. chequeo: ${fmtDate(s.lastCheckedAt)}</span>
+            <span class="card-sub">Last checked: ${fmtDate(s.lastCheckedAt)}</span>
           </div>
         </div>
       `;
@@ -344,7 +342,7 @@
     const select = $('#shipment-form select[name="carrier"]');
     if (carrier) {
       select.value = carrier;
-      hint.textContent = `Detectado: ${CARRIER_LABEL[carrier]}`;
+      hint.textContent = `Detected: ${CARRIER_LABEL[carrier]}`;
     } else {
       hint.textContent = '';
     }
@@ -357,7 +355,7 @@
       await api('/shipments', { method: 'POST', body: fd });
       $('#shipment-modal').hidden = true;
       e.target.reset();
-      toast('Envío agregado, buscando tracking…');
+      toast('Shipment added, looking up tracking…');
       await loadShipments();
     } catch (err) {
       toast(err.message);
@@ -365,12 +363,12 @@
   });
 
   $('#refresh-now-btn').addEventListener('click', async () => {
-    toast('Actualizando envíos…');
+    toast('Refreshing shipments…');
     try {
       await api('/shipments/refresh-all/now', { method: 'POST' });
       await loadShipments();
       await loadNotifications();
-      toast('Envíos actualizados');
+      toast('Shipments updated');
     } catch (err) {
       toast(err.message);
     }
@@ -381,14 +379,14 @@
     state.currentShipmentId = id;
     showView('shipment-detail');
     renderShipmentDetail();
-    // refrescamos ese envío puntual al entrar, para ver el ultimo estado
+    // Refresh this specific shipment on open, to show the latest status.
     try {
       const updated = await api(`/shipments/${id}/refresh`, { method: 'POST' });
       const idx = state.shipments.findIndex((s) => s.id === id);
       if (idx >= 0) state.shipments[idx] = updated;
       renderShipmentDetail();
     } catch (err) {
-      // si falla el refresh puntual, igual mostramos lo que ya tenemos
+      // If the targeted refresh fails, we still show what we already have.
     }
   }
 
@@ -407,31 +405,31 @@
       </div>
       <span class="badge status-${s.status}" style="margin-top:10px; display:inline-block;">${escapeHtml(s.statusLabel || s.status)}</span>
       <div class="hero-eta">
-        <small>Entrega estimada</small>
+        <small>Estimated delivery</small>
         ${fmtDate(s.estimatedDelivery)}
       </div>
-      <p class="small muted" style="margin:2px 0 0;">Último chequeo: ${fmtDate(s.lastCheckedAt)}</p>
+      <p class="small muted" style="margin:2px 0 0;">Last checked: ${fmtDate(s.lastCheckedAt)}</p>
       ${contact ? `<p class="small" style="margin-top:10px;">📇 ${escapeHtml(contact.name)}</p>` : ''}
-      <button class="btn-secondary small" id="delete-shipment-btn" style="margin-top:14px;">Eliminar envío</button>
+      <button class="btn-secondary small" id="delete-shipment-btn" style="margin-top:14px;">Delete shipment</button>
     `;
 
     $('#delete-shipment-btn').addEventListener('click', async () => {
-      if (!confirm('¿Eliminar este envío?')) return;
+      if (!confirm('Delete this shipment?')) return;
       await api(`/shipments/${s.id}`, { method: 'DELETE' });
-      toast('Envío eliminado');
+      toast('Shipment deleted');
       state.currentShipmentId = null;
       showView('shipments');
       loadShipments();
     });
 
-    // El mapa depende de una librería externa (Leaflet); si por lo que sea no
-    // cargó (sin internet, un bloqueador, una red restringida) no queremos
-    // que eso rompa el resto del detalle del envío.
+    // The map depends on an external library (Leaflet); if it fails to
+    // load for any reason (offline, a blocker, a restricted network) we
+    // don't want that to break the rest of the shipment detail.
     try {
       renderMap(s);
     } catch (err) {
-      console.error('No se pudo dibujar el mapa:', err);
-      $('#map').innerHTML = '<div class="empty" style="padding:20px;">No se pudo cargar el mapa (sin conexión al proveedor de mapas). El resto de la información del envío sigue disponible abajo.</div>';
+      console.error('Could not render the map:', err);
+      $('#map').innerHTML = '<div class="empty" style="padding:20px;">Could not load the map (no connection to the map provider). The rest of the shipment info is still available below.</div>';
     }
     renderCheckpoints(s);
   }
@@ -441,11 +439,11 @@
     const route = shipment.fullRoute && shipment.fullRoute.length ? shipment.fullRoute : null;
 
     if (!route) {
-      container.innerHTML = '<div class="empty" style="padding:20px;">El mapa aparece en cuanto el courier reporte el primer checkpoint.</div>';
+      container.innerHTML = '<div class="empty" style="padding:20px;">The map will appear as soon as the courier reports the first checkpoint.</div>';
       return;
     }
     if (typeof L === 'undefined') {
-      container.innerHTML = '<div class="empty" style="padding:20px;">No se pudo cargar el mapa (sin conexión al proveedor de mapas). El resto de la información del envío sigue disponible abajo.</div>';
+      container.innerHTML = '<div class="empty" style="padding:20px;">Could not load the map (no connection to the map provider). The rest of the shipment info is still available below.</div>';
       return;
     }
     container.innerHTML = '';
@@ -509,7 +507,7 @@
     $('#notif-dot').hidden = unread === 0;
 
     if (!state.notifications.length) {
-      list.innerHTML = `<div class="empty">Sin notificaciones todavía. Te avisamos acá cuando cambie el estado de un envío.</div>`;
+      list.innerHTML = `<div class="empty">No notifications yet. We'll let you know here when a shipment's status changes.</div>`;
       return;
     }
 
@@ -537,7 +535,7 @@
     loadNotifications();
   });
 
-  // ---------------- push notifications del navegador (opcional) ----------------
+  // ---------------- browser push notifications (optional) ----------------
   function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
     const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -559,13 +557,13 @@
       const existing = await reg.pushManager.getSubscription();
       updatePushButton(Boolean(existing));
     } catch (err) {
-      // si el service worker no esta listo todavia, dejamos el boton en su estado inicial
+      // If the service worker isn't ready yet, leave the button in its default state.
     }
   }
 
   function updatePushButton(subscribed) {
     const btn = $('#push-toggle-btn');
-    btn.textContent = subscribed ? 'Notificaciones activadas ✓' : 'Activar notificaciones';
+    btn.textContent = subscribed ? 'Notifications enabled ✓' : 'Enable notifications';
   }
 
   $('#push-toggle-btn').addEventListener('click', async () => {
@@ -574,19 +572,19 @@
       const reg = await navigator.serviceWorker.ready;
       const existing = await reg.pushManager.getSubscription();
       if (existing) {
-        toast('Las notificaciones ya están activadas en este navegador.');
+        toast('Notifications are already enabled in this browser.');
         return;
       }
 
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
-        toast('No se concedió el permiso de notificaciones.');
+        toast('Notification permission was not granted.');
         return;
       }
 
       const { publicKey } = await api('/push/vapid-public-key');
       if (!publicKey) {
-        toast('El servidor todavía no tiene configuradas las notificaciones push.');
+        toast('The server does not have push notifications configured yet.');
         return;
       }
 
@@ -596,9 +594,9 @@
       });
       await api('/push/subscribe', { method: 'POST', body: sub.toJSON() });
       updatePushButton(true);
-      toast('Notificaciones activadas');
+      toast('Notifications enabled');
     } catch (err) {
-      toast('No se pudo activar las notificaciones: ' + err.message);
+      toast('Could not enable notifications: ' + err.message);
     }
   });
 
@@ -608,10 +606,10 @@
     }[c]));
   }
 
-  // ---------------- polling ligero mientras la app esta abierta ----------------
-  // Ademas del refresh automatico del servidor cada 30 min, refrescamos
-  // notificaciones/envios cada 2 min mientras el usuario tiene la app abierta,
-  // para que se vea al toque si el scheduler encontro cambios.
+  // ---------------- light polling while the app is open ----------------
+  // Besides the server's automatic refresh every 30 min, we refresh
+  // notifications/shipments every 2 min while the app is open, so
+  // changes picked up by the scheduler show up quickly.
   setInterval(() => {
     if (state.token) {
       loadNotifications().catch(() => {});

@@ -1,88 +1,88 @@
 # Sputnik Ship
 
-App para guardar contactos y hacer seguimiento de envíos (FedEx, UPS, DHL, USPS) en un solo lugar:
+An app to keep contacts and track shipments (FedEx, UPS, DHL, USPS) in one place:
 
-- Login simple con email y contraseña — **sin verificación de identidad (KYC)**.
-- Agenda de contactos (nombre, teléfono, email, empresa, dirección, notas).
-- Envíos asociados a un contacto, con courier y número de tracking.
-- Actualización automática del estado de cada envío **cada 30 minutos** (configurable).
-- Notificaciones cuando cambia el estado de un envío.
-- Mapa con la ruta del envío (origen → checkpoints → destino) con [Leaflet](https://leafletjs.com/) + OpenStreetMap.
-- Funciona en el navegador y es instalable como **PWA** (ícono en la pantalla de inicio del celular, en Android y iOS).
+- Simple login with a username and password — **no identity verification (KYC)**.
+- Contact book (name, phone, email, company, address, notes).
+- Shipments linked to a contact, with courier and tracking number.
+- Automatic status updates for every shipment **every 30 minutes** (configurable).
+- Notifications when a shipment's status changes.
+- Map with the shipment's route (origin → checkpoints → destination) via [Leaflet](https://leafletjs.com/) + OpenStreetMap.
+- Works in the browser and is installable as a **PWA** (home screen icon, on Android and iOS).
 
-Por defecto la app corre con **datos de tracking simulados** (`TRACKING_MODE=mock`), para que puedas probar todo el flujo — contactos, envíos, mapa, notificaciones — sin necesitar todavía cuentas con los couriers. Cuando tengas las credenciales de FedEx/UPS/DHL/USPS, seguís los pasos de la sección "Conectar las APIs reales" y pasás a `TRACKING_MODE=live`.
+By default the app runs with **simulated tracking data** (`TRACKING_MODE=mock`), so you can try the whole flow — contacts, shipments, map, notifications — without needing courier accounts yet. Once you have FedEx/UPS/DHL/USPS credentials, follow the "Connecting real tracking" section and switch to `TRACKING_MODE=live`.
 
-## Cómo correrla en tu computadora
+## Running it on your computer
 
-Necesitás [Node.js](https://nodejs.org/) 18 o más nuevo instalado.
+You need [Node.js](https://nodejs.org/) 18 or newer installed.
 
 ```bash
 cd sputnik-ship
 npm install
 cp .env.example .env
-# abrí .env y al menos cambiá JWT_SECRET por un texto largo random
+# open .env and at least change JWT_SECRET to a long random string
 npm start
 ```
 
-Abrí `http://localhost:3000` en el navegador, creá tu cuenta (Crear cuenta) y ya podés usar la app.
+Open `http://localhost:3000` in your browser, create your account (Sign up), and you're ready to use the app.
 
-> Nota: en el entorno donde se generó este proyecto no había acceso a internet para bajar los paquetes de npm, así que `npm install` no se corrió acá — se probó la sintaxis de todos los archivos y la lógica interna (base de datos, simulador de tracking) por separado. En tu computadora, con internet normal, `npm install` va a funcionar sin problema.
+> Note: in the environment where this project was generated there was no internet access to download npm packages, so `npm install` wasn't run there — the syntax of every file and the internal logic (database, tracking simulator) were tested separately. On your own computer, with normal internet, `npm install` will work fine.
 
-## Cómo probar el seguimiento sin esperar 30 minutos
+## Testing tracking without waiting 30 minutes
 
-- Botón **"Actualizar ahora"** en la pantalla de Envíos: fuerza el mismo ciclo que corre automáticamente cada 30 min, para todos los envíos.
-- Al abrir el detalle de un envío también se refresca ese envío puntual.
-- Cada vez que agregás un envío nuevo, se consulta el tracking inicial al toque.
+- The **"Refresh now"** button on the Shipments screen: forces the same cycle that runs automatically every 30 min, for every shipment.
+- Opening a shipment's detail view also refreshes that specific shipment.
+- Every time you add a new shipment, its initial tracking is looked up immediately.
 
-Con datos simulados, cada refresh hace "avanzar" el envío un checkpoint más en su ruta (creado → retirado → en tránsito → en reparto → entregado), así podés ver notificaciones y el mapa moverse sin esperar.
+With simulated data, every refresh "advances" the shipment one checkpoint further along its route (created → picked up → in transit → out for delivery → delivered), so you can see notifications and the map move without waiting.
 
-## Estructura del proyecto
+## Project structure
 
 ```
 sputnik-ship/
-  server.js                  Servidor Express (API + sirve el frontend)
+  server.js                  Express server (API + serves the frontend)
   routes/
-    auth.js                  Registro / login (JWT, sin KYC)
-    contacts.js               CRUD de contactos
-    shipments.js              CRUD de envíos + refresh de tracking
-    notifications.js          Notificaciones
+    auth.js                  Signup / login (JWT, no KYC)
+    contacts.js               Contact CRUD
+    shipments.js              Shipment CRUD + tracking refresh
+    notifications.js          Notifications
   services/
-    store.js                  Base de datos en un archivo JSON local (data/db.json)
-    carrierProviders.js       Motor de tracking: modo mock + stubs para FedEx/UPS/DHL/USPS reales
-    scheduler.js               Cron que refresca todos los envíos cada 30 min
-    notify.js                  Crea notificaciones (+ email opcional)
-  middleware/auth.js          Verifica el token JWT en cada request
-  public/                     Frontend (HTML/CSS/JS sin frameworks) + PWA (manifest, service worker)
+    store.js                  Database in a local JSON file (data/db.json)
+    carrierProviders.js       Tracking engine: mock mode + real FedEx/UPS/DHL/USPS stubs
+    scheduler.js               Cron that refreshes every shipment every 30 min
+    notify.js                  Creates notifications (+ optional email)
+  middleware/auth.js          Verifies the JWT token on every request
+  public/                     Frontend (framework-free HTML/CSS/JS) + PWA (manifest, service worker)
 ```
 
-## Conectar tracking real (Ship24)
+## Connecting real tracking (Ship24)
 
-En vez de crear una cuenta de developer separada en cada courier (FedEx, UPS,
-DHL, USPS — cada uno con su propio flujo de OAuth), la app usa
-[Ship24](https://www.ship24.com/tracking-api) como agregador: **una sola
-API key** cubre esos 4 y +2500 couriers más, detectando el carrier
-automáticamente por el formato del número.
+Instead of creating a separate developer account with each courier (FedEx,
+UPS, DHL, USPS — each with its own OAuth flow), the app uses
+[Ship24](https://www.ship24.com/tracking-api) as an aggregator: **a single
+API key** covers those 4 plus 2500+ more couriers, auto-detecting the
+carrier from the tracking number's format.
 
-1. Registrate en [ship24.com/tracking-api](https://www.ship24.com/tracking-api)
-   (plan gratis: 10 envíos/mes, con bonus de 100 el primer mes).
-2. Pegá tu key en `.env`: `SHIP24_API_KEY=...`
-3. Cambiá `TRACKING_MODE=live` en `.env` y reiniciá el servidor.
+1. Sign up at [ship24.com/tracking-api](https://www.ship24.com/tracking-api)
+   (free plan: 10 shipments/month, with a 100-shipment bonus the first month).
+2. Paste your key into `.env`: `SHIP24_API_KEY=...`
+3. Set `TRACKING_MODE=live` in `.env` and restart the server.
 
-Los couriers reales solo informan el nombre del lugar de cada checkpoint
-("Memphis, TN, US"), no coordenadas — por eso, en modo `live`, la app
-geocodifica cada ubicación con Nominatim/OpenStreetMap (mismo proveedor que
-ya usa el mapa) para poder seguir dibujando la ruta. Eso agrega una demora
-chica la primera vez que aparece un lugar nuevo (después queda en caché).
+Real couriers only report the place name for each checkpoint
+("Memphis, TN, US"), not coordinates — that's why, in `live` mode, the app
+geocodes each location with Nominatim/OpenStreetMap (the same provider the
+map already uses) so it can keep drawing the route. That adds a small delay
+the first time a new place shows up (it's cached after that).
 
-La integración está escrita contra la especificación oficial de Ship24
+The integration is written against Ship24's official spec
 ([OpenAPI](https://docs.ship24.com/assets/openapi/ship24-tracking-api.yaml)),
-así que los nombres de campo en `parseShip24Response()`
-(`services/carrierProviders.js`) deberían coincidir con la respuesta real —
-igual conviene probarlo una vez que actives `live` con tu key.
+so the field names in `parseShip24Response()`
+(`services/carrierProviders.js`) should match the real response — it's
+still worth testing once you turn on `live` with your key.
 
-## Notificaciones por email (opcional)
+## Email notifications (optional)
 
-Las notificaciones siempre quedan guardadas dentro de la app (campanita 🔔). Si además querés recibirlas por email, completá en `.env`:
+Notifications always stay saved inside the app (the 🔔 bell). If you also want to receive them by email, fill this in `.env`:
 
 ```
 NOTIFY_EMAIL_ENABLED=true
@@ -94,56 +94,56 @@ NOTIFY_EMAIL_FROM=...
 NOTIFY_EMAIL_TO=...
 ```
 
-Y agregá la dependencia: `npm install nodemailer`.
+And add the dependency: `npm install nodemailer`.
 
-## Notificaciones push del navegador (opcional)
+## Browser push notifications (optional)
 
-Además de la campanita dentro de la app, podés activar notificaciones push
-reales del navegador (avisan aunque tengas la app cerrada). Son opcionales:
-si no configurás nada, el resto de la app funciona igual.
+Besides the in-app bell, you can enable real browser push notifications
+(they alert you even with the app closed). They're optional: if you don't
+configure anything, the rest of the app works the same.
 
-1. Generá las claves una sola vez: `npx web-push generate-vapid-keys`.
-2. Pegalas en tu `.env`:
+1. Generate the keys once: `npx web-push generate-vapid-keys`.
+2. Paste them into your `.env`:
 
 ```
 VAPID_PUBLIC_KEY=...
 VAPID_PRIVATE_KEY=...
-VAPID_SUBJECT=mailto:tu-email@ejemplo.com
+VAPID_SUBJECT=mailto:your-email@example.com
 ```
 
-3. Reiniciá el servidor, entrá a la pestaña **Avisos** dentro de la app y
-   tocá **"Activar notificaciones"** — el navegador te va a pedir permiso.
+3. Restart the server, open the **Alerts** tab inside the app, and tap
+   **"Enable notifications"** — the browser will ask for permission.
 
-En `localhost` funciona bien para probar en Chrome. Para que ande para
-otras personas hace falta desplegar la app con HTTPS real (ver la sección
-de despliegue más abajo).
+It works fine on `localhost` for testing in Chrome. For it to work for
+other people you'll need to deploy the app with real HTTPS (see the
+deployment section below).
 
-## Cambiar cada cuánto se actualiza
+## Changing how often it refreshes
 
-En `.env`, `TRACKING_REFRESH_MINUTES=30` (podés bajarlo a 5 o 10 mientras probás, por ejemplo).
+In `.env`, `TRACKING_REFRESH_MINUTES=30` (you can lower it to 5 or 10 while testing, for example).
 
-## Cerrar el registro (solo vos como usuario)
+## Closing signup (just you as the user)
 
-Como elegiste que la app la uses solo vos, una vez que crees tu cuenta podés "cerrar" el registro para que nadie más pueda crear una cuenta nueva: en `routes/auth.js`, dentro de `/signup`, agregá al principio:
+Since you chose to use this app just for yourself, once you create your account you can "close" signup so no one else can create a new account: in `routes/auth.js`, inside `/signup`, add at the top:
 
 ```js
 if (db.users.length >= 1) {
-  return res.status(403).json({ error: 'El registro está cerrado.' });
+  return res.status(403).json({ error: 'Signup is closed.' });
 }
 ```
 
-## Desplegarla para que corra 24/7 (y así el refresh de 30 min funcione siempre)
+## Deploying it to run 24/7 (so the 30-min refresh always works)
 
-Mientras la app corre solo en tu computadora, el refresh automático de cada 30 min solo pasa cuando la computadora está prendida y `npm start` está corriendo. Para que ande todo el tiempo (y puedas abrirla desde el celular como una app instalada), lo más simple es desplegarla en un servicio gratuito/económico que mantenga un proceso Node corriendo, por ejemplo:
+While the app only runs on your computer, the automatic 30-min refresh only happens while the computer is on and `npm start` is running. To have it run all the time (and be able to open it from your phone as an installed app), the simplest option is deploying it to a free/cheap service that keeps a Node process running, for example:
 
-- **Render** (render.com) — plan gratuito para probar, "Web Service" desde este mismo código.
+- **Render** (render.com) — free plan to try it out, "Web Service" from this same code.
 - **Railway** (railway.app)
 - **Fly.io**
 
-En cualquiera de los tres: subís este proyecto (por ejemplo a un repositorio de GitHub), lo conectás al servicio, configurás las variables de entorno del `.env` en su panel, y el comando de arranque es `npm start`. Una vez desplegada, entrá a la URL pública desde el celular y usá "Agregar a pantalla de inicio" para instalarla como app.
+With any of the three: push this project (e.g. to a GitHub repo), connect it to the service, set the `.env` environment variables in its dashboard, and the start command is `npm start`. Once deployed, open the public URL from your phone and use "Add to Home Screen" to install it as an app.
 
-## Próximos pasos sugeridos
+## Suggested next steps
 
-- Conectar las APIs reales de los couriers que más uses (ver sección arriba).
-- Activar notificaciones push del navegador (Web Push) si querés avisos aunque la app esté cerrada — requiere desplegar con HTTPS.
-- Si más adelante necesitás que varias personas usen la app con sus propias cuentas, la base ya soporta múltiples usuarios (cada quien ve solo sus propios contactos y envíos).
+- Connect the real APIs for the couriers you use most (see section above).
+- Enable browser push notifications (Web Push) if you want alerts even while the app is closed — requires deploying with HTTPS.
+- If down the line you need several people to use the app with their own accounts, the foundation already supports multiple users (each one only sees their own contacts and shipments).

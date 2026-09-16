@@ -15,7 +15,7 @@ router.use(requireAuth);
 router.post('/subscribe', async (req, res) => {
   const { endpoint, keys } = req.body || {};
   if (!endpoint || !keys || !keys.p256dh || !keys.auth) {
-    return res.status(400).json({ error: 'Suscripcion invalida.' });
+    return res.status(400).json({ error: 'Invalid subscription.' });
   }
 
   await update((data) => {

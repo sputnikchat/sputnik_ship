@@ -12,9 +12,9 @@ const { startScheduler } = require('./services/scheduler');
 
 if (!process.env.JWT_SECRET) {
   console.warn(
-    '[AVISO] No hay JWT_SECRET en el entorno. Copia .env.example a .env y define uno antes de usar en produccion.'
+    '[WARNING] No JWT_SECRET set in the environment. Copy .env.example to .env and set one before using this in production.'
   );
-  process.env.JWT_SECRET = process.env.JWT_SECRET || 'secreto-de-desarrollo-cambiame';
+  process.env.JWT_SECRET = process.env.JWT_SECRET || 'change-me-dev-secret';
 }
 
 const app = express();
@@ -31,7 +31,7 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
 
-// Frontend estatico (PWA)
+// Static frontend (PWA)
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
@@ -40,6 +40,6 @@ app.get('*', (req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Sputnik Ship corriendo en http://localhost:${PORT}`);
+  console.log(`Sputnik Ship running at http://localhost:${PORT}`);
   startScheduler();
 });

@@ -1,13 +1,13 @@
-// Convierte nombres de lugar ("Memphis, TN, US") en coordenadas lat/lng
-// usando Nominatim (OpenStreetMap) - el mismo proveedor que ya usa el mapa
-// en el frontend. Los couriers reales (via 17TRACK) solo dan el nombre del
-// lugar, no coordenadas, asi que esto es lo que permite seguir dibujando
-// la ruta en el mapa con datos de tracking reales.
+// Converts place names ("Memphis, TN, US") into lat/lng coordinates
+// using Nominatim (OpenStreetMap) - the same provider the frontend map
+// already uses. Real couriers only give the place name, not
+// coordinates, so this is what keeps the route drawable on the map
+// with real tracking data.
 //
-// Nominatim pide como cortesia: maximo ~1 request/seg y un User-Agent que
-// identifique la app (https://operations.osmfoundation.org/policies/nominatim/).
-// Por eso cacheamos en memoria (un mismo hub aparece en muchos envios) y
-// espaciamos las llamadas nuevas.
+// Nominatim's courtesy policy asks for: max ~1 request/sec and a
+// User-Agent identifying the app (https://operations.osmfoundation.org/policies/nominatim/).
+// That's why we cache in memory (the same hub shows up across many
+// shipments) and space out new calls.
 
 const cache = new Map();
 let lastCallAt = 0;
@@ -21,7 +21,7 @@ async function geocodeLocation(text) {
   if (!key) return null;
   if (cache.has(key)) return cache.get(key);
 
-  // Espaciamos las llamadas nuevas a Nominatim (no las que pegan en cache).
+  // Space out new calls to Nominatim (not the ones that hit cache).
   const elapsed = Date.now() - lastCallAt;
   if (elapsed < 1100) await wait(1100 - elapsed);
   lastCallAt = Date.now();
@@ -29,9 +29,9 @@ async function geocodeLocation(text) {
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(key)}`;
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'SputnikShip/1.0 (tracking de envios personal; hello.chefjoice@gmail.com)' },
+      headers: { 'User-Agent': 'SputnikShip/1.0 (personal shipment tracker; hello.chefjoice@gmail.com)' },
     });
-    if (!res.ok) throw new Error(`Nominatim respondio ${res.status}`);
+    if (!res.ok) throw new Error(`Nominatim responded ${res.status}`);
     const results = await res.json();
     const point = results && results[0]
       ? { lat: Number(results[0].lat), lng: Number(results[0].lon) }
@@ -39,7 +39,7 @@ async function geocodeLocation(text) {
     cache.set(key, point);
     return point;
   } catch (err) {
-    console.error(`No se pudo geocodificar "${text}":`, err.message);
+    console.error(`Could not geocode "${text}":`, err.message);
     cache.set(key, null);
     return null;
   }

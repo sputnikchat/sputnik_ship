@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Sputnik Ship — Contactos y envíos</title>
+<title>Sputnik Ship — Contacts &amp; Shipments</title>
 <meta name="theme-color" content="#ff6b45" />
 <link rel="manifest" href="/manifest.json" />
 <link rel="icon" href="/icons/icon-192.png" />
@@ -18,53 +18,51 @@
 
 <div id="toast" class="toast" hidden></div>
 
-<!-- Pantalla de login / registro -->
+<!-- Login / signup screen -->
 <div id="auth-screen" class="auth-screen">
   <div class="auth-card">
     <div class="brand">
       <div class="brand-badge">🚀</div>
       <h1>Sputnik Ship</h1>
     </div>
-    <p class="muted">Contactos y seguimiento de envíos en un solo lugar.</p>
+    <p class="muted">Contacts and shipment tracking, all in one place.</p>
 
     <div class="tabs">
-      <button class="tab active" data-tab="login">Entrar</button>
-      <button class="tab" data-tab="signup">Crear cuenta</button>
+      <button class="tab active" data-tab="login">Log in</button>
+      <button class="tab" data-tab="signup">Sign up</button>
     </div>
 
     <form id="login-form" class="auth-form">
-      <label>Usuario
+      <label>Username
         <div class="handle-input">
           <span>@</span>
-          <input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="tuusuario" />
+          <input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourusername" />
         </div>
       </label>
-      <label>Contraseña
+      <label>Password
         <input type="password" name="password" required autocomplete="current-password" />
       </label>
-      <button type="submit" class="btn-primary">Entrar</button>
+      <button type="submit" class="btn-primary">Log in</button>
       <p class="error" id="login-error" hidden></p>
     </form>
 
     <form id="signup-form" class="auth-form" hidden>
-      <label>Usuario
+      <label>Username
         <div class="handle-input">
           <span>@</span>
-          <input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="tuusuario" />
+          <input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourusername" />
         </div>
       </label>
-      <label>Contraseña
+      <label>Password
         <input type="password" name="password" required minlength="6" autocomplete="new-password" />
       </label>
-      <button type="submit" class="btn-primary">Crear cuenta</button>
+      <button type="submit" class="btn-primary">Create account</button>
       <p class="error" id="signup-error" hidden></p>
     </form>
-
-    <p class="hint">Acceso simple con usuario y contraseña — sin nombre real, sin email, sin verificación de identidad (KYC).</p>
   </div>
 </div>
 
-<!-- App principal -->
+<!-- Main app -->
 <div id="app" class="app" hidden>
   <header class="topbar">
     <div class="brand-mini">
@@ -72,73 +70,73 @@
       <span>Sputnik Ship</span>
     </div>
     <div class="topbar-actions">
-      <button id="notif-btn" class="icon-btn" title="Notificaciones">
+      <button id="notif-btn" class="icon-btn" title="Notifications">
         🔔<span id="notif-dot" class="dot" hidden></span>
       </button>
-      <button id="logout-btn" class="icon-btn" title="Salir">⎋</button>
+      <button id="logout-btn" class="icon-btn" title="Log out">⎋</button>
       <div class="avatar avatar-sm" id="topbar-avatar">?</div>
     </div>
   </header>
 
   <nav class="bottom-nav">
-    <button class="nav-btn active" data-view="shipments">📦<span>Envíos</span></button>
-    <button class="nav-btn" data-view="contacts">👤<span>Contactos</span></button>
-    <button class="nav-btn" data-view="notifications">🔔<span>Avisos</span></button>
+    <button class="nav-btn active" data-view="shipments">📦<span>Shipments</span></button>
+    <button class="nav-btn" data-view="contacts">👤<span>Contacts</span></button>
+    <button class="nav-btn" data-view="notifications">🔔<span>Alerts</span></button>
   </nav>
 
   <main class="content">
 
-    <!-- Vista: Envíos -->
+    <!-- View: Shipments -->
     <section id="view-shipments" class="view active">
       <div class="greeting-glow"></div>
       <div class="greeting-row">
         <div class="greeting-with-avatar">
           <div class="avatar avatar-lg" id="greeting-avatar">?</div>
           <div class="greeting">
-            <h1 id="greeting-title">Hola</h1>
-            <p id="greeting-sub">Se actualizan automáticamente cada 30 minutos.</p>
+            <h1 id="greeting-title">Hi</h1>
+            <p id="greeting-sub">Updates automatically every 30 minutes.</p>
           </div>
         </div>
         <div class="stat-pill">
           <span class="stat-pill-icon">🚚</span>
-          <span class="stat-pill-text"><span class="stat-pill-num" id="active-shipments-count">0</span> en curso</span>
+          <span class="stat-pill-text"><span class="stat-pill-num" id="active-shipments-count">0</span> in progress</span>
         </div>
       </div>
       <div class="view-header">
-        <button id="refresh-now-btn" class="btn-secondary small">Actualizar ahora</button>
-        <button id="add-shipment-btn" class="btn-primary small">+ Nuevo envío</button>
+        <button id="refresh-now-btn" class="btn-secondary small">Refresh now</button>
+        <button id="add-shipment-btn" class="btn-primary small">+ New shipment</button>
       </div>
-      <input id="shipment-search" class="search" type="search" placeholder="Buscar por tracking o etiqueta…" />
+      <input id="shipment-search" class="search" type="search" placeholder="Search by tracking number or label…" />
       <div id="shipments-list" class="cards"></div>
     </section>
 
-    <!-- Vista: Detalle de envío + mapa -->
+    <!-- View: Shipment detail + map -->
     <section id="view-shipment-detail" class="view">
       <div class="view-header">
-        <button class="btn-secondary small" id="back-to-shipments">← Volver</button>
+        <button class="btn-secondary small" id="back-to-shipments">← Back</button>
       </div>
       <div id="map" class="map"></div>
       <div id="shipment-detail-body" class="shipment-hero"></div>
       <div id="checkpoints-list" class="checkpoints"></div>
     </section>
 
-    <!-- Vista: Contactos -->
+    <!-- View: Contacts -->
     <section id="view-contacts" class="view">
       <div class="view-header">
-        <h2>Contactos</h2>
-        <button id="add-contact-btn" class="btn-primary small">+ Nuevo contacto</button>
+        <h2>Contacts</h2>
+        <button id="add-contact-btn" class="btn-primary small">+ New contact</button>
       </div>
-      <input id="contact-search" class="search" type="search" placeholder="Buscar contacto…" />
+      <input id="contact-search" class="search" type="search" placeholder="Search contacts…" />
       <div id="contacts-list" class="cards"></div>
     </section>
 
-    <!-- Vista: Notificaciones -->
+    <!-- View: Notifications -->
     <section id="view-notifications" class="view">
       <div class="view-header">
-        <h2>Notificaciones</h2>
+        <h2>Notifications</h2>
         <div style="display:flex; gap:6px;">
-          <button id="push-toggle-btn" class="btn-secondary small" hidden>Activar notificaciones</button>
-          <button id="mark-all-read-btn" class="btn-secondary small">Marcar todo leído</button>
+          <button id="push-toggle-btn" class="btn-secondary small" hidden>Enable notifications</button>
+          <button id="mark-all-read-btn" class="btn-secondary small">Mark all read</button>
         </div>
       </div>
       <div id="notifications-list" class="cards"></div>
@@ -147,30 +145,30 @@
   </main>
 </div>
 
-<!-- Modal: nuevo/editar contacto -->
+<!-- Modal: new/edit contact -->
 <div id="contact-modal" class="modal" hidden>
   <div class="modal-card">
-    <h3 id="contact-modal-title">Nuevo contacto</h3>
+    <h3 id="contact-modal-title">New contact</h3>
     <form id="contact-form">
       <input type="hidden" name="id" />
-      <label>Nombre *<input type="text" name="name" required /></label>
-      <label>Teléfono<input type="tel" name="phone" /></label>
+      <label>Name *<input type="text" name="name" required /></label>
+      <label>Phone<input type="tel" name="phone" /></label>
       <label>Email<input type="email" name="email" /></label>
-      <label>Empresa<input type="text" name="company" /></label>
-      <label>Dirección<input type="text" name="address" /></label>
-      <label>Notas<textarea name="notes" rows="2"></textarea></label>
+      <label>Company<input type="text" name="company" /></label>
+      <label>Address<input type="text" name="address" /></label>
+      <label>Notes<textarea name="notes" rows="2"></textarea></label>
       <div class="modal-actions">
-        <button type="button" class="btn-secondary" id="contact-cancel">Cancelar</button>
-        <button type="submit" class="btn-primary">Guardar</button>
+        <button type="button" class="btn-secondary" id="contact-cancel">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
       </div>
     </form>
   </div>
 </div>
 
-<!-- Modal: nuevo envío -->
+<!-- Modal: new shipment -->
 <div id="shipment-modal" class="modal" hidden>
   <div class="modal-card">
-    <h3>Nuevo envío</h3>
+    <h3>New shipment</h3>
     <form id="shipment-form">
       <label>Courier *
         <select name="carrier" required>
@@ -180,19 +178,19 @@
           <option value="usps">USPS</option>
         </select>
       </label>
-      <label>Número de tracking *
+      <label>Tracking number *
         <input type="text" name="trackingNumber" required autocomplete="off" />
         <span class="field-hint" id="carrier-detect-hint"></span>
       </label>
-      <label>Contacto asociado
+      <label>Linked contact
         <select name="contactId">
-          <option value="">— Ninguno —</option>
+          <option value="">— None —</option>
         </select>
       </label>
-      <label>Etiqueta / descripción<input type="text" name="label" placeholder="Ej: Pedido de ingredientes" /></label>
+      <label>Label / description<input type="text" name="label" placeholder="E.g. Ingredients order" /></label>
       <div class="modal-actions">
-        <button type="button" class="btn-secondary" id="shipment-cancel">Cancelar</button>
-        <button type="submit" class="btn-primary">Guardar</button>
+        <button type="button" class="btn-secondary" id="shipment-cancel">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
       </div>
     </form>
   </div>

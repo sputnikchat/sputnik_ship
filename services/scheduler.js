@@ -3,8 +3,8 @@ const { update } = require('./store');
 const { getTrackingUpdate } = require('./carrierProviders');
 const { pushNotification } = require('./notify');
 
-// Refresca el tracking de todos los envios activos (no entregados) y
-// genera una notificacion cuando el estado cambia.
+// Refreshes tracking for all active (not-delivered) shipments and
+// generates a notification whenever the status changes.
 async function refreshAllShipments() {
   await update(async (data) => {
     const active = data.shipments.filter((s) => s.status !== 'delivered' && !s.archived);
@@ -28,13 +28,13 @@ async function refreshAllShipments() {
           pushNotification(data, {
             userId: shipment.userId,
             shipmentId: shipment.id,
-            title: `Envio ${shipment.trackingNumber} (${shipment.carrier.toUpperCase()})`,
-            message: `Nuevo estado: ${result.statusLabel}`,
+            title: `Shipment ${shipment.trackingNumber} (${shipment.carrier.toUpperCase()})`,
+            message: `New status: ${result.statusLabel}`,
             level: result.status === 'delivered' ? 'success' : 'info',
           });
         }
       } catch (err) {
-        console.error(`Error actualizando el envio ${shipment.id}:`, err.message);
+        console.error(`Error updating shipment ${shipment.id}:`, err.message);
       }
     }
   });
@@ -43,9 +43,9 @@ async function refreshAllShipments() {
 function startScheduler() {
   const minutes = Number(process.env.TRACKING_REFRESH_MINUTES || 30);
   const cronExpr = `*/${minutes} * * * *`;
-  console.log(`Scheduler de tracking activo: se actualizan los envios cada ${minutes} minuto(s).`);
+  console.log(`Tracking scheduler active: shipments refresh every ${minutes} minute(s).`);
   cron.schedule(cronExpr, () => {
-    refreshAllShipments().catch((err) => console.error('Error en el refresh programado:', err));
+    refreshAllShipments().catch((err) => console.error('Error in scheduled refresh:', err));
   });
 }
 

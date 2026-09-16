@@ -16,27 +16,27 @@ function sign(user) {
   );
 }
 
-// Registro estilo wallet: solo @handle + contraseña. Sin nombre real, sin
-// email, sin verificacion de identidad (KYC). Cualquiera con el link del
-// servidor puede crear su cuenta salvo que decidas desactivar el registro
-// publico (ver README, seccion "Cerrar el registro").
+// Wallet-style signup: just @handle + password. No real name, no email,
+// no identity verification (KYC). Anyone with the server link can create
+// an account unless you decide to close public signup (see README,
+// "Closing signup" section).
 router.post('/signup', async (req, res) => {
   const { handle, password } = req.body || {};
   if (!handle || !password) {
-    return res.status(400).json({ error: 'Faltan datos: usuario y contraseña son obligatorios.' });
+    return res.status(400).json({ error: 'Missing data: username and password are required.' });
   }
   if (!HANDLE_RE.test(handle)) {
-    return res.status(400).json({ error: 'El usuario debe tener entre 3 y 20 caracteres: letras, números o "_".' });
+    return res.status(400).json({ error: 'Username must be 3-20 characters: letters, numbers, or "_".' });
   }
   if (password.length < 6) {
-    return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
+    return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
   }
 
   const normalizedHandle = handle.toLowerCase();
   const db = readDB();
   const exists = db.users.find((u) => u.handle === normalizedHandle);
   if (exists) {
-    return res.status(409).json({ error: 'Ese usuario ya está en uso.' });
+    return res.status(409).json({ error: 'That username is already taken.' });
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
@@ -58,16 +58,16 @@ router.post('/signup', async (req, res) => {
 router.post('/login', async (req, res) => {
   const { handle, password } = req.body || {};
   if (!handle || !password) {
-    return res.status(400).json({ error: 'Faltan datos: usuario y contraseña.' });
+    return res.status(400).json({ error: 'Missing data: username and password.' });
   }
 
   const normalizedHandle = handle.toLowerCase();
   const db = readDB();
   const user = db.users.find((u) => u.handle === normalizedHandle);
-  if (!user) return res.status(401).json({ error: 'Usuario o contraseña incorrectos.' });
+  if (!user) return res.status(401).json({ error: 'Incorrect username or password.' });
 
   const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return res.status(401).json({ error: 'Usuario o contraseña incorrectos.' });
+  if (!ok) return res.status(401).json({ error: 'Incorrect username or password.' });
 
   const token = sign(user);
   res.json({ token, user: { id: user.id, handle: user.handle } });

@@ -21,7 +21,7 @@ router.post('/:id/read', async (req, res) => {
       found = true;
     }
   });
-  if (!found) return res.status(404).json({ error: 'Notificacion no encontrada.' });
+  if (!found) return res.status(404).json({ error: 'Notification not found.' });
   res.status(204).end();
 });
 

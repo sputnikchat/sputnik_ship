@@ -16,7 +16,7 @@ router.get('/', (req, res) => {
 
 router.post('/', async (req, res) => {
   const { name, phone, email, address, company, notes } = req.body || {};
-  if (!name) return res.status(400).json({ error: 'El nombre es obligatorio.' });
+  if (!name) return res.status(400).json({ error: 'Name is required.' });
 
   const contact = {
     id: uuidv4(),
@@ -54,7 +54,7 @@ router.put('/:id', async (req, res) => {
     });
     updated = contact;
   });
-  if (!updated) return res.status(404).json({ error: 'Contacto no encontrado.' });
+  if (!updated) return res.status(404).json({ error: 'Contact not found.' });
   res.json(updated);
 });
 
@@ -66,7 +66,7 @@ router.delete('/:id', async (req, res) => {
     data.contacts = data.contacts.filter((c) => !(c.id === id && c.userId === req.user.id));
     found = data.contacts.length < before;
   });
-  if (!found) return res.status(404).json({ error: 'Contacto no encontrado.' });
+  if (!found) return res.status(404).json({ error: 'Contact not found.' });
   res.status(204).end();
 });
 

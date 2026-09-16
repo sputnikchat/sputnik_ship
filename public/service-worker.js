@@ -1,6 +1,6 @@
-// Service worker minimo: cachea el shell de la app para que abra rapido
-// y sea instalable en el celular. Los datos (contactos, envios) siempre
-// se piden en vivo a /api/*, no se cachean.
+// Minimal service worker: caches the app shell so it opens fast and is
+// installable on a phone. Data (contacts, shipments) is always fetched
+// live from /api/*, never cached.
 
 const CACHE_NAME = 'sputnikship-shell-v2';
 const SHELL_FILES = [
@@ -29,7 +29,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  if (url.pathname.startsWith('/api/')) return; // nunca cachear la API
+  if (url.pathname.startsWith('/api/')) return; // never cache the API
 
   event.respondWith(
     caches.match(event.request).then((cached) => cached || fetch(event.request))
@@ -37,11 +37,11 @@ self.addEventListener('fetch', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-  let data = { title: 'Sputnik Ship', body: 'Tenés una actualización de envío.' };
+  let data = { title: 'Sputnik Ship', body: 'You have a shipment update.' };
   try {
     if (event.data) data = event.data.json();
   } catch (err) {
-    // si el payload no es JSON valido, usamos el texto default de arriba
+    // if the payload isn't valid JSON, fall back to the default text above
   }
   event.waitUntil(
     self.registration.showNotification(data.title, {

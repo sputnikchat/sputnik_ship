@@ -1,7 +1,7 @@
 {
   "name": "Sputnik Ship",
   "short_name": "Sputnik Ship",
-  "description": "Contactos y seguimiento de envios (FedEx, UPS, DHL, USPS)",
+  "description": "Contacts and shipment tracking (FedEx, UPS, DHL, USPS)",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ff6b45",

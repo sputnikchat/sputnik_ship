@@ -11,8 +11,8 @@ if (VAPID_READY) {
   );
 }
 
-// Crea una notificacion en la base de datos (queda guardada dentro del
-// mismo objeto `data` que ya estas modificando en un store.update(...)).
+// Creates a notification in the database (saved inside the same `data`
+// object you're already modifying in a store.update(...)).
 function pushNotification(data, { userId, shipmentId, title, message, level = 'info' }) {
   const notification = {
     id: uuidv4(),
@@ -25,7 +25,7 @@ function pushNotification(data, { userId, shipmentId, title, message, level = 'i
     createdAt: new Date().toISOString(),
   };
   data.notifications.unshift(notification);
-  // Nos quedamos con como maximo 200 notificaciones para no crecer sin limite
+  // Keep at most 200 notifications so this doesn't grow without limit
   data.notifications = data.notifications.slice(0, 200);
 
   maybeSendEmail(notification);
@@ -33,13 +33,13 @@ function pushNotification(data, { userId, shipmentId, title, message, level = 'i
   return notification;
 }
 
-// Envio de email opcional (desactivado por defecto). Activalo en .env con
-// NOTIFY_EMAIL_ENABLED=true y las credenciales SMTP. No es obligatorio:
-// las notificaciones siempre quedan disponibles dentro de la app.
+// Optional email delivery (disabled by default). Enable it in .env with
+// NOTIFY_EMAIL_ENABLED=true and SMTP credentials. It's optional:
+// notifications always stay available inside the app regardless.
 async function maybeSendEmail(notification) {
   if (String(process.env.NOTIFY_EMAIL_ENABLED).toLowerCase() !== 'true') return;
   try {
-    // nodemailer es opcional: si no esta instalado, no rompemos la app.
+    // nodemailer is optional: if it isn't installed, we don't break the app.
     const nodemailer = require('nodemailer');
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
@@ -53,14 +53,14 @@ async function maybeSendEmail(notification) {
       text: notification.message,
     });
   } catch (err) {
-    console.error('No se pudo enviar el email de notificacion:', err.message);
+    console.error('Could not send notification email:', err.message);
   }
 }
 
-// Notificaciones push del navegador (opcional). Desactivado por defecto:
-// solo actua si VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY estan seteadas en .env
-// (ver README). Fire-and-forget: no bloquea la creacion de la notificacion
-// ni requiere que los callers de pushNotification() hagan await.
+// Browser push notifications (optional). Disabled by default: only
+// runs when VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY are set in .env (see
+// README). Fire-and-forget: doesn't block notification creation and
+// doesn't require callers of pushNotification() to await it.
 function maybeSendWebPush(data, notification) {
   if (!VAPID_READY) return;
   data.pushSubscriptions ||= [];
@@ -72,15 +72,15 @@ function maybeSendWebPush(data, notification) {
       .sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, payload)
       .catch((err) => {
         if (err.statusCode === 404 || err.statusCode === 410) {
-          // La suscripcion vencio o el usuario revoco el permiso: la sacamos.
-          // Se hace en un store.update() propio (no tocando el `data` de
-          // arriba) porque este callback corre despues de que la transaccion
-          // que llamo a pushNotification() ya termino y persistio en disco.
+          // The subscription expired or the user revoked permission: remove it.
+          // This uses its own store.update() (rather than touching the `data`
+          // above) because this callback runs after the transaction that
+          // called pushNotification() has already finished and persisted.
           storeUpdate((d) => {
             d.pushSubscriptions = (d.pushSubscriptions || []).filter((s) => s.id !== sub.id);
           }).catch(() => {});
         } else {
-          console.error('No se pudo enviar la notificacion push:', err.message);
+          console.error('Could not send push notification:', err.message);
         }
       });
   });
