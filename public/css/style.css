@@ -277,6 +277,11 @@ button, input, select, textarea { font-family: inherit; }
 .checkbox-label input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--accent); }
 .checkbox-label span { font-weight: 500; }
 
+/* ---------- Shared shipment view (public, no account) ---------- */
+.shared-view { min-height: 100vh; }
+.shared-cta { margin: 20px 0 0; }
+.shared-auth-card { max-width: 420px; margin: 0 auto; padding: 22px; }
+
 /* ---------- Live camera scan ---------- */
 .scan-camera-view {
   position: fixed; inset: 0; z-index: 60; background: #000;

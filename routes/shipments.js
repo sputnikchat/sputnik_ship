@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const { readDB, update } = require('../services/store');
 const { requireAuth } = require('../middleware/auth');
@@ -39,6 +40,7 @@ router.post('/', async (req, res) => {
     currentLocation: null,
     estimatedDelivery: null,
     lastCheckedAt: null,
+    shareToken: null,
     archived: false,
     createdAt: new Date().toISOString(),
   };
@@ -124,6 +126,25 @@ router.post('/:id/refresh', async (req, res) => {
   } catch (err) {
     res.status(502).json({ error: `Could not update tracking: ${err.message}` });
   }
+});
+
+// Returns a public share link for this shipment, creating the token the
+// first time it's called and reusing it after (so re-sharing doesn't
+// invalidate a link someone already has).
+router.post('/:id/share', async (req, res) => {
+  const db = readDB();
+  const shipment = db.shipments.find((s) => s.id === req.params.id && s.userId === req.user.id);
+  if (!shipment) return res.status(404).json({ error: 'Shipment not found.' });
+
+  if (!shipment.shareToken) {
+    await update((data) => {
+      const s = data.shipments.find((x) => x.id === shipment.id);
+      s.shareToken = crypto.randomBytes(9).toString('base64url');
+    });
+  }
+
+  const token = shipment.shareToken || readDB().shipments.find((s) => s.id === shipment.id).shareToken;
+  res.json({ shareToken: token, url: `/s/${token}` });
 });
 
 router.delete('/:id', async (req, res) => {

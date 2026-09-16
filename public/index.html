@@ -19,6 +19,27 @@
 
 <div id="toast" class="toast" hidden></div>
 
+<!-- Public shared-shipment view: sputnikship.app/s/<token>, no account needed -->
+<div id="shared-view" class="shared-view" hidden>
+  <header class="topbar">
+    <div class="brand-mini">
+      <div class="brand-badge">
+        <svg class="logo-mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="38" cy="38" r="24"/>
+          <rect x="48" y="48" width="34" height="34" rx="9"/>
+        </svg>
+      </div>
+      <span>Sputnik Ship</span>
+    </div>
+  </header>
+  <main class="content">
+    <div id="shared-body"></div>
+    <div id="shared-map" class="map" hidden></div>
+    <div id="shared-checkpoints" class="checkpoints"></div>
+    <div id="shared-cta" class="shared-cta"></div>
+  </main>
+</div>
+
 <!-- Login / signup screen -->
 <div id="auth-screen" class="auth-screen">
   <div class="auth-card">

@@ -576,6 +576,33 @@
     }
   }
 
+  // Gets (or creates) this shipment's public share link and hands it to
+  // the native share sheet on mobile, or copies it to the clipboard
+  // everywhere else. The link opens a read-only tracking page for anyone,
+  // no account required - see the /s/:token handling near boot() below.
+  async function shareShipment(id) {
+    try {
+      const { url } = await api(`/shipments/${id}/share`, { method: 'POST' });
+      const fullUrl = location.origin + url;
+      const s = state.shipments.find((x) => x.id === id);
+      const shareData = {
+        title: 'Track my shipment',
+        text: `Track ${s ? (s.label || s.trackingNumber) : 'my shipment'} on Sputnik Ship`,
+        url: fullUrl,
+      };
+      if (navigator.share) {
+        await navigator.share(shareData).catch(() => {}); // user cancelling the share sheet isn't an error
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(fullUrl);
+        toast('Link copied to clipboard');
+      } else {
+        toast(fullUrl);
+      }
+    } catch (err) {
+      toast('Could not create a share link: ' + err.message);
+    }
+  }
+
   function renderShipmentDetail() {
     const s = state.shipments.find((x) => x.id === state.currentShipmentId);
     if (!s) return;
@@ -596,8 +623,13 @@
       </div>
       <p class="small muted" style="margin:2px 0 0;">Last checked: ${fmtDate(s.lastCheckedAt)}</p>
       ${contact ? `<p class="small" style="margin-top:10px;">📇 ${escapeHtml(contact.name)}</p>` : ''}
-      <button class="btn-secondary small" id="delete-shipment-btn" style="margin-top:14px;">Delete shipment</button>
+      <div class="modal-actions" style="justify-content:flex-start; margin-top:14px;">
+        <button class="btn-secondary small" id="share-shipment-btn">Share shipping</button>
+        <button class="btn-secondary small" id="delete-shipment-btn">Delete shipment</button>
+      </div>
     `;
+
+    $('#share-shipment-btn').addEventListener('click', () => shareShipment(s.id));
 
     $('#delete-shipment-btn').addEventListener('click', async () => {
       if (!confirm('Delete this shipment?')) return;
@@ -620,8 +652,11 @@
     renderCheckpoints(s);
   }
 
-  function renderMap(shipment) {
-    const container = $('#map');
+  // containerSel/mapKey let this be reused for the read-only shared view
+  // (its own #shared-map container, its own state.sharedMap instance) as
+  // well as the normal logged-in shipment detail (#map / state.map).
+  function renderMap(shipment, containerSel = '#map', mapKey = 'map') {
+    const container = $(containerSel);
     const route = shipment.fullRoute && shipment.fullRoute.length ? shipment.fullRoute : null;
 
     if (!route) {
@@ -634,23 +669,24 @@
     }
     container.innerHTML = '';
 
-    if (state.map) {
-      state.map.remove();
-      state.map = null;
+    if (state[mapKey]) {
+      state[mapKey].remove();
+      state[mapKey] = null;
     }
 
-    state.map = L.map(container, { zoomControl: true, attributionControl: true });
+    const map = L.map(container, { zoomControl: true, attributionControl: true });
+    state[mapKey] = map;
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 18,
       attribution: '&copy; OpenStreetMap contributors',
-    }).addTo(state.map);
+    }).addTo(map);
 
     const latlngs = route.map((p) => [p.lat, p.lng]);
     const doneIndex = shipment.checkpointIndex ?? -1;
 
-    L.polyline(latlngs, { color: '#3a3a38', weight: 3, dashArray: '6 6' }).addTo(state.map);
+    L.polyline(latlngs, { color: '#3a3a38', weight: 3, dashArray: '6 6' }).addTo(map);
     if (doneIndex >= 0) {
-      L.polyline(latlngs.slice(0, doneIndex + 1), { color: '#c6f135', weight: 4 }).addTo(state.map);
+      L.polyline(latlngs.slice(0, doneIndex + 1), { color: '#c6f135', weight: 4 }).addTo(map);
     }
 
     route.forEach((p, i) => {
@@ -661,16 +697,16 @@
         fillColor: isDone ? '#c6f135' : '#232323',
         fillOpacity: 1,
         weight: 2,
-      }).addTo(state.map);
+      }).addTo(map);
       marker.bindPopup(`<b>${escapeHtml(p.label)}</b>`);
     });
 
     const bounds = L.latLngBounds(latlngs);
-    state.map.fitBounds(bounds, { padding: [30, 30] });
+    map.fitBounds(bounds, { padding: [30, 30] });
   }
 
-  function renderCheckpoints(shipment) {
-    const list = $('#checkpoints-list');
+  function renderCheckpoints(shipment, containerSel = '#checkpoints-list') {
+    const list = $(containerSel);
     const checkpoints = shipment.checkpoints || [];
     if (!checkpoints.length) {
       list.innerHTML = '';
@@ -792,6 +828,136 @@
     }[c]));
   }
 
+  // ---------------- shared shipment view (public, no account needed) ----------------
+  // sputnikship.app/s/<token>: a read-only tracking page anyone can open,
+  // with an inline sign-up/log-in so a new user never has to leave the
+  // page to end up looking at the exact shipment they were sent.
+  async function renderSharedShipment(token) {
+    $('#auth-screen').hidden = true;
+    $('#app').hidden = true;
+    $('#shared-view').hidden = false;
+    $('#shared-body').innerHTML = '<p class="empty">Loading shipment…</p>';
+    $('#shared-checkpoints').innerHTML = '';
+    $('#shared-map').hidden = true;
+
+    try {
+      const res = await fetch(`${API}/public/shipments/${token}`);
+      const s = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(s.error || 'This share link is no longer valid.');
+
+      $('#shared-body').innerHTML = `
+        <div class="shipment-hero">
+          <div class="hero-top">
+            <div>
+              <h2>${escapeHtml(s.label || s.trackingNumber)}</h2>
+              <p class="muted small" style="margin:0;">${escapeHtml(s.trackingNumber)}</p>
+            </div>
+            ${courierBadge(s.carrier)}
+          </div>
+          <span class="badge status-${s.status}" style="margin-top:10px; display:inline-block;">${escapeHtml(s.statusLabel || s.status)}</span>
+          <div class="hero-eta">
+            <small>Estimated delivery</small>
+            ${fmtDate(s.estimatedDelivery)}
+          </div>
+          <p class="small muted" style="margin:2px 0 0;">Last checked: ${fmtDate(s.lastCheckedAt)}</p>
+        </div>
+      `;
+      $('#shared-map').hidden = false;
+      try {
+        renderMap(s, '#shared-map', 'sharedMap');
+      } catch (err) {
+        $('#shared-map').innerHTML = '<div class="empty" style="padding:20px;">Could not load the map.</div>';
+      }
+      renderCheckpoints(s, '#shared-checkpoints');
+    } catch (err) {
+      $('#shared-body').innerHTML = `<div class="empty">${escapeHtml(err.message)}</div>`;
+    }
+
+    renderSharedCta();
+  }
+
+  function renderSharedCta() {
+    const cta = $('#shared-cta');
+
+    if (state.token && state.user) {
+      cta.innerHTML = `
+        <div class="auth-card shared-auth-card">
+          <p class="small muted" style="margin:0 0 14px;">Logged in as @${escapeHtml(state.user.handle)}</p>
+          <a href="/" class="btn-primary" style="display:block; text-align:center; text-decoration:none;">Go to my shipments</a>
+        </div>
+      `;
+      return;
+    }
+
+    cta.innerHTML = `
+      <div class="auth-card shared-auth-card">
+        <p class="small muted" style="margin:0 0 14px;">Create a free account to track your own shipments.</p>
+        <div class="tabs">
+          <button type="button" class="tab active" data-tab="login">Log in</button>
+          <button type="button" class="tab" data-tab="signup">Sign up</button>
+        </div>
+        <form id="shared-login-form" class="auth-form">
+          <label>Username
+            <div class="handle-input"><span>@</span><input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourusername" /></div>
+          </label>
+          <label>Password<input type="password" name="password" required autocomplete="current-password" /></label>
+          <button type="submit" class="btn-primary">Log in</button>
+          <p class="error" id="shared-login-error" hidden></p>
+        </form>
+        <form id="shared-signup-form" class="auth-form" hidden>
+          <label>Username
+            <div class="handle-input"><span>@</span><input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourusername" /></div>
+          </label>
+          <label>Password<input type="password" name="password" required minlength="6" autocomplete="new-password" /></label>
+          <button type="submit" class="btn-primary">Create account</button>
+          <p class="error" id="shared-signup-error" hidden></p>
+        </form>
+      </div>
+    `;
+
+    $all('.tab', cta).forEach((tab) => {
+      tab.addEventListener('click', () => {
+        $all('.tab', cta).forEach((t) => t.classList.remove('active'));
+        tab.classList.add('active');
+        const isLogin = tab.dataset.tab === 'login';
+        $('#shared-login-form').hidden = !isLogin;
+        $('#shared-signup-form').hidden = isLogin;
+      });
+    });
+
+    $('#shared-login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const errEl = $('#shared-login-error');
+      errEl.hidden = true;
+      try {
+        const data = await api('/auth/login', { method: 'POST', body: Object.fromEntries(fd) });
+        saveSession(data.token, data.user);
+        toast(`Welcome back, @${data.user.handle}`);
+        renderSharedCta(); // stays on this same page, now signed in
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.hidden = false;
+      }
+    });
+
+    $('#shared-signup-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const errEl = $('#shared-signup-error');
+      errEl.hidden = true;
+      try {
+        const data = await api('/auth/signup', { method: 'POST', body: Object.fromEntries(fd) });
+        saveSession(data.token, data.user);
+        toast(`Welcome, @${data.user.handle}`);
+        renderSharedCta();
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.hidden = false;
+      }
+    });
+  }
+
   // ---------------- light polling while the app is open ----------------
   // Besides the server's automatic refresh every 30 min, we refresh
   // notifications/shipments every 2 min while the app is open, so
@@ -803,7 +969,10 @@
   }, 2 * 60 * 1000);
 
   // ---------------- boot ----------------
-  if (state.token && state.user) {
+  const sharedMatch = location.pathname.match(/^\/s\/([A-Za-z0-9_-]+)$/);
+  if (sharedMatch) {
+    renderSharedShipment(sharedMatch[1]);
+  } else if (state.token && state.user) {
     showApp();
   } else {
     showAuth();
