@@ -336,6 +336,18 @@
   }
 
   // ---------------- contact modal ----------------
+  function updateContactAvatarPreview() {
+    const el = $('#contact-modal-avatar');
+    const nameVal = ($('#contact-name-input').value || '').trim();
+    if (nameVal) {
+      el.textContent = nameVal[0].toUpperCase();
+      el.classList.remove('avatar-empty');
+    } else {
+      el.innerHTML = ICONS.contact;
+      el.classList.add('avatar-empty');
+    }
+  }
+
   function openContactModal(id) {
     const form = $('#contact-form');
     form.reset();
@@ -353,9 +365,11 @@
       $('#contact-modal-title').textContent = 'New contact';
       form.id.value = '';
     }
+    updateContactAvatarPreview();
     $('#contact-modal').hidden = false;
   }
 
+  $('#contact-name-input').addEventListener('input', updateContactAvatarPreview);
   $('#add-contact-btn').addEventListener('click', () => openContactModal(null));
   $('#contact-cancel').addEventListener('click', () => { $('#contact-modal').hidden = true; });
   $('#contact-modal').addEventListener('click', (e) => { if (e.target.id === 'contact-modal') $('#contact-modal').hidden = true; });

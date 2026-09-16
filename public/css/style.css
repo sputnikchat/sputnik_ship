@@ -312,9 +312,32 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
   padding: 10px 12px; border-radius: var(--radius-sm); font-size: 16px;
 }
-#contact-form input::placeholder, #shipment-form input::placeholder { color: var(--placeholder); }
+#contact-form input::placeholder, #contact-form textarea::placeholder,
+#shipment-form input::placeholder { color: var(--placeholder); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
 .field-hint { font-size: 0.75rem; color: var(--accent); min-height: 1em; }
+
+/* ---------- Contact modal ---------- */
+.contact-modal-header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.contact-modal-header h3 { margin: 0; }
+.avatar.avatar-empty { background: var(--surface-2); color: var(--muted); }
+.avatar-lg svg.icon { width: 24px; height: 24px; }
+
+/* Same pill treatment as .handle-input on the auth screen, generalized to
+   any field that wants a leading icon instead of a plain box. */
+.icon-field {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 0 12px; transition: border-color 0.15s, box-shadow 0.15s;
+}
+.icon-field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(198, 241, 53, 0.25); }
+.icon-field svg.icon { color: var(--muted); flex-shrink: 0; }
+.icon-field input, .icon-field textarea {
+  flex: 1; background: none; border: none; padding: 10px 0; font-size: 16px; color: var(--text); outline: none;
+}
+.icon-field-textarea { align-items: flex-start; padding: 10px 12px; }
+.icon-field-textarea svg.icon { margin-top: 2px; }
+.icon-field-textarea textarea { padding: 0; resize: vertical; min-height: 40px; }
 
 .scan-label-btn { width: 100%; margin-bottom: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .scan-contact-block {
