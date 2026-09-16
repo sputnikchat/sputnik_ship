@@ -45,6 +45,13 @@
 
   const CARRIER_LABEL = { fedex: 'FedEx', ups: 'UPS', dhl: 'DHL', usps: 'USPS' };
 
+  // Thin-stroke icons (matches the rest of the app's icon language) used
+  // inside JS-rendered templates - static markup in index.html has its
+  // own inline copies of the same style.
+  const ICONS = {
+    contact: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="12" r="2"/><path d="M14 10h4M14 14h4M6.3 16.8c.5-1.7 1.8-2.4 2.7-2.4s2.2.7 2.7 2.4"/></svg>',
+  };
+
   // Official brand marks (Simple Icons, https://simpleicons.org) with each
   // courier's real brand color as the badge background.
   const COURIER_BADGE = {
@@ -610,19 +617,22 @@
 
     $('#shipment-detail-body').innerHTML = `
       <div class="hero-top">
-        <div>
-          <h2>${escapeHtml(s.label || s.trackingNumber)}</h2>
-          <p class="muted small" style="margin:0;">${escapeHtml(s.trackingNumber)}</p>
-        </div>
+        <h2>${escapeHtml(s.label || s.trackingNumber)}</h2>
         ${courierBadge(s.carrier)}
       </div>
       <span class="badge status-${s.status}" style="margin-top:10px; display:inline-block;">${escapeHtml(s.statusLabel || s.status)}</span>
-      <div class="hero-eta">
-        <small>Estimated delivery</small>
-        ${fmtDate(s.estimatedDelivery)}
+      <div class="data-strip">
+        <div class="data-row data-eta">
+          <small class="data-label">Estimated delivery</small>
+          ${fmtDate(s.estimatedDelivery)}
+        </div>
+        <div class="data-row data-tracking">
+          <small class="data-label">Tracking #</small>
+          <span class="tn">${escapeHtml(s.trackingNumber)}</span>
+        </div>
       </div>
-      <p class="small muted" style="margin:2px 0 0;">Last checked: ${fmtDate(s.lastCheckedAt)}</p>
-      ${contact ? `<p class="small" style="margin-top:10px;">📇 ${escapeHtml(contact.name)}</p>` : ''}
+      <p class="small muted" style="margin:8px 0 0;">Last checked: ${fmtDate(s.lastCheckedAt)}</p>
+      ${contact ? `<p class="small" style="margin-top:10px; display:flex; align-items:center; gap:6px;">${ICONS.contact} ${escapeHtml(contact.name)}</p>` : ''}
       <div class="modal-actions" style="justify-content:flex-start; margin-top:14px;">
         <button class="btn-secondary small" id="share-shipment-btn">Share shipping</button>
         <button class="btn-secondary small" id="delete-shipment-btn">Delete shipment</button>
@@ -848,18 +858,21 @@
       $('#shared-body').innerHTML = `
         <div class="shipment-hero">
           <div class="hero-top">
-            <div>
-              <h2>${escapeHtml(s.label || s.trackingNumber)}</h2>
-              <p class="muted small" style="margin:0;">${escapeHtml(s.trackingNumber)}</p>
-            </div>
+            <h2>${escapeHtml(s.label || s.trackingNumber)}</h2>
             ${courierBadge(s.carrier)}
           </div>
           <span class="badge status-${s.status}" style="margin-top:10px; display:inline-block;">${escapeHtml(s.statusLabel || s.status)}</span>
-          <div class="hero-eta">
-            <small>Estimated delivery</small>
-            ${fmtDate(s.estimatedDelivery)}
+          <div class="data-strip">
+            <div class="data-row data-eta">
+              <small class="data-label">Estimated delivery</small>
+              ${fmtDate(s.estimatedDelivery)}
+            </div>
+            <div class="data-row data-tracking">
+              <small class="data-label">Tracking #</small>
+              <span class="tn">${escapeHtml(s.trackingNumber)}</span>
+            </div>
           </div>
-          <p class="small muted" style="margin:2px 0 0;">Last checked: ${fmtDate(s.lastCheckedAt)}</p>
+          <p class="small muted" style="margin:8px 0 0;">Last checked: ${fmtDate(s.lastCheckedAt)}</p>
         </div>
       `;
       $('#shared-map').hidden = false;

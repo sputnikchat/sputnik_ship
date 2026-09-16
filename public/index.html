@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Sputnik Ship — Contacts &amp; Shipments</title>
-<meta name="theme-color" content="#0d0d0d" />
+<meta name="theme-color" content="#0a0a0a" />
 <link rel="manifest" href="/manifest.json" />
 <link rel="icon" type="image/svg+xml" href="/icons/logo-mark.svg" />
 <link rel="icon" href="/icons/icon-192.png" />
@@ -103,24 +103,35 @@
     </div>
     <div class="topbar-actions">
       <button id="notif-btn" class="icon-btn" title="Notifications">
-        🔔<span id="notif-dot" class="dot" hidden></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 10a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6Z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+        <span id="notif-dot" class="dot" hidden></span>
       </button>
-      <button id="logout-btn" class="icon-btn" title="Log out">⎋</button>
+      <button id="logout-btn" class="icon-btn" title="Log out">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4"/><path d="M15 8l4 4-4 4"/><path d="M19 12H9"/></svg>
+      </button>
       <div class="avatar avatar-sm" id="topbar-avatar">?</div>
     </div>
   </header>
 
   <nav class="bottom-nav">
-    <button class="nav-btn active" data-view="shipments">📦<span>Shipments</span></button>
-    <button class="nav-btn" data-view="contacts">👤<span>Contacts</span></button>
-    <button class="nav-btn" data-view="notifications">🔔<span>Alerts</span></button>
+    <button class="nav-btn active" data-view="shipments">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 7.5v9L12 21l9-4.5v-9L12 3Z"/><path d="M3 7.5 12 12l9-4.5"/><path d="M12 12v9"/></svg>
+      <span>Shipments</span>
+    </button>
+    <button class="nav-btn" data-view="contacts">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+      <span>Contacts</span>
+    </button>
+    <button class="nav-btn" data-view="notifications">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 10a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6Z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+      <span>Alerts</span>
+    </button>
   </nav>
 
   <main class="content">
 
     <!-- View: Shipments -->
     <section id="view-shipments" class="view active">
-      <div class="greeting-glow"></div>
       <div class="greeting-row">
         <div class="greeting-with-avatar">
           <div class="avatar avatar-lg" id="greeting-avatar">?</div>
@@ -130,7 +141,7 @@
           </div>
         </div>
         <div class="stat-pill">
-          <span class="stat-pill-icon">🚚</span>
+          <span class="stat-pill-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h10v9H3z"/><path d="M13 11h4l3 3v2h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17.5" cy="18" r="1.6"/></svg></span>
           <span class="stat-pill-text"><span class="stat-pill-num" id="active-shipments-count">0</span> in progress</span>
         </div>
       </div>
@@ -202,7 +213,10 @@
   <div class="modal-card">
     <h3>New shipment</h3>
 
-    <button type="button" class="btn-secondary scan-label-btn" id="scan-label-btn">📷 Scan label</button>
+    <button type="button" class="btn-secondary scan-label-btn" id="scan-label-btn">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      Scan label
+    </button>
     <input type="file" accept="image/*" capture="environment" id="scan-label-input" hidden />
     <p class="field-hint" id="scan-status" hidden></p>
 
@@ -249,7 +263,9 @@
   <video id="scan-video" class="scan-video" autoplay playsinline muted></video>
   <div class="scan-overlay">
     <div class="scan-topbar">
-      <button type="button" class="scan-close-btn" id="scan-camera-close" aria-label="Close">✕</button>
+      <button type="button" class="scan-close-btn" id="scan-camera-close" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
       <span class="scan-status-pill" id="scan-camera-status">Starting camera…</span>
     </div>
     <div class="scan-frame">
