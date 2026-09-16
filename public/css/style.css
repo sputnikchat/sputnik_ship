@@ -204,6 +204,12 @@ button, input, select, textarea { font-family: inherit; }
   padding: 3px 9px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border);
 }
 
+.courier-badge {
+  width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+}
+
 .empty { text-align: center; color: var(--muted-on-bg); padding: 40px 10px; }
 
 /* ---------- Shipment detail / map ---------- */
