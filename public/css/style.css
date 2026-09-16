@@ -339,6 +339,53 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .icon-field-textarea svg.icon { margin-top: 2px; }
 .icon-field-textarea textarea { padding: 0; resize: vertical; min-height: 40px; }
 
+.field-row { display: flex; gap: 10px; }
+
+/* ---------- Category chips ---------- */
+.category-chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.category-chip {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--muted);
+  border-radius: var(--radius-badge); padding: 8px 12px; font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.category-chip svg.icon { width: 15px; height: 15px; }
+.category-chip.active { background: rgba(198, 241, 53, 0.12); border-color: var(--accent); color: var(--accent); }
+
+/* ---------- Photo attachment ---------- */
+.photo-preview { position: relative; width: 96px; margin-top: 10px; }
+.photo-preview img { width: 96px; height: 96px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border); display: block; }
+.photo-preview-remove {
+  position: absolute; top: -7px; right: -7px; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--danger); color: #fff; border: 2px solid var(--surface); display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.photo-preview-remove svg { width: 12px; height: 12px; }
+.shipment-photo { width: 100%; max-width: 220px; border-radius: var(--radius-sm); border: 1px solid var(--border); display: block; margin-top: 12px; }
+
+/* ---------- Shipment card: category icon + cost + archived state ---------- */
+.card.archived { opacity: 0.55; }
+.card-category-icon {
+  width: 30px; height: 30px; border-radius: 50%; background: var(--surface-2); color: var(--muted);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.card-category-icon svg.icon { width: 16px; height: 16px; }
+
+/* ---------- Per-shipment chat ---------- */
+.chat-section { margin-top: 22px; }
+.chat-heading { font-size: 15px; font-weight: 500; margin: 0 0 10px; color: var(--text); }
+.chat-messages { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; max-height: 340px; overflow-y: auto; }
+.chat-msg { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; max-width: 85%; }
+.chat-msg.mine { align-self: flex-end; background: rgba(198, 241, 53, 0.1); border-color: rgba(198, 241, 53, 0.3); }
+.chat-msg-meta { font-size: 11px; color: var(--muted); margin-bottom: 2px; display: flex; gap: 6px; }
+.chat-msg-text { font-size: 14px; color: var(--text); word-break: break-word; }
+.chat-form { display: flex; gap: 8px; }
+.chat-form input {
+  flex: 1; background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  padding: 10px 12px; border-radius: var(--radius-sm); font-size: 16px;
+}
+.chat-form input::placeholder { color: var(--placeholder); }
+.chat-form button { display: flex; align-items: center; justify-content: center; width: 44px; flex-shrink: 0; }
+.chat-form button svg { width: 18px; height: 18px; }
+
 .scan-label-btn { width: 100%; margin-bottom: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .scan-contact-block {
   background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);

@@ -45,6 +45,17 @@
 
   const CARRIER_LABEL = { fedex: 'FedEx', ups: 'UPS', dhl: 'DHL', usps: 'USPS' };
 
+  // Kept in sync by hand with CATEGORIES in routes/shipments.js.
+  const CATEGORIES = [
+    { value: 'electronics', label: 'Electronics', icon: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>' },
+    { value: 'documents', label: 'Documents', icon: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v5h5M8 12h8M8 16h5"/></svg>' },
+    { value: 'gifts', label: 'Gifts', icon: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="18" height="12" rx="1"/><path d="M3 9V6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v3M12 5v16M12 5C10 5 8 3.8 8 2.3 8 1.6 8.6 1 9.4 1 11 1 12 3 12 5ZM12 5c2 0 4-1.2 4-2.7C16 1.6 15.4 1 14.6 1 13 1 12 3 12 5Z"/></svg>' },
+    { value: 'clothing', label: 'Clothing', icon: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4 4 7l2 3 2-1.3V21h8V8.7L18 10l2-3-4-3-2 1.5h-4L8 4Z"/></svg>' },
+    { value: 'food', label: 'Food', icon: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v8a2 2 0 0 0 4 0V2M8 10v12M18 2c-2 1-3 3-3 6s1 3 2 3v11"/></svg>' },
+    { value: 'other', label: 'Other', icon: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-5 9 5-9 5-9-5Z"/><path d="M3 8v8l9 5 9-5V8M12 13v8"/></svg>' },
+  ];
+  const CATEGORY_ICON = Object.fromEntries(CATEGORIES.map((c) => [c.value, c.icon]));
+
   // Thin-stroke icons (matches the rest of the app's icon language) used
   // inside JS-rendered templates - static markup in index.html has its
   // own inline copies of the same style.
@@ -237,6 +248,7 @@
 
   // ---------------- navigation ----------------
   function showView(name) {
+    if (name !== 'shipment-detail') stopChatPolling();
     $all('.view').forEach((v) => v.classList.remove('active'));
     $all('.nav-btn').forEach((b) => b.classList.remove('active'));
     const view = $('#view-' + name);
@@ -398,7 +410,7 @@
     $('#greeting-avatar').textContent = initial;
     $('#topbar-avatar').textContent = initial;
 
-    const active = state.shipments.filter((s) => s.status !== 'delivered').length;
+    const active = state.shipments.filter((s) => s.status !== 'delivered' && !s.archived).length;
     $('#active-shipments-count').textContent = active;
     $('#greeting-sub').textContent = active
       ? `You have ${active} shipment${active === 1 ? '' : 's'} on the way.`
@@ -410,7 +422,14 @@
     renderGreeting();
     const list = $('#shipments-list');
     const q = ($('#shipment-search').value || '').toLowerCase();
-    const items = state.shipments.filter((s) =>
+    const byFilter = state.shipments.filter((s) => {
+      if (shipmentFilter === 'archived') return s.archived;
+      if (s.archived) return false; // archived shipments only show under the "Archived" tab
+      if (shipmentFilter === 'active') return s.status !== 'delivered';
+      if (shipmentFilter === 'delayed') return s.delayFlagged;
+      return true; // 'all'
+    });
+    const items = byFilter.filter((s) =>
       !q || s.trackingNumber.toLowerCase().includes(q) || (s.label || '').toLowerCase().includes(q)
     );
 
@@ -419,23 +438,31 @@
       return;
     }
     if (!items.length) {
-      list.innerHTML = `<div class="empty">No shipment matches "${escapeHtml(q)}".</div>`;
+      list.innerHTML = q
+        ? `<div class="empty">No shipment matches "${escapeHtml(q)}".</div>`
+        : `<div class="empty">Nothing here.</div>`;
       return;
     }
     list.innerHTML = items.map((s) => {
       const contact = state.contacts.find((c) => c.id === s.contactId);
+      const costText = s.cost != null ? `${escapeHtml(s.currency || '')} ${s.cost.toFixed(2)}` : '';
       return `
-        <div class="card" data-id="${s.id}">
+        <div class="card ${s.archived ? 'archived' : ''}" data-id="${s.id}">
           <div class="card-row">
-            <div>
-              <p class="card-title">${escapeHtml(s.label || s.trackingNumber)}</p>
-              <p class="card-sub">${escapeHtml(s.trackingNumber)}${contact ? ' · ' + escapeHtml(contact.name) : ''}</p>
+            <div class="card-row" style="gap:10px; align-items:flex-start;">
+              <div class="card-category-icon">${CATEGORY_ICON[s.category] || CATEGORY_ICON.other}</div>
+              <div>
+                <p class="card-title">${escapeHtml(s.label || s.trackingNumber)}</p>
+                <p class="card-sub">${escapeHtml(s.trackingNumber)}${contact ? ' · ' + escapeHtml(contact.name) : ''}</p>
+              </div>
             </div>
             ${courierBadge(s.carrier)}
           </div>
           <div class="card-row" style="margin-top:8px; align-items:center; flex-wrap:wrap; gap:6px;">
             <span class="badge status-${s.status}">${escapeHtml(s.statusLabel || s.status)}</span>
             ${s.delayFlagged ? '<span class="badge badge-delay">Possible delay</span>' : ''}
+            ${s.archived ? '<span class="badge">Archived</span>' : ''}
+            ${costText ? `<span class="badge">${costText}</span>` : ''}
             <span class="card-sub">Last checked: ${fmtDate(s.lastCheckedAt)}</span>
           </div>
         </div>
@@ -449,13 +476,112 @@
 
   $('#shipment-search').addEventListener('input', renderShipments);
 
+  // ---------------- shipment filter tabs ----------------
+  let shipmentFilter = 'active';
+  $all('#shipment-filter-tabs .tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      shipmentFilter = tab.dataset.filter;
+      $all('#shipment-filter-tabs .tab').forEach((t) => t.classList.toggle('active', t === tab));
+      renderShipments();
+    });
+  });
+
+  // ---------------- category chips (new shipment form) ----------------
+  function renderCategoryChips() {
+    const container = $('#category-chips');
+    container.innerHTML = CATEGORIES.map((c) =>
+      `<button type="button" class="category-chip" data-value="${c.value}">${c.icon}${c.label}</button>`
+    ).join('');
+    $all('.category-chip', container).forEach((chip) =>
+      chip.addEventListener('click', () => setActiveCategory(chip.dataset.value))
+    );
+  }
+  function setActiveCategory(value) {
+    $('#shipment-category-input').value = value;
+    $all('.category-chip', $('#category-chips')).forEach((chip) =>
+      chip.classList.toggle('active', chip.dataset.value === value)
+    );
+  }
+  renderCategoryChips();
+
+  // ---------------- photo attachment (new shipment form) ----------------
+  function resetPhotoPicker() {
+    $('#shipment-photo-input').value = '';
+    $('#shipment-photo-file').value = '';
+    $('#shipment-photo-preview').hidden = true;
+    $('#shipment-photo-preview-img').src = '';
+  }
+
+  // Resizes/compresses client-side before storing as base64 in the shipment
+  // document (Postgres jsonb) - keeps the document small since there's no
+  // separate file storage set up.
+  function compressImage(file, maxDim = 900, quality = 0.75) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+        URL.revokeObjectURL(img.src);
+      };
+      img.onerror = () => reject(new Error('Could not read that image.'));
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
+  $('#shipment-photo-btn').addEventListener('click', () => $('#shipment-photo-file').click());
+  $('#shipment-photo-file').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const dataUrl = await compressImage(file);
+      $('#shipment-photo-input').value = dataUrl;
+      $('#shipment-photo-preview-img').src = dataUrl;
+      $('#shipment-photo-preview').hidden = false;
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+  $('#shipment-photo-remove').addEventListener('click', resetPhotoPicker);
+
+  // ---------------- paste-and-go ----------------
+  // On opening a blank "New shipment" form, silently checks the clipboard
+  // for something that already looks like a tracking number and pre-fills
+  // it - a no-op if the browser denies clipboard access or there's no
+  // match, never blocking the form.
+  async function tryPasteAndGo() {
+    if (!navigator.clipboard || !navigator.clipboard.readText) return;
+    try {
+      const text = (await navigator.clipboard.readText() || '').trim();
+      const carrier = detectCarrier(text);
+      if (!carrier) return;
+      const input = $('#shipment-form input[name="trackingNumber"]');
+      input.value = text.replace(/\s+/g, '');
+      $('#shipment-form select[name="carrier"]').value = carrier;
+      $('#carrier-detect-hint').textContent = `Detected from clipboard: ${CARRIER_LABEL[carrier]}`;
+    } catch (err) {
+      // Clipboard permission denied or unavailable - fine, just skip it.
+    }
+  }
+
   $('#add-shipment-btn').addEventListener('click', () => {
     renderShipmentContactOptions();
     $('#shipment-form').reset();
     $('#carrier-detect-hint').textContent = '';
     $('#scan-contact-block').hidden = true;
     $('#scan-status').hidden = true;
+    setActiveCategory('other');
+    resetPhotoPicker();
     $('#shipment-modal').hidden = false;
+    tryPasteAndGo();
   });
   $('#shipment-cancel').addEventListener('click', () => { $('#shipment-modal').hidden = true; });
   $('#shipment-modal').addEventListener('click', (e) => { if (e.target.id === 'shipment-modal') $('#shipment-modal').hidden = true; });
@@ -652,6 +778,7 @@
     state.currentShipmentId = id;
     showView('shipment-detail');
     renderShipmentDetail();
+    startChatPolling(id);
     // Refresh this specific shipment on open, to show the latest status.
     try {
       const updated = await api(`/shipments/${id}/refresh`, { method: 'POST' });
@@ -694,13 +821,20 @@
     const s = state.shipments.find((x) => x.id === state.currentShipmentId);
     if (!s) return;
     const contact = state.contacts.find((c) => c.id === s.contactId);
+    const costText = s.cost != null ? `${escapeHtml(s.currency || '')} ${s.cost.toFixed(2)}` : '';
 
     $('#shipment-detail-body').innerHTML = `
       <div class="hero-top">
         <h2>${escapeHtml(s.label || s.trackingNumber)}</h2>
         ${courierBadge(s.carrier)}
       </div>
-      <span class="badge status-${s.status}" style="margin-top:10px; display:inline-block;">${escapeHtml(s.statusLabel || s.status)}</span>
+      <div class="card-row" style="align-items:center; flex-wrap:wrap; gap:6px; margin-top:10px;">
+        <span class="badge status-${s.status}">${escapeHtml(s.statusLabel || s.status)}</span>
+        ${s.delayFlagged ? '<span class="badge badge-delay">Possible delay</span>' : ''}
+        ${s.archived ? '<span class="badge">Archived</span>' : ''}
+        <span class="badge">${CATEGORY_ICON[s.category] || CATEGORY_ICON.other} ${escapeHtml((CATEGORIES.find((c) => c.value === s.category) || {}).label || 'Other')}</span>
+        ${costText ? `<span class="badge">${costText}</span>` : ''}
+      </div>
       <div class="data-strip">
         <div class="data-row data-eta">
           <small class="data-label">Estimated delivery</small>
@@ -713,13 +847,24 @@
       </div>
       <p class="small muted" style="margin:8px 0 0;">Last checked: ${fmtDate(s.lastCheckedAt)}</p>
       ${contact ? `<p class="small" style="margin-top:10px; display:flex; align-items:center; gap:6px;">${ICONS.contact} ${escapeHtml(contact.name)}</p>` : ''}
-      <div class="modal-actions" style="justify-content:flex-start; margin-top:14px;">
+      ${s.notes ? `<p class="small" style="margin-top:10px; white-space:pre-wrap;">${escapeHtml(s.notes)}</p>` : ''}
+      ${s.photo ? `<img class="shipment-photo" src="${s.photo}" alt="Shipment photo" />` : ''}
+      <div class="modal-actions" style="justify-content:flex-start; margin-top:14px; flex-wrap:wrap;">
         <button class="btn-secondary small" id="share-shipment-btn">Share shipping</button>
+        <button class="btn-secondary small" id="archive-shipment-btn">${s.archived ? 'Unarchive' : 'Archive'}</button>
         <button class="btn-secondary small" id="delete-shipment-btn">Delete shipment</button>
       </div>
     `;
 
     $('#share-shipment-btn').addEventListener('click', () => shareShipment(s.id));
+
+    $('#archive-shipment-btn').addEventListener('click', async () => {
+      const updated = await api(`/shipments/${s.id}/archive`, { method: 'POST' });
+      const idx = state.shipments.findIndex((x) => x.id === s.id);
+      if (idx >= 0) state.shipments[idx] = updated;
+      toast(updated.archived ? 'Shipment archived' : 'Shipment unarchived');
+      renderShipmentDetail();
+    });
 
     $('#delete-shipment-btn').addEventListener('click', async () => {
       if (!confirm('Delete this shipment?')) return;
@@ -740,7 +885,66 @@
       $('#map').innerHTML = '<div class="empty" style="padding:20px;">Could not load the map (no connection to the map provider). The rest of the shipment info is still available below.</div>';
     }
     renderCheckpoints(s);
+    renderChatMessages(s);
   }
+
+  // ---------------- per-shipment chat ----------------
+  let chatPollTimer = null;
+
+  function stopChatPolling() {
+    if (chatPollTimer) { clearInterval(chatPollTimer); chatPollTimer = null; }
+  }
+
+  // Polls only while this shipment's detail view is open (no websockets/
+  // infra needed for a first version) - stopped by showView() as soon as
+  // the user navigates away.
+  function startChatPolling(id) {
+    stopChatPolling();
+    chatPollTimer = setInterval(async () => {
+      try {
+        const updated = await api(`/shipments/${id}`);
+        const idx = state.shipments.findIndex((x) => x.id === id);
+        if (idx >= 0) state.shipments[idx] = updated;
+        if (state.currentShipmentId === id) renderChatMessages(updated);
+      } catch (err) {
+        // Silent - the next tick (or a manual refresh) will catch up.
+      }
+    }, 8000);
+  }
+
+  function renderChatMessages(s) {
+    const list = $('#chat-messages');
+    const messages = s.messages || [];
+    if (!messages.length) {
+      list.innerHTML = `<div class="empty small" style="padding:16px 10px;">No messages yet. Leave a note for whoever else is tracking this.</div>`;
+      return;
+    }
+    const wasNearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+    list.innerHTML = messages.map((m) => `
+      <div class="chat-msg ${m.userId === state.user?.id ? 'mine' : ''}">
+        <div class="chat-msg-meta"><span>@${escapeHtml(m.handle)}</span><span>${fmtDate(m.createdAt)}</span></div>
+        <div class="chat-msg-text">${escapeHtml(m.text)}</div>
+      </div>
+    `).join('');
+    if (wasNearBottom) list.scrollTop = list.scrollHeight;
+  }
+
+  $('#chat-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = $('#chat-input');
+    const text = input.value.trim();
+    if (!text || !state.currentShipmentId) return;
+    input.value = '';
+    try {
+      const updated = await api(`/shipments/${state.currentShipmentId}/messages`, { method: 'POST', body: { text } });
+      const idx = state.shipments.findIndex((x) => x.id === state.currentShipmentId);
+      if (idx >= 0) state.shipments[idx] = updated;
+      renderChatMessages(updated);
+    } catch (err) {
+      toast(err.message);
+      input.value = text;
+    }
+  });
 
   // containerSel/mapKey let this be reused for the read-only shared view
   // (its own #shared-map container, its own state.sharedMap instance) as

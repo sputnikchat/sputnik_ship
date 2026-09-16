@@ -12,6 +12,8 @@ const { checkDelay } = require('../services/delayDetector');
 const router = express.Router();
 router.use(requireAuth);
 
+const CATEGORIES = ['electronics', 'documents', 'gifts', 'clothing', 'food', 'other'];
+
 router.get('/', async (req, res) => {
   const db = await readDB();
   const spaceUserIds = getSpaceUserIds(db, req.user.id);
@@ -22,11 +24,16 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { carrier, trackingNumber, contactId, label } = req.body || {};
+  const { carrier, trackingNumber, contactId, label, notes, cost, currency, category, photo } = req.body || {};
   if (!carrier || !CARRIERS.includes(String(carrier).toLowerCase())) {
     return res.status(400).json({ error: `Courier must be one of: ${CARRIERS.join(', ')}` });
   }
   if (!trackingNumber) return res.status(400).json({ error: 'Tracking number is required.' });
+
+  const parsedCost = cost !== undefined && cost !== null && cost !== '' ? Number(cost) : null;
+  if (parsedCost !== null && !Number.isFinite(parsedCost)) {
+    return res.status(400).json({ error: 'Cost must be a number.' });
+  }
 
   const shipment = {
     id: uuidv4(),
@@ -35,6 +42,11 @@ router.post('/', async (req, res) => {
     trackingNumber: String(trackingNumber).trim(),
     contactId: contactId || null,
     label: label || '',
+    notes: notes || '',
+    cost: parsedCost,
+    currency: parsedCost !== null ? (currency || 'USD').toUpperCase() : null,
+    category: CATEGORIES.includes(category) ? category : 'other',
+    photo: photo || null,
     status: 'label_created',
     statusLabel: 'Label created',
     checkpointIndex: -1,
@@ -46,6 +58,7 @@ router.post('/', async (req, res) => {
     shareToken: null,
     delayFlagged: false,
     archived: false,
+    messages: [],
     createdAt: new Date().toISOString(),
   };
 
@@ -163,6 +176,61 @@ router.post('/:id/share', async (req, res) => {
   }
 
   res.json({ shareToken: token, url: `/s/${token}` });
+});
+
+// Archiving hides a shipment from the main list without deleting its
+// history - reversible, unlike delete.
+router.post('/:id/archive', async (req, res) => {
+  const db = await readDB();
+  const spaceUserIds = getSpaceUserIds(db, req.user.id);
+  const shipment = db.shipments.find((s) => s.id === req.params.id && spaceUserIds.includes(s.userId));
+  if (!shipment) return res.status(404).json({ error: 'Shipment not found.' });
+
+  let updated = null;
+  await update((data) => {
+    const s = data.shipments.find((x) => x.id === shipment.id);
+    s.archived = !s.archived;
+    updated = s;
+  });
+  res.json(updated);
+});
+
+// A per-shipment message thread, shared by everyone in the space (the
+// "communicator" feature: co-owners can leave notes for each other on a
+// specific shipment, e.g. "left it with the doorman").
+router.post('/:id/messages', async (req, res) => {
+  const { text } = req.body || {};
+  if (!text || !String(text).trim()) return res.status(400).json({ error: 'Message text is required.' });
+
+  const db = await readDB();
+  const spaceUserIds = getSpaceUserIds(db, req.user.id);
+  const shipment = db.shipments.find((s) => s.id === req.params.id && spaceUserIds.includes(s.userId));
+  if (!shipment) return res.status(404).json({ error: 'Shipment not found.' });
+
+  let updated = null;
+  await update((data) => {
+    const s = data.shipments.find((x) => x.id === shipment.id);
+    const author = data.users.find((u) => u.id === req.user.id);
+    const msg = {
+      id: uuidv4(),
+      userId: req.user.id,
+      handle: author ? author.handle : 'unknown',
+      text: String(text).trim().slice(0, 2000),
+      createdAt: new Date().toISOString(),
+    };
+    s.messages ||= [];
+    s.messages.push(msg);
+    pushNotification(data, {
+      userId: s.userId,
+      shipmentId: s.id,
+      title: `New message on ${s.label || s.trackingNumber}`,
+      message: `@${msg.handle}: ${msg.text}`,
+      level: 'info',
+      excludeUserId: req.user.id,
+    });
+    updated = s;
+  });
+  res.json(updated);
 });
 
 router.delete('/:id', async (req, res) => {

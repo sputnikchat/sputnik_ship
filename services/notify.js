@@ -17,8 +17,8 @@ if (VAPID_READY) {
 // the shipment's owner, but every co-owner in that user's space gets
 // their own independent copy - own read/unread state, own push - since
 // "get notified on every change" is the whole point of sharing a space.
-function pushNotification(data, { userId, shipmentId, title, message, level = 'info' }) {
-  const recipients = getSpaceUserIds(data, userId);
+function pushNotification(data, { userId, shipmentId, title, message, level = 'info', excludeUserId = null }) {
+  const recipients = getSpaceUserIds(data, userId).filter((id) => id !== excludeUserId);
   let first = null;
   for (const recipientId of recipients) {
     const notification = {
