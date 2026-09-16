@@ -169,6 +169,11 @@
 <div id="shipment-modal" class="modal" hidden>
   <div class="modal-card">
     <h3>New shipment</h3>
+
+    <button type="button" class="btn-secondary scan-label-btn" id="scan-label-btn">📷 Scan label</button>
+    <input type="file" accept="image/*" capture="environment" id="scan-label-input" hidden />
+    <p class="field-hint" id="scan-status" hidden></p>
+
     <form id="shipment-form">
       <label>Courier *
         <select name="carrier" required>
@@ -188,6 +193,17 @@
         </select>
       </label>
       <label>Label / description<input type="text" name="label" placeholder="E.g. Ingredients order" /></label>
+
+      <div id="scan-contact-block" class="scan-contact-block" hidden>
+        <label class="checkbox-label">
+          <input type="checkbox" id="scan-save-contact" checked />
+          Also save contact: <span id="scan-contact-name"></span>
+        </label>
+        <label>Name<input type="text" id="scan-contact-name-input" /></label>
+        <label>Address<input type="text" id="scan-contact-address-input" /></label>
+        <p class="field-hint">Detected from photo — check before saving.</p>
+      </div>
+
       <div class="modal-actions">
         <button type="button" class="btn-secondary" id="shipment-cancel">Cancel</button>
         <button type="submit" class="btn-primary">Save</button>
@@ -197,6 +213,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="/js/scan.js"></script>
 <script src="/js/app.js"></script>
 </body>
 </html>

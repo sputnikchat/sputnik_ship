@@ -267,6 +267,18 @@ button, input, select, textarea { font-family: inherit; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
 .field-hint { font-size: 0.75rem; color: var(--accent); min-height: 1em; }
 
+.scan-label-btn { width: 100%; margin-bottom: 14px; }
+.scan-contact-block {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 12px; display: flex; flex-direction: column; gap: 10px;
+}
+.checkbox-label {
+  display: flex !important; flex-direction: row !important; align-items: center; gap: 8px;
+  font-size: 0.9rem !important; color: var(--text) !important;
+}
+.checkbox-label input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--accent); }
+.checkbox-label span { font-weight: 700; }
+
 /* ---------- Toast ---------- */
 .toast {
   position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%);

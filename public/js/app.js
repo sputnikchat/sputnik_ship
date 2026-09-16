@@ -366,10 +366,50 @@
     renderShipmentContactOptions();
     $('#shipment-form').reset();
     $('#carrier-detect-hint').textContent = '';
+    $('#scan-contact-block').hidden = true;
+    $('#scan-status').hidden = true;
     $('#shipment-modal').hidden = false;
   });
   $('#shipment-cancel').addEventListener('click', () => { $('#shipment-modal').hidden = true; });
   $('#shipment-modal').addEventListener('click', (e) => { if (e.target.id === 'shipment-modal') $('#shipment-modal').hidden = true; });
+
+  // ---------------- scan label (camera + OCR/barcode) ----------------
+  $('#scan-label-btn').addEventListener('click', () => $('#scan-label-input').click());
+
+  $('#scan-label-input').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = ''; // allow scanning the same file again later
+    if (!file) return;
+
+    const status = $('#scan-status');
+    status.hidden = false;
+    status.textContent = 'Reading label… this can take a few seconds.';
+
+    try {
+      const result = await scanShippingLabel(file);
+
+      if (result.trackingNumber) {
+        const trackingInput = $('#shipment-form input[name="trackingNumber"]');
+        trackingInput.value = result.trackingNumber;
+        // Fire the existing input listener below so carrier auto-detection
+        // runs exactly as it does when someone types the number by hand.
+        trackingInput.dispatchEvent(new Event('input', { bubbles: true }));
+        status.textContent = 'Tracking number detected — double-check it below.';
+      } else {
+        status.textContent = "Couldn't find a tracking number in that photo. Try a clearer shot, or enter it manually.";
+      }
+
+      if (result.recipientName) {
+        $('#scan-contact-block').hidden = false;
+        $('#scan-contact-name').textContent = result.recipientName;
+        $('#scan-contact-name-input').value = result.recipientName;
+        $('#scan-contact-address-input').value = result.address || '';
+        $('#scan-save-contact').checked = true;
+      }
+    } catch (err) {
+      status.textContent = "Couldn't read that photo: " + err.message;
+    }
+  });
 
   $('#shipment-form input[name="trackingNumber"]').addEventListener('input', (e) => {
     const carrier = detectCarrier(e.target.value);
@@ -387,9 +427,24 @@
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(e.target));
     try {
+      const wantsScannedContact = !$('#scan-contact-block').hidden && $('#scan-save-contact').checked;
+      if (wantsScannedContact) {
+        const name = $('#scan-contact-name-input').value.trim();
+        if (name) {
+          const contact = await api('/contacts', {
+            method: 'POST',
+            body: { name, address: $('#scan-contact-address-input').value.trim() },
+          });
+          fd.contactId = contact.id;
+          await loadContacts();
+        }
+      }
+
       await api('/shipments', { method: 'POST', body: fd });
       $('#shipment-modal').hidden = true;
       e.target.reset();
+      $('#scan-contact-block').hidden = true;
+      $('#scan-status').hidden = true;
       toast('Shipment added, looking up tracking…');
       await loadShipments();
     } catch (err) {
