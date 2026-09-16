@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const webpush = require('web-push');
 const { update: storeUpdate } = require('./store');
+const { getSpaceUserIds } = require('./space');
 
 const VAPID_READY = Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
 if (VAPID_READY) {
@@ -12,25 +13,35 @@ if (VAPID_READY) {
 }
 
 // Creates a notification in the database (saved inside the same `data`
-// object you're already modifying in a store.update(...)).
+// object you're already modifying in a store.update(...)). `userId` is
+// the shipment's owner, but every co-owner in that user's space gets
+// their own independent copy - own read/unread state, own push - since
+// "get notified on every change" is the whole point of sharing a space.
 function pushNotification(data, { userId, shipmentId, title, message, level = 'info' }) {
-  const notification = {
-    id: uuidv4(),
-    userId,
-    shipmentId,
-    title,
-    message,
-    level, // info | success | warning
-    read: false,
-    createdAt: new Date().toISOString(),
-  };
-  data.notifications.unshift(notification);
-  // Keep at most 200 notifications so this doesn't grow without limit
+  const recipients = getSpaceUserIds(data, userId);
+  let first = null;
+  for (const recipientId of recipients) {
+    const notification = {
+      id: uuidv4(),
+      userId: recipientId,
+      shipmentId,
+      title,
+      message,
+      level, // info | success | warning
+      read: false,
+      createdAt: new Date().toISOString(),
+    };
+    data.notifications.unshift(notification);
+    maybeSendWebPush(data, notification);
+    if (recipientId === userId) first = notification;
+  }
+  // Keep at most 200 notifications total so this doesn't grow without limit.
   data.notifications = data.notifications.slice(0, 200);
 
-  maybeSendEmail(notification);
-  maybeSendWebPush(data, notification);
-  return notification;
+  // Email (if enabled) is a single fixed address in .env, not per-user -
+  // send it once regardless of how many co-owners were notified.
+  maybeSendEmail(first || { title, message });
+  return first;
 }
 
 // Optional email delivery (disabled by default). Enable it in .env with

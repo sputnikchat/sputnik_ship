@@ -156,24 +156,81 @@
     try {
       const data = await api('/auth/signup', { method: 'POST', body: Object.fromEntries(fd) });
       saveSession(data.token, data.user);
-      showApp();
+      showRecoveryCode(data.recoveryCode, showApp);
     } catch (err) {
       errEl.textContent = err.message;
       errEl.hidden = false;
     }
   });
 
-  $all('.tab').forEach((tab) => {
+  $all('.auth-screen .tab').forEach((tab) => {
     tab.addEventListener('click', () => {
-      $all('.tab').forEach((t) => t.classList.remove('active'));
+      $all('.auth-screen .tab').forEach((t) => t.classList.remove('active'));
       tab.classList.add('active');
       const isLogin = tab.dataset.tab === 'login';
       $('#login-form').hidden = !isLogin;
       $('#signup-form').hidden = isLogin;
+      $('#recovery-form').hidden = true;
     });
   });
 
   $('#logout-btn').addEventListener('click', logout);
+
+  // ---------------- forgot password / account recovery ----------------
+  $('#forgot-password-btn').addEventListener('click', () => {
+    $('#login-form').hidden = true;
+    $('#signup-form').hidden = true;
+    $('#recovery-form').hidden = false;
+  });
+
+  $('#recovery-back-btn').addEventListener('click', () => {
+    $('#recovery-form').hidden = true;
+    $('#login-form').hidden = false;
+  });
+
+  $('#recovery-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const errEl = $('#recovery-error');
+    errEl.hidden = true;
+    try {
+      const data = await api('/auth/recover', { method: 'POST', body: Object.fromEntries(fd) });
+      saveSession(data.token, data.user);
+      $('#recovery-form').hidden = true;
+      $('#recovery-form').reset();
+      showRecoveryCode(data.recoveryCode, showApp);
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.hidden = false;
+    }
+  });
+
+  // Shows a recovery code once, blocking further action until the user
+  // checks "I saved it" - used after signup, after recovering a locked
+  // account, and after regenerating a code from Account settings.
+  function showRecoveryCode(code, onContinue) {
+    const modal = $('#recovery-reveal-modal');
+    const check = $('#recovery-code-saved-check');
+    const continueBtn = $('#recovery-code-continue-btn');
+    $('#recovery-code-display').textContent = code;
+    check.checked = false;
+    continueBtn.disabled = true;
+    modal.hidden = false;
+
+    check.onchange = () => { continueBtn.disabled = !check.checked; };
+    $('#recovery-code-copy-btn').onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(code);
+        toast('Recovery code copied');
+      } catch (err) {
+        toast('Could not copy — select and copy it manually');
+      }
+    };
+    continueBtn.onclick = () => {
+      modal.hidden = true;
+      if (onContinue) onContinue();
+    };
+  }
 
   // ---------------- navigation ----------------
   function showView(name) {
@@ -969,6 +1026,196 @@
         errEl.hidden = false;
       }
     });
+  }
+
+  // ---------------- account ----------------
+  $('#topbar-avatar').addEventListener('click', openAccountView);
+  $('#greeting-avatar').addEventListener('click', openAccountView);
+  $('#back-from-account').addEventListener('click', () => showView('shipments'));
+  $('#account-logout-btn').addEventListener('click', logout);
+
+  function openAccountView() {
+    showView('account');
+    const initial = state.user?.handle ? state.user.handle[0].toUpperCase() : '?';
+    $('#account-handle').textContent = state.user?.handle ? `@${state.user.handle}` : '@';
+    $('#account-avatar').textContent = initial;
+    renderCoOwners();
+  }
+
+  async function renderCoOwners() {
+    try {
+      const { coOwners } = await api('/account/co-owners');
+      const list = $('#co-owners-list');
+      list.innerHTML = coOwners.map((c) => `
+        <span class="co-owner-chip">
+          <span class="avatar">${escapeHtml(c.handle[0].toUpperCase())}</span>
+          @${escapeHtml(c.handle)}
+        </span>
+      `).join('');
+      $('#leave-space-btn').hidden = coOwners.length === 0;
+      $('#account-space-hint').textContent = coOwners.length
+        ? 'Everyone listed here sees and manages the exact same shipments and contacts as you.'
+        : '';
+    } catch (err) {
+      toast(err.message);
+    }
+  }
+
+  // ---- change password ----
+  $('#change-password-btn').addEventListener('click', () => {
+    $('#change-password-form').reset();
+    $('#change-password-error').hidden = true;
+    $('#change-password-modal').hidden = false;
+  });
+  $('#change-password-cancel').addEventListener('click', () => { $('#change-password-modal').hidden = true; });
+  $('#change-password-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(e.target));
+    const errEl = $('#change-password-error');
+    errEl.hidden = true;
+    try {
+      await api('/auth/change-password', { method: 'POST', body: fd });
+      $('#change-password-modal').hidden = true;
+      toast('Password changed');
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.hidden = false;
+    }
+  });
+
+  // ---- regenerate recovery code ----
+  $('#regen-recovery-btn').addEventListener('click', () => {
+    $('#regen-recovery-form').reset();
+    $('#regen-recovery-error').hidden = true;
+    $('#regen-recovery-modal').hidden = false;
+  });
+  $('#regen-recovery-cancel').addEventListener('click', () => { $('#regen-recovery-modal').hidden = true; });
+  $('#regen-recovery-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(e.target));
+    const errEl = $('#regen-recovery-error');
+    errEl.hidden = true;
+    try {
+      const data = await api('/auth/regenerate-recovery-code', { method: 'POST', body: fd });
+      $('#regen-recovery-modal').hidden = true;
+      showRecoveryCode(data.recoveryCode);
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.hidden = false;
+    }
+  });
+
+  // ---- invite / join / leave a shared space ----
+  $('#invite-btn').addEventListener('click', async () => {
+    try {
+      const { code } = await api('/account/invite', { method: 'POST' });
+      $('#invite-code-display').textContent = code;
+      $('#invite-code-modal').hidden = false;
+      $('#invite-code-copy-btn').onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(code);
+          toast('Invite code copied');
+        } catch (err) {
+          toast('Could not copy — select and copy it manually');
+        }
+      };
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+  $('#invite-code-close-btn').addEventListener('click', () => { $('#invite-code-modal').hidden = true; });
+
+  $('#join-space-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(e.target));
+    try {
+      await api('/account/join', { method: 'POST', body: fd });
+      e.target.reset();
+      toast('Joined! You now share shipments and contacts.');
+      await renderCoOwners();
+      await loadAll();
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+
+  $('#leave-space-btn').addEventListener('click', async () => {
+    if (!confirm('Leave this shared space? You’ll only see your own shipments and contacts afterward.')) return;
+    try {
+      await api('/account/leave-space', { method: 'POST' });
+      toast('Left the shared space');
+      await renderCoOwners();
+      await loadAll();
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+
+  // ---------------- passport (shipping stats) ----------------
+  let passportPeriod = 'all';
+
+  $('#open-passport-btn').addEventListener('click', () => {
+    passportPeriod = 'all';
+    showView('passport');
+    loadPassport();
+  });
+  $('#back-from-passport').addEventListener('click', () => showView('account'));
+
+  async function loadPassport() {
+    try {
+      const stats = await api(`/stats/passport?year=${passportPeriod}`);
+      renderPassportPeriodTabs(stats.years);
+      renderPassportStats(stats);
+    } catch (err) {
+      toast(err.message);
+    }
+  }
+
+  function renderPassportPeriodTabs(years) {
+    const container = $('#passport-period');
+    const options = [{ value: 'all', label: 'All time' }, ...years.map((y) => ({ value: String(y), label: String(y) }))];
+    container.innerHTML = options.map((o) => `
+      <button type="button" class="tab ${passportPeriod === o.value ? 'active' : ''}" data-period="${o.value}">${o.label}</button>
+    `).join('');
+    $all('.tab', container).forEach((btn) => {
+      btn.addEventListener('click', () => {
+        passportPeriod = btn.dataset.period;
+        loadPassport();
+      });
+    });
+  }
+
+  function renderPassportStats(stats) {
+    $('#pp-total').textContent = stats.totalShipments;
+    $('#pp-delivered').textContent = stats.delivered;
+    $('#pp-contacts').textContent = stats.contactsShippedTo;
+    $('#pp-avg').textContent = stats.avgDeliveryDays != null ? `${stats.avgDeliveryDays.toFixed(1)}d` : '—';
+    if (stats.fastest) {
+      $('#pp-fastest').textContent = `${stats.fastest.days.toFixed(1)}d`;
+      $('#pp-fastest-label').textContent = `Fastest · ${CARRIER_LABEL[stats.fastest.carrier] || stats.fastest.carrier}`;
+    } else {
+      $('#pp-fastest').textContent = '—';
+      $('#pp-fastest-label').textContent = 'Fastest delivery';
+    }
+
+    const maxCount = Math.max(1, ...stats.couriers.map((c) => c.count));
+    $('#pp-couriers').innerHTML = stats.couriers.map((c) => {
+      const brand = COURIER_BADGE[c.carrier];
+      const bg = brand ? brand.color : 'var(--surface-2)';
+      const fg = brand ? brand.iconColor : 'var(--muted)';
+      return `
+        <div class="pp-courier-row">
+          <div class="pp-courier-badge" style="background:${bg}; color:${fg};">${escapeHtml(c.label.slice(0, 3).toUpperCase())}</div>
+          <div class="pp-courier-name">${escapeHtml(c.label)}</div>
+          <div class="pp-courier-bar-track"><div class="pp-courier-bar-fill" style="width:${(c.count / maxCount) * 100}%;"></div></div>
+          <div class="pp-courier-count">${c.count}</div>
+        </div>
+      `;
+    }).join('') || '<p class="empty" style="padding:20px;">No shipments in this period yet.</p>';
+
+    $('#pp-milestone').textContent = stats.firstShipmentDate
+      ? `First shipment logged ${fmtDate(stats.firstShipmentDate)}`
+      : 'Add your first shipment to start your passport.';
   }
 
   // ---------------- light polling while the app is open ----------------

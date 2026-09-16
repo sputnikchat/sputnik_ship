@@ -64,6 +64,26 @@
       </label>
       <button type="submit" class="btn-primary">Log in</button>
       <p class="error" id="login-error" hidden></p>
+      <button type="button" class="link-btn" id="forgot-password-btn">Forgot password?</button>
+    </form>
+
+    <form id="recovery-form" class="auth-form" hidden>
+      <p class="small muted" style="margin:0;">Enter your username, your recovery code (shown once when you signed up), and a new password.</p>
+      <label>Username
+        <div class="handle-input">
+          <span>@</span>
+          <input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourusername" />
+        </div>
+      </label>
+      <label>Recovery code
+        <input type="text" name="recoveryCode" required placeholder="XXXX-XXXX-XXXX" style="text-transform:uppercase;" />
+      </label>
+      <label>New password
+        <input type="password" name="newPassword" required minlength="6" autocomplete="new-password" />
+      </label>
+      <button type="submit" class="btn-primary">Reset password</button>
+      <p class="error" id="recovery-error" hidden></p>
+      <button type="button" class="link-btn" id="recovery-back-btn">Back to log in</button>
     </form>
 
     <form id="signup-form" class="auth-form" hidden>
@@ -175,7 +195,159 @@
       <div id="notifications-list" class="cards"></div>
     </section>
 
+    <!-- View: Account -->
+    <section id="view-account" class="view">
+      <div class="view-header">
+        <button class="btn-secondary small" id="back-from-account">← Back</button>
+      </div>
+      <div class="greeting-with-avatar" style="margin-bottom:18px;">
+        <div class="avatar avatar-lg" id="account-avatar">?</div>
+        <div>
+          <h1 id="account-handle" style="font-size:20px; font-weight:500; margin:0;">@handle</h1>
+          <p class="muted small" style="margin:2px 0 0;">Wallet-style account — no email, no real name on file.</p>
+        </div>
+      </div>
+
+      <button type="button" class="btn-secondary" id="open-passport-btn" style="width:100%; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between;">
+        <span>Your Passport — shipping stats</span>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+
+      <div class="pp-section-title">Security</div>
+      <div class="account-block">
+        <button type="button" class="btn-secondary" id="change-password-btn">Change password</button>
+        <button type="button" class="btn-secondary" id="regen-recovery-btn">Regenerate recovery code</button>
+      </div>
+
+      <div class="pp-section-title">Shared with</div>
+      <div class="account-block">
+        <div id="co-owners-list" class="co-owners-list"></div>
+        <div class="account-row-buttons">
+          <button type="button" class="btn-secondary small" id="invite-btn">Invite someone</button>
+          <button type="button" class="btn-secondary small" id="leave-space-btn" hidden>Leave shared space</button>
+        </div>
+        <form id="join-space-form" class="join-space-form">
+          <input type="text" name="code" placeholder="Enter invite code" style="text-transform:uppercase;" />
+          <button type="submit" class="btn-secondary small">Join</button>
+        </form>
+        <p class="field-hint" id="account-space-hint"></p>
+      </div>
+
+      <button type="button" class="btn-secondary" id="account-logout-btn" style="width:100%; margin-top:20px;">Log out</button>
+    </section>
+
+    <!-- View: Passport (shipping stats) -->
+    <section id="view-passport" class="view">
+      <div class="view-header">
+        <button class="btn-secondary small" id="back-from-passport">← Back</button>
+      </div>
+      <h1 style="font-size:20px; font-weight:500; margin:0 0 14px;">Your Passport</h1>
+      <div class="tabs" id="passport-period"></div>
+      <div class="pp-hero">
+        <div>
+          <div class="pp-hero-num" id="pp-total">0</div>
+          <div class="pp-hero-label">Shipments tracked</div>
+        </div>
+        <div class="pp-hero-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 7.5v9L12 21l9-4.5v-9L12 3Z"/><path d="M3 7.5 12 12l9-4.5"/><path d="M12 12v9"/></svg>
+        </div>
+      </div>
+      <div class="pp-grid">
+        <div class="pp-stat">
+          <div class="pp-stat-num" id="pp-delivered">0</div>
+          <div class="pp-stat-label">Delivered</div>
+        </div>
+        <div class="pp-stat">
+          <div class="pp-stat-num" id="pp-contacts">0</div>
+          <div class="pp-stat-label">Contacts shipped to</div>
+        </div>
+        <div class="pp-stat">
+          <div class="pp-stat-num" id="pp-avg">—</div>
+          <div class="pp-stat-label">Avg. delivery time</div>
+        </div>
+        <div class="pp-stat">
+          <div class="pp-stat-num" id="pp-fastest">—</div>
+          <div class="pp-stat-label" id="pp-fastest-label">Fastest delivery</div>
+        </div>
+      </div>
+      <div class="pp-section-title">Couriers</div>
+      <div class="pp-couriers" id="pp-couriers"></div>
+      <p class="pp-milestone" id="pp-milestone"></p>
+    </section>
+
   </main>
+</div>
+
+<!-- Modal: recovery code reveal (shown once after signup / password recovery / regenerating) -->
+<div id="recovery-reveal-modal" class="modal" hidden>
+  <div class="modal-card">
+    <h3>Save your recovery code</h3>
+    <p class="small muted">Sputnik Ship doesn't ask for an email, so there's no "reset link" if you forget your password. This code is the only way back into your account. It's shown <b>once</b>, right now.</p>
+    <div class="data-strip">
+      <div class="data-row">
+        <small class="data-label">Recovery code</small>
+        <span class="tn" id="recovery-code-display" style="font-size:18px; letter-spacing:0.04em;"></span>
+      </div>
+    </div>
+    <button type="button" class="btn-secondary" id="recovery-code-copy-btn" style="width:100%;">Copy code</button>
+    <label class="checkbox-label" style="margin-top:4px;">
+      <input type="checkbox" id="recovery-code-saved-check" />
+      I've saved this somewhere safe
+    </label>
+    <div class="modal-actions">
+      <button type="button" class="btn-primary" id="recovery-code-continue-btn" disabled style="width:100%;">Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: change password -->
+<div id="change-password-modal" class="modal" hidden>
+  <div class="modal-card">
+    <h3>Change password</h3>
+    <form id="change-password-form">
+      <label>Current password<input type="password" name="currentPassword" required autocomplete="current-password" /></label>
+      <label>New password<input type="password" name="newPassword" required minlength="6" autocomplete="new-password" /></label>
+      <p class="error" id="change-password-error" hidden></p>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="change-password-cancel">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: confirm password before regenerating the recovery code -->
+<div id="regen-recovery-modal" class="modal" hidden>
+  <div class="modal-card">
+    <h3>Regenerate recovery code</h3>
+    <p class="small muted">Your current recovery code will stop working. Confirm your password to get a new one.</p>
+    <form id="regen-recovery-form">
+      <label>Current password<input type="password" name="currentPassword" required autocomplete="current-password" /></label>
+      <p class="error" id="regen-recovery-error" hidden></p>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="regen-recovery-cancel">Cancel</button>
+        <button type="submit" class="btn-primary">Regenerate</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: share an invite code with a co-owner -->
+<div id="invite-code-modal" class="modal" hidden>
+  <div class="modal-card">
+    <h3>Invite someone to co-own your shipments</h3>
+    <p class="small muted">Share this code with them (text, WhatsApp, in person). They enter it under their own Account → "Join". It expires in 24 hours and works once.</p>
+    <div class="data-strip">
+      <div class="data-row">
+        <small class="data-label">Invite code</small>
+        <span class="tn" id="invite-code-display" style="font-size:22px; letter-spacing:0.06em;"></span>
+      </div>
+    </div>
+    <button type="button" class="btn-secondary" id="invite-code-copy-btn" style="width:100%;">Copy code</button>
+    <div class="modal-actions">
+      <button type="button" class="btn-primary" id="invite-code-close-btn" style="width:100%;">Done</button>
+    </div>
+  </div>
 </div>
 
 <!-- Modal: new/edit contact -->

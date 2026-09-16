@@ -392,3 +392,64 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
   padding: 10px 16px; border-radius: var(--radius-sm); font-size: 12px; z-index: 100;
 }
+
+/* ---------- Link-style button (forgot password, back to log in) ---------- */
+.link-btn {
+  background: none; border: none; color: var(--accent); font-size: 12px; font-weight: 500;
+  cursor: pointer; padding: 4px 0; text-align: center; width: 100%;
+}
+
+/* ---------- Account view ---------- */
+.account-block {
+  background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius);
+  padding: 14px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 6px;
+}
+.account-block .btn-secondary { width: 100%; }
+.co-owners-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.co-owners-list:empty::before {
+  content: "Just you, for now."; color: var(--muted); font-size: 12px;
+}
+.co-owner-chip {
+  display: flex; align-items: center; gap: 6px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: var(--radius-badge); padding: 5px 10px 5px 5px;
+  font-size: 12px; font-weight: 500;
+}
+.co-owner-chip .avatar { width: 20px; height: 20px; font-size: 10px; }
+.account-row-buttons { display: flex; gap: 8px; }
+.account-row-buttons .btn-secondary { flex: 1; }
+.join-space-form { display: flex; gap: 8px; }
+.join-space-form input {
+  flex: 1; background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  padding: 8px 12px; border-radius: var(--radius-sm); font-size: 13px;
+}
+.join-space-form input::placeholder { color: var(--placeholder); }
+
+/* ---------- Passport ---------- */
+.pp-hero {
+  background: var(--card-light-bg); color: var(--card-light-ink); border-radius: var(--radius);
+  padding: 18px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;
+}
+.pp-hero-num { font-size: 36px; font-weight: 500; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; }
+.pp-hero-label { font-size: 11px; font-weight: 500; color: var(--card-light-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 6px; }
+.pp-hero-icon {
+  width: 44px; height: 44px; border-radius: 50%; background: rgba(198,241,53,0.16);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #6b8f0a;
+}
+.pp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px; }
+.pp-stat { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 14px; }
+.pp-stat-num { font-size: 20px; font-weight: 500; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; color: var(--accent); }
+.pp-stat-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.pp-section-title { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 20px 0 10px; }
+.pp-couriers { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.pp-couriers:empty { display: none; }
+.pp-courier-row { display: flex; align-items: center; gap: 10px; }
+.pp-courier-badge {
+  width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700;
+}
+.pp-courier-name { font-size: 13px; font-weight: 500; width: 46px; flex-shrink: 0; }
+.pp-courier-bar-track { flex: 1; height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.pp-courier-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; }
+.pp-courier-count { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; width: 18px; text-align: right; }
+.pp-milestone { text-align: center; color: var(--muted-2); font-size: 12px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
+.pp-milestone b { color: var(--muted); font-weight: 500; }

@@ -2,14 +2,16 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { readDB, update } = require('../services/store');
 const { requireAuth } = require('../middleware/auth');
+const { getSpaceUserIds } = require('../services/space');
 
 const router = express.Router();
 router.use(requireAuth);
 
 router.get('/', async (req, res) => {
   const db = await readDB();
+  const spaceUserIds = getSpaceUserIds(db, req.user.id);
   const contacts = db.contacts
-    .filter((c) => c.userId === req.user.id)
+    .filter((c) => spaceUserIds.includes(c.userId))
     .sort((a, b) => a.name.localeCompare(b.name));
   res.json(contacts);
 });
@@ -39,9 +41,11 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
+  const db = await readDB();
+  const spaceUserIds = getSpaceUserIds(db, req.user.id);
   let updated = null;
   await update((data) => {
-    const contact = data.contacts.find((c) => c.id === id && c.userId === req.user.id);
+    const contact = data.contacts.find((c) => c.id === id && spaceUserIds.includes(c.userId));
     if (!contact) return;
     const { name, phone, email, address, company, notes } = req.body || {};
     Object.assign(contact, {
@@ -60,10 +64,12 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
+  const db = await readDB();
+  const spaceUserIds = getSpaceUserIds(db, req.user.id);
   let found = false;
   await update((data) => {
     const before = data.contacts.length;
-    data.contacts = data.contacts.filter((c) => !(c.id === id && c.userId === req.user.id));
+    data.contacts = data.contacts.filter((c) => !(c.id === id && spaceUserIds.includes(c.userId)));
     found = data.contacts.length < before;
   });
   if (!found) return res.status(404).json({ error: 'Contact not found.' });

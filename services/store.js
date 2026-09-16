@@ -24,6 +24,7 @@ function defaultData() {
     shipments: [],
     notifications: [],
     pushSubscriptions: [],
+    spaceInvites: [],
   };
 }
 

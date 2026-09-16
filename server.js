@@ -9,6 +9,8 @@ const shipmentsRoutes = require('./routes/shipments');
 const notificationsRoutes = require('./routes/notifications');
 const pushRoutes = require('./routes/push');
 const publicRoutes = require('./routes/public');
+const accountRoutes = require('./routes/account');
+const statsRoutes = require('./routes/stats');
 const { startScheduler } = require('./services/scheduler');
 
 if (!process.env.JWT_SECRET) {
@@ -28,6 +30,8 @@ app.use('/api/shipments', shipmentsRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/public', publicRoutes);
+app.use('/api/account', accountRoutes);
+app.use('/api/stats', statsRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });

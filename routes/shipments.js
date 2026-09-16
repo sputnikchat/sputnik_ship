@@ -6,14 +6,16 @@ const { requireAuth } = require('../middleware/auth');
 const { getTrackingUpdate, CARRIERS } = require('../services/carrierProviders');
 const { pushNotification } = require('../services/notify');
 const { refreshAllShipments } = require('../services/scheduler');
+const { getSpaceUserIds } = require('../services/space');
 
 const router = express.Router();
 router.use(requireAuth);
 
 router.get('/', async (req, res) => {
   const db = await readDB();
+  const spaceUserIds = getSpaceUserIds(db, req.user.id);
   const shipments = db.shipments
-    .filter((s) => s.userId === req.user.id)
+    .filter((s) => spaceUserIds.includes(s.userId))
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   res.json(shipments);
 });
@@ -84,7 +86,8 @@ router.post('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   const db = await readDB();
-  const shipment = db.shipments.find((s) => s.id === req.params.id && s.userId === req.user.id);
+  const spaceUserIds = getSpaceUserIds(db, req.user.id);
+  const shipment = db.shipments.find((s) => s.id === req.params.id && spaceUserIds.includes(s.userId));
   if (!shipment) return res.status(404).json({ error: 'Shipment not found.' });
   res.json(shipment);
 });
@@ -92,7 +95,8 @@ router.get('/:id', async (req, res) => {
 // Force a manual refresh of ONE shipment (besides the automatic refresh every 30 min).
 router.post('/:id/refresh', async (req, res) => {
   const db = await readDB();
-  const shipment = db.shipments.find((s) => s.id === req.params.id && s.userId === req.user.id);
+  const spaceUserIds = getSpaceUserIds(db, req.user.id);
+  const shipment = db.shipments.find((s) => s.id === req.params.id && spaceUserIds.includes(s.userId));
   if (!shipment) return res.status(404).json({ error: 'Shipment not found.' });
 
   try {
@@ -133,7 +137,8 @@ router.post('/:id/refresh', async (req, res) => {
 // invalidate a link someone already has).
 router.post('/:id/share', async (req, res) => {
   const db = await readDB();
-  const shipment = db.shipments.find((s) => s.id === req.params.id && s.userId === req.user.id);
+  const spaceUserIds = getSpaceUserIds(db, req.user.id);
+  const shipment = db.shipments.find((s) => s.id === req.params.id && spaceUserIds.includes(s.userId));
   if (!shipment) return res.status(404).json({ error: 'Shipment not found.' });
 
   let token = shipment.shareToken;
@@ -150,10 +155,12 @@ router.post('/:id/share', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
+  const db = await readDB();
+  const spaceUserIds = getSpaceUserIds(db, req.user.id);
   let found = false;
   await update((data) => {
     const before = data.shipments.length;
-    data.shipments = data.shipments.filter((s) => !(s.id === id && s.userId === req.user.id));
+    data.shipments = data.shipments.filter((s) => !(s.id === id && spaceUserIds.includes(s.userId)));
     found = data.shipments.length < before;
   });
   if (!found) return res.status(404).json({ error: 'Shipment not found.' });
@@ -165,7 +172,8 @@ router.delete('/:id', async (req, res) => {
 router.post('/refresh-all/now', async (req, res) => {
   await refreshAllShipments();
   const db = await readDB();
-  const shipments = db.shipments.filter((s) => s.userId === req.user.id);
+  const spaceUserIds = getSpaceUserIds(db, req.user.id);
+  const shipments = db.shipments.filter((s) => spaceUserIds.includes(s.userId));
   res.json({ ok: true, shipments });
 });
 
