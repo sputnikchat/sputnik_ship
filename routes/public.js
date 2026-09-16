@@ -9,8 +9,8 @@ const { readDB } = require('../services/store');
 
 const router = express.Router();
 
-router.get('/shipments/:token', (req, res) => {
-  const db = readDB();
+router.get('/shipments/:token', async (req, res) => {
+  const db = await readDB();
   const shipment = db.shipments.find((s) => s.shareToken === req.params.token);
   if (!shipment) return res.status(404).json({ error: 'This share link is no longer valid.' });
 

@@ -6,8 +6,8 @@ const { requireAuth } = require('../middleware/auth');
 const router = express.Router();
 router.use(requireAuth);
 
-router.get('/', (req, res) => {
-  const db = readDB();
+router.get('/', async (req, res) => {
+  const db = await readDB();
   const contacts = db.contacts
     .filter((c) => c.userId === req.user.id)
     .sort((a, b) => a.name.localeCompare(b.name));

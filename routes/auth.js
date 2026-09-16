@@ -33,7 +33,7 @@ router.post('/signup', async (req, res) => {
   }
 
   const normalizedHandle = handle.toLowerCase();
-  const db = readDB();
+  const db = await readDB();
   const exists = db.users.find((u) => u.handle === normalizedHandle);
   if (exists) {
     return res.status(409).json({ error: 'That username is already taken.' });
@@ -62,7 +62,7 @@ router.post('/login', async (req, res) => {
   }
 
   const normalizedHandle = handle.toLowerCase();
-  const db = readDB();
+  const db = await readDB();
   const user = db.users.find((u) => u.handle === normalizedHandle);
   if (!user) return res.status(401).json({ error: 'Incorrect username or password.' });
 

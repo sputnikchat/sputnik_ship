@@ -10,8 +10,8 @@ const { refreshAllShipments } = require('../services/scheduler');
 const router = express.Router();
 router.use(requireAuth);
 
-router.get('/', (req, res) => {
-  const db = readDB();
+router.get('/', async (req, res) => {
+  const db = await readDB();
   const shipments = db.shipments
     .filter((s) => s.userId === req.user.id)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -78,12 +78,12 @@ router.post('/', async (req, res) => {
     console.error('Could not fetch initial tracking:', err.message);
   }
 
-  const db = readDB();
+  const db = await readDB();
   res.status(201).json(db.shipments.find((s) => s.id === shipment.id));
 });
 
-router.get('/:id', (req, res) => {
-  const db = readDB();
+router.get('/:id', async (req, res) => {
+  const db = await readDB();
   const shipment = db.shipments.find((s) => s.id === req.params.id && s.userId === req.user.id);
   if (!shipment) return res.status(404).json({ error: 'Shipment not found.' });
   res.json(shipment);
@@ -91,7 +91,7 @@ router.get('/:id', (req, res) => {
 
 // Force a manual refresh of ONE shipment (besides the automatic refresh every 30 min).
 router.post('/:id/refresh', async (req, res) => {
-  const db = readDB();
+  const db = await readDB();
   const shipment = db.shipments.find((s) => s.id === req.params.id && s.userId === req.user.id);
   if (!shipment) return res.status(404).json({ error: 'Shipment not found.' });
 
@@ -132,18 +132,19 @@ router.post('/:id/refresh', async (req, res) => {
 // first time it's called and reusing it after (so re-sharing doesn't
 // invalidate a link someone already has).
 router.post('/:id/share', async (req, res) => {
-  const db = readDB();
+  const db = await readDB();
   const shipment = db.shipments.find((s) => s.id === req.params.id && s.userId === req.user.id);
   if (!shipment) return res.status(404).json({ error: 'Shipment not found.' });
 
-  if (!shipment.shareToken) {
+  let token = shipment.shareToken;
+  if (!token) {
     await update((data) => {
       const s = data.shipments.find((x) => x.id === shipment.id);
       s.shareToken = crypto.randomBytes(9).toString('base64url');
+      token = s.shareToken;
     });
   }
 
-  const token = shipment.shareToken || readDB().shipments.find((s) => s.id === shipment.id).shareToken;
   res.json({ shareToken: token, url: `/s/${token}` });
 });
 
@@ -163,7 +164,7 @@ router.delete('/:id', async (req, res) => {
 // the scheduler does every 30 min). Useful for testing without waiting.
 router.post('/refresh-all/now', async (req, res) => {
   await refreshAllShipments();
-  const db = readDB();
+  const db = await readDB();
   const shipments = db.shipments.filter((s) => s.userId === req.user.id);
   res.json({ ok: true, shipments });
 });

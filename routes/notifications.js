@@ -5,8 +5,8 @@ const { requireAuth } = require('../middleware/auth');
 const router = express.Router();
 router.use(requireAuth);
 
-router.get('/', (req, res) => {
-  const db = readDB();
+router.get('/', async (req, res) => {
+  const db = await readDB();
   const notifications = db.notifications.filter((n) => n.userId === req.user.id);
   res.json(notifications);
 });

@@ -47,7 +47,7 @@ sputnik-ship/
     shipments.js              Shipment CRUD + tracking refresh
     notifications.js          Notifications
   services/
-    store.js                  Database in a local JSON file (data/db.json)
+    store.js                  Database: Postgres (Supabase), one JSON document per app
     carrierProviders.js       Tracking engine: mock mode + real FedEx/UPS/DHL/USPS stubs
     scheduler.js               Cron that refreshes every shipment every 30 min
     notify.js                  Creates notifications (+ optional email)
