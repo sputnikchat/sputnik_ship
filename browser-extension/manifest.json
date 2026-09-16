@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Sputnik Ship — Tracking Detector",
+  "version": "1.0.0",
+  "description": "Finds shipment tracking numbers on the page you're viewing and adds them to Sputnik Ship with one click.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icons/icon-16.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" }
+  },
+  "icons": { "16": "icons/icon-16.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" },
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["https://*/*", "http://*/*"]
+}

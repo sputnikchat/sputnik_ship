@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Sputnik Ship</title>
+<link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <img src="icons/icon-48.png" width="22" height="22" alt="" />
+  <span>Sputnik Ship</span>
+</header>
+
+<!-- Logged out -->
+<div id="login-view" class="view">
+  <p class="muted small">Log in to add tracking numbers found on this page.</p>
+  <form id="login-form">
+    <label>Username
+      <div class="handle-input">
+        <span>@</span>
+        <input type="text" name="handle" required autocomplete="username" placeholder="yourusername" />
+      </div>
+    </label>
+    <label>Password
+      <input type="password" name="password" required autocomplete="current-password" />
+    </label>
+    <button type="submit" class="btn-primary">Log in</button>
+    <p class="error" id="login-error" hidden></p>
+  </form>
+</div>
+
+<!-- Logged in -->
+<div id="scan-view" class="view" hidden>
+  <div class="scan-header">
+    <span id="scan-status" class="muted small">Scanning this page…</span>
+    <button type="button" id="rescan-btn" class="link-btn">Rescan</button>
+  </div>
+  <div id="results-list"></div>
+  <button type="button" id="logout-btn" class="link-btn" style="margin-top:14px;">Log out (@<span id="current-handle"></span>)</button>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="popup.js"></script>
+</body>
+</html>
