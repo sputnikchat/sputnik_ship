@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { name, phone, email, address, company, notes } = req.body || {};
+  const { name, phone, email, address, notes } = req.body || {};
   if (!name) return res.status(400).json({ error: 'Name is required.' });
 
   const contact = {
@@ -27,7 +27,6 @@ router.post('/', async (req, res) => {
     phone: phone || '',
     email: email || '',
     address: address || '',
-    company: company || '',
     notes: notes || '',
     createdAt: new Date().toISOString(),
   };
@@ -47,13 +46,12 @@ router.put('/:id', async (req, res) => {
   await update((data) => {
     const contact = data.contacts.find((c) => c.id === id && spaceUserIds.includes(c.userId));
     if (!contact) return;
-    const { name, phone, email, address, company, notes } = req.body || {};
+    const { name, phone, email, address, notes } = req.body || {};
     Object.assign(contact, {
       name: name ?? contact.name,
       phone: phone ?? contact.phone,
       email: email ?? contact.email,
       address: address ?? contact.address,
-      company: company ?? contact.company,
       notes: notes ?? contact.notes,
     });
     updated = contact;

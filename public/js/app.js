@@ -63,7 +63,6 @@
     contact: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="12" r="2"/><path d="M14 10h4M14 14h4M6.3 16.8c.5-1.7 1.8-2.4 2.7-2.4s2.2.7 2.7 2.4"/></svg>',
     phone: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h3l1.5 4-2 1.5a11 11 0 0 0 5.5 5.5l1.5-2 4 1.5v3a2 2 0 0 1-2.2 2A17 17 0 0 1 3 5.2 2 2 0 0 1 5 4Z"/></svg>',
     email: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>',
-    building: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 8h.01M15 8h.01M9 12h.01M15 12h.01M9 16h.01M15 16h.01"/></svg>',
     chat: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4V5Z"/></svg>',
   };
 
@@ -303,9 +302,7 @@
   function renderContacts() {
     const list = $('#contacts-list');
     const q = ($('#contact-search').value || '').toLowerCase();
-    const items = state.contacts.filter((c) =>
-      !q || c.name.toLowerCase().includes(q) || (c.company || '').toLowerCase().includes(q)
-    );
+    const items = state.contacts.filter((c) => !q || c.name.toLowerCase().includes(q));
 
     if (!items.length) {
       list.innerHTML = `<div class="empty">You haven't added any contacts yet.<br>Tap "+ New contact" to get started.</div>`;
@@ -314,7 +311,6 @@
 
     list.innerHTML = items.map((c) => {
       const methods = [
-        c.company ? `<span class="contact-method">${ICONS.building}${escapeHtml(c.company)}</span>` : '',
         c.phone ? `<span class="contact-method">${ICONS.phone}${escapeHtml(c.phone)}</span>` : '',
         c.email ? `<span class="contact-method">${ICONS.email}${escapeHtml(c.email)}</span>` : '',
       ].filter(Boolean).join('');
