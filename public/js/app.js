@@ -1358,7 +1358,18 @@
 
   async function initPush() {
     const btn = $('#push-toggle-btn');
-    if (!pushSupported()) return;
+    const hint = $('#push-unavailable-hint');
+    if (!pushSupported()) {
+      // On iOS, PushManager only exists once the app is running as an
+      // installed, standalone PWA - opened from Safari (even "Add to
+      // Home Screen" not yet done) it's silently missing. Without this
+      // hint the button just never appears and nothing explains why.
+      if (isIos() && !isStandalone()) {
+        hint.textContent = 'To get notifications on iPhone, first install this app: tap the Share icon in Safari, then "Add to Home Screen" - then open it from there and come back here.';
+        hint.hidden = false;
+      }
+      return;
+    }
     btn.hidden = false;
 
     try {
@@ -1401,9 +1412,13 @@
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey),
       });
-      await api('/push/subscribe', { method: 'POST', body: sub.toJSON() });
+      const result = await api('/push/subscribe', { method: 'POST', body: sub.toJSON() });
       updatePushButton(true);
-      toast('Notifications enabled');
+      if (result.testPush?.ok) {
+        toast('Notifications enabled - check for the test alert');
+      } else {
+        toast('Subscribed, but the test notification failed: ' + (result.testPush?.reason || 'unknown error'));
+      }
     } catch (err) {
       toast('Could not enable notifications: ' + err.message);
     }

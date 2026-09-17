@@ -2,6 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 const express = require('express');
 const { update } = require('../services/store');
 const { requireAuth } = require('../middleware/auth');
+const { sendTestPush } = require('../services/notify');
 
 const router = express.Router();
 
@@ -32,7 +33,11 @@ router.post('/subscribe', async (req, res) => {
     });
   });
 
-  res.status(201).json({ ok: true });
+  // Send one real push right away - "subscribed successfully" in the
+  // browser doesn't mean delivery actually works, and silently hoping
+  // is exactly how this went unnoticed before.
+  const testPush = await sendTestPush({ endpoint, keys });
+  res.status(201).json({ ok: true, testPush });
 });
 
 router.post('/unsubscribe', async (req, res) => {

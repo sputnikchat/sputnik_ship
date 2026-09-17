@@ -45,6 +45,23 @@ if (VAPID_READY) {
   );
 }
 
+// Fired right after a device subscribes (routes/push.js), so "Enable
+// notifications" gets an immediate, real answer instead of silent hope -
+// a subscription can be created client-side and still never actually
+// deliver (a stale VAPID key mismatch, a malformed endpoint, etc.).
+async function sendTestPush(sub) {
+  if (!VAPID_READY) return { ok: false, reason: 'Push notifications are not configured on the server.' };
+  try {
+    await webpush.sendNotification(
+      { endpoint: sub.endpoint, keys: sub.keys },
+      JSON.stringify({ title: 'Sputnik Ship', body: 'Notifications are working - you\'ll get alerts here from now on.' })
+    );
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: err.message };
+  }
+}
+
 // Creates one notification per recipient (saved inside the same `data`
 // object you're already modifying in a store.update(...)), skipping anyone
 // who has turned this `type` off in their own notification preferences.
@@ -141,4 +158,4 @@ function maybeSendWebPush(data, notification) {
   });
 }
 
-module.exports = { pushNotification, pushNotificationToUsers, pushSystemMessage, applyCustomsAlert };
+module.exports = { pushNotification, pushNotificationToUsers, pushSystemMessage, applyCustomsAlert, sendTestPush };
