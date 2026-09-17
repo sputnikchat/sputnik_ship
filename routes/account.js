@@ -1,5 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const { readDB, update } = require('../services/store');
 const { requireAuth } = require('../middleware/auth');
 const { spaceIdOf, getSpaceUserIds } = require('../services/space');
@@ -113,6 +114,39 @@ router.put('/notify-prefs', async (req, res) => {
     prefs = { ...DEFAULT_NOTIFY_PREFS, ...me.notifyPrefs };
   });
   res.json(prefs);
+});
+
+// Permanently deletes this account and everything it owns: contacts,
+// shipments (and this user's own read/message history on shipments
+// they were only following), notifications, push subscriptions, and any
+// pending invite they issued. A co-owner in the same space keeps their
+// own shipments/contacts untouched - only this user's data is removed.
+// Requires the current password so a stolen/left-open session can't
+// silently wipe the account.
+router.delete('/', async (req, res) => {
+  const { currentPassword } = req.body || {};
+  if (!currentPassword) return res.status(400).json({ error: 'Current password is required.' });
+
+  const db = await readDB();
+  const user = db.users.find((u) => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'Account not found.' });
+  const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!ok) return res.status(401).json({ error: 'Current password is incorrect.' });
+
+  await update((data) => {
+    const uid = req.user.id;
+    data.contacts = data.contacts.filter((c) => c.userId !== uid);
+    data.shipments = data.shipments
+      .filter((s) => s.userId !== uid)
+      .map((s) => ({ ...s, followers: (s.followers || []).filter((f) => f !== uid) }));
+    data.notifications = data.notifications.filter((n) => n.userId !== uid);
+    data.pushSubscriptions = (data.pushSubscriptions || []).filter((p) => p.userId !== uid);
+    data.spaceInvites = (data.spaceInvites || []).filter((i) => i.fromUserId !== uid);
+    data.users = data.users.filter((u) => u.id !== uid);
+  });
+
+  res.clearCookie('sputnikship_token', { httpOnly: true, secure: req.secure, sameSite: 'lax', path: '/' });
+  res.status(204).end();
 });
 
 module.exports = router;

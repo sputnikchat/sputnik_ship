@@ -303,6 +303,12 @@
       </div>
 
       <button type="button" class="btn-secondary" id="account-logout-btn" style="width:100%; margin-top:20px;">Log out</button>
+
+      <div class="pp-section-title">Danger zone</div>
+      <div class="account-block">
+        <p class="small muted" style="margin:0 0 10px;">Permanently deletes your account, shipments, contacts, and messages. Co-owners keep their own data. This can't be undone.</p>
+        <button type="button" class="btn-danger" id="delete-account-btn" style="width:100%;">Delete my account</button>
+      </div>
     </section>
 
     <!-- View: Passport (shipping stats) -->
@@ -396,6 +402,22 @@
       <div class="modal-actions">
         <button type="button" class="btn-secondary" id="regen-recovery-cancel">Cancel</button>
         <button type="submit" class="btn-primary">Regenerate</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: confirm password before permanently deleting the account -->
+<div id="delete-account-modal" class="modal" hidden>
+  <div class="modal-card">
+    <h3>Delete your account?</h3>
+    <p class="small muted">This permanently deletes your account, shipments, contacts, and messages. Co-owners keep their own data. This can't be undone. Confirm your password to continue.</p>
+    <form id="delete-account-form">
+      <label>Current password<input type="password" name="currentPassword" required autocomplete="current-password" /></label>
+      <p class="error" id="delete-account-error" hidden></p>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="delete-account-cancel">Cancel</button>
+        <button type="submit" class="btn-danger">Delete my account</button>
       </div>
     </form>
   </div>
