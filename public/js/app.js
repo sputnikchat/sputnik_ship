@@ -799,18 +799,29 @@
     const month = calendarCursor.getMonth();
     $('#calendar-month-label').textContent = calendarCursor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
+    const todayKey = dateKey(new Date());
     const byDay = {};
     for (const s of state.shipments) {
-      if (!s.estimatedDelivery || s.archived) continue;
-      const key = dateKey(new Date(s.estimatedDelivery));
-      byDay[key] ||= { delay: false, items: [] };
-      if (s.delayFlagged) byDay[key].delay = true;
-      byDay[key].items.push(s);
+      if (s.archived) continue;
+      if (s.estimatedDelivery) {
+        const key = dateKey(new Date(s.estimatedDelivery));
+        byDay[key] ||= { delay: false, items: [] };
+        if (s.delayFlagged) byDay[key].delay = true;
+        byDay[key].items.push(s);
+      }
+      // "Out for delivery" means the courier has it today, regardless of
+      // what the estimated-delivery date says (or if there even is one) -
+      // always surface it under today so it isn't missed.
+      if (s.status === 'out_for_delivery') {
+        byDay[todayKey] ||= { delay: false, items: [] };
+        if (!byDay[todayKey].items.some((x) => x.id === s.id)) {
+          byDay[todayKey].items.push(s);
+        }
+      }
     }
 
     const firstOfMonth = new Date(year, month, 1);
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const todayKey = dateKey(new Date());
 
     const cells = [];
     for (let i = 0; i < firstOfMonth.getDay(); i++) cells.push(null);
