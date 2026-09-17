@@ -1,7 +1,7 @@
 const cron = require('node-cron');
 const { update } = require('./store');
 const { getTrackingUpdate } = require('./carrierProviders');
-const { pushNotification, pushSystemMessage } = require('./notify');
+const { pushNotification, pushSystemMessage, applyCustomsAlert } = require('./notify');
 const { checkDelay } = require('./delayDetector');
 const { sendDailyDigest } = require('./digest');
 
@@ -50,6 +50,8 @@ async function refreshAllShipments() {
             type: 'delay',
           });
         }
+
+        applyCustomsAlert(data, shipment, result);
       } catch (err) {
         console.error(`Error updating shipment ${shipment.id}:`, err.message);
       }

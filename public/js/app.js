@@ -1128,7 +1128,7 @@
       // array as human ones, in the order they happened, so the thread
       // reads as one timeline instead of two things to cross-reference.
       list.innerHTML = messages.map((m) => m.type === 'system' ? `
-        <div class="chat-msg-system">${escapeHtml(m.text)} · ${fmtDate(m.createdAt)}</div>
+        <div class="chat-msg-system">${linkify(escapeHtml(m.text))} · ${fmtDate(m.createdAt)}</div>
       ` : `
         <div class="chat-msg ${m.userId === state.user?.id ? 'mine' : ''}">
           <div class="chat-msg-meta"><span>@${escapeHtml(m.handle)}</span><span>${fmtDate(m.createdAt)}</span></div>
@@ -1415,6 +1415,17 @@
     }[c]));
   }
 
+  // Turns a bare URL inside an already-escaped string into a clickable
+  // link - used for system messages like a customs hold, where the
+  // courier's own status text sometimes includes a payment/info link.
+  // Never called on raw text - always escapeHtml() first.
+  function linkify(escapedHtml) {
+    return escapedHtml.replace(/https?:\/\/[^\s<]+/g, (url) => {
+      const clean = url.replace(/[.,)]+$/, '');
+      return `<a href="${clean}" target="_blank" rel="noopener noreferrer">${clean}</a>`;
+    });
+  }
+
   // ---------------- shared shipment view (public, no account needed) ----------------
   // sputnikship.app/s/<token>: a read-only tracking page anyone can open,
   // with an inline sign-up/log-in so a new user never has to leave the
@@ -1576,7 +1587,7 @@
   }
 
   // ---- notification preferences ----
-  const NOTIFY_TOGGLE_IDS = { status: 'notify-status', delay: 'notify-delay', digest: 'notify-digest', chat: 'notify-chat' };
+  const NOTIFY_TOGGLE_IDS = { status: 'notify-status', delay: 'notify-delay', customs: 'notify-customs', digest: 'notify-digest', chat: 'notify-chat' };
 
   async function loadNotifyPrefs() {
     try {

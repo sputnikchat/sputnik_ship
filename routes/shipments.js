@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const { readDB, update } = require('../services/store');
 const { requireAuth } = require('../middleware/auth');
 const { getTrackingUpdate, CARRIERS } = require('../services/carrierProviders');
-const { pushNotification, pushNotificationToUsers, pushSystemMessage } = require('../services/notify');
+const { pushNotification, pushNotificationToUsers, pushSystemMessage, applyCustomsAlert } = require('../services/notify');
 const { refreshAllShipments } = require('../services/scheduler');
 const { getSpaceUserIds } = require('../services/space');
 const { checkDelay } = require('../services/delayDetector');
@@ -86,6 +86,7 @@ router.post('/', async (req, res) => {
     lastCheckedAt: null,
     shareToken: null,
     delayFlagged: false,
+    customsAlertedAt: null,
     archived: false,
     messages: [],
     followers: [],
@@ -126,6 +127,7 @@ router.post('/', async (req, res) => {
         level: 'info',
         type: 'status',
       });
+      applyCustomsAlert(data, s, result);
     });
   } catch (err) {
     console.error('Could not fetch initial tracking:', err.message);
@@ -235,6 +237,7 @@ router.post('/:id/refresh', async (req, res) => {
           type: 'delay',
         });
       }
+      applyCustomsAlert(data, s, result);
       updated = s;
     });
     res.json(decryptForOwner(updated));

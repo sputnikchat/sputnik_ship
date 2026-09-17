@@ -84,6 +84,20 @@ function mockTrackingUpdate(carrier, trackingNumber, shipment) {
     timestamp: new Date(Date.now() - (nextIndex - i) * 3 * 60 * 60 * 1000).toISOString(),
   }));
 
+  // Test hook, mock mode only: a tracking number containing "CUSTOMS"
+  // (e.g. CUSTOMS_TEST_001) simulates a customs hold from the second
+  // checkpoint onward, so Fase 4 can be exercised without a real courier
+  // account or an actual held parcel. Nothing to do with Ship24 - that's
+  // handled separately in findCustomsAlert() for TRACKING_MODE=live.
+  const customsAlert =
+    /customs/i.test(trackingNumber) && nextIndex >= 1
+      ? {
+          statusCode: 'customs_exception',
+          message: 'Simulated: additional documents or payment required to release this shipment from customs.',
+          occurredAt: checkpoints[checkpoints.length - 1].timestamp,
+        }
+      : null;
+
   return {
     status,
     statusLabel: STATUS_LABELS[status] || status,
@@ -92,6 +106,7 @@ function mockTrackingUpdate(carrier, trackingNumber, shipment) {
     checkpoints,
     currentLocation: route[nextIndex],
     estimatedDelivery: shipment.estimatedDelivery || new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+    customsAlert,
   };
 }
 
@@ -130,6 +145,27 @@ const SHIP24_MILESTONE_MAP = {
   exception: 'exception',
 };
 
+// The 2 statusCodes the ship24-tracking-statuses skill calls out as
+// carrying real business meaning under the `customs` category - a hold
+// pending extra documents/payment, or an outright rejection. There's no
+// separate "customs" milestone: these ride alongside whatever milestone
+// the shipment is otherwise at (usually in_transit or exception).
+const CUSTOMS_STATUS_CODES = ['customs_exception', 'customs_rejected'];
+
+// Ship24 doesn't expose a structured "pay duties here" field - only the
+// courier's own free-text status line (`ev.status`). If that text happens
+// to contain a URL we surface it as-is; we never fabricate one.
+function findCustomsAlert(orderedEvents) {
+  const customsEvents = orderedEvents.filter((ev) => CUSTOMS_STATUS_CODES.includes(ev.statusCode));
+  if (!customsEvents.length) return null;
+  const latest = customsEvents[customsEvents.length - 1];
+  return {
+    statusCode: latest.statusCode,
+    message: latest.status || 'The courier flagged a customs issue with this shipment.',
+    occurredAt: latest.occurrenceDatetime || null,
+  };
+}
+
 async function ship24Track(trackingNumber) {
   const apiKey = process.env.SHIP24_API_KEY;
   if (!apiKey) {
@@ -159,6 +195,7 @@ async function parseShip24Response(data) {
       checkpoints: [],
       currentLocation: null,
       estimatedDelivery: null,
+      customsAlert: null,
     };
   }
 
@@ -204,6 +241,7 @@ async function parseShip24Response(data) {
     checkpoints,
     currentLocation: fullRoute[fullRoute.length - 1] || null,
     estimatedDelivery,
+    customsAlert: findCustomsAlert(orderedEvents),
   };
 }
 

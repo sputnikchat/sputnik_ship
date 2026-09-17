@@ -12,6 +12,30 @@ function pushSystemMessage(shipment, text) {
   shipment.messages.push({ id: uuidv4(), type: 'system', text, createdAt: new Date().toISOString() });
 }
 
+// A customs hold (Fase 4): same system-message mechanism as a status
+// change or delay, plus its own push notification type so it can be
+// muted independently. Idempotent per distinct alert - shipment.
+// customsAlertedAt stores a marker for the last one already raised, so a
+// refresh that sees the SAME still-open hold doesn't re-notify every 30
+// minutes, but a genuinely new one (different statusCode or a later
+// occurrenceDatetime) does.
+function applyCustomsAlert(data, shipment, result) {
+  const alert = result.customsAlert;
+  if (!alert) return;
+  const marker = `${alert.statusCode}@${alert.occurredAt || 'unknown'}`;
+  if (shipment.customsAlertedAt === marker) return;
+  pushSystemMessage(shipment, `Customs: ${alert.message}`);
+  pushNotification(data, {
+    userId: shipment.userId,
+    shipmentId: shipment.id,
+    title: `Customs hold: ${shipment.trackingNumber} (${shipment.carrier.toUpperCase()})`,
+    message: alert.message,
+    level: 'warning',
+    type: 'customs',
+  });
+  shipment.customsAlertedAt = marker;
+}
+
 const VAPID_READY = Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
 if (VAPID_READY) {
   webpush.setVapidDetails(
@@ -117,4 +141,4 @@ function maybeSendWebPush(data, notification) {
   });
 }
 
-module.exports = { pushNotification, pushNotificationToUsers, pushSystemMessage };
+module.exports = { pushNotification, pushNotificationToUsers, pushSystemMessage, applyCustomsAlert };

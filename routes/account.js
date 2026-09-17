@@ -93,8 +93,8 @@ router.post('/leave-space', async (req, res) => {
   res.status(204).end();
 });
 
-const NOTIFY_TYPES = ['status', 'delay', 'digest', 'chat'];
-const DEFAULT_NOTIFY_PREFS = { status: true, delay: true, digest: true, chat: true };
+const NOTIFY_TYPES = ['status', 'delay', 'digest', 'chat', 'customs'];
+const DEFAULT_NOTIFY_PREFS = { status: true, delay: true, digest: true, chat: true, customs: true };
 
 router.get('/notify-prefs', async (req, res) => {
   const db = await readDB();
