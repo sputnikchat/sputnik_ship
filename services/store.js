@@ -39,6 +39,15 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }, // Supabase requires SSL; its cert chain isn't in Node's default trust store.
 });
 
+// node-postgres emits 'error' on the pool whenever an IDLE client gets
+// disconnected from the backend (Supabase's pooler does this routinely,
+// not an outage) - with no listener, that's an uncaught exception that
+// kills the whole Node process. This isn't a query failure; it's
+// unrelated background housekeeping and must not crash live requests.
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle Postgres client (app_state pool):', err.message);
+});
+
 const ROW_ID = 1;
 let ensured = null;
 

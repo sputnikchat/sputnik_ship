@@ -20,17 +20,34 @@ const { Pool } = require('pg');
 
 if (!process.env.AUDIT_DATABASE_URL) {
   throw new Error(
-    'AUDIT_DATABASE_URL is not set. Run scratch/setup-audit-role.js once (with DATABASE_URL pointing at an admin-level Postgres role) to create the audit_log table and its restricted role, then put the connection string it writes into .env.'
+    'AUDIT_DATABASE_URL is not set. Run scripts/setup-audit-role.js once (with DATABASE_URL pointing at an admin-level Postgres role) to create the audit_log table and its restricted role, then put the connection string it writes into .env.'
   );
 }
 
 const pool = new Pool({ connectionString: process.env.AUDIT_DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
+// Same reasoning as services/store.js's pool: an idle client getting
+// disconnected by Supabase's pooler emits 'error' on the pool itself,
+// and with no listener that's an uncaught exception that kills the
+// whole process - unrelated to any specific request.
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle Postgres client (audit_log pool):', err.message);
+});
+
+// Callers await this inside plain Express handlers with no try/catch,
+// so a transient failure here (a network blip, the pooler recycling a
+// connection mid-query) must never become an uncaught rejection that
+// takes the whole server down over a missed audit entry - it's
+// supplementary telemetry, not something worth trading availability for.
 async function logAudit({ userId, action, shipmentId = null, req = null }) {
-  await pool.query(
-    'INSERT INTO audit_log (id, user_id, action, shipment_id, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6)',
-    [uuidv4(), userId, action, shipmentId, req?.ip || null, req?.headers?.['user-agent'] || null]
-  );
+  try {
+    await pool.query(
+      'INSERT INTO audit_log (id, user_id, action, shipment_id, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6)',
+      [uuidv4(), userId, action, shipmentId, req?.ip || null, req?.headers?.['user-agent'] || null]
+    );
+  } catch (err) {
+    console.error('Could not write audit log entry:', err.message);
+  }
 }
 
 module.exports = { logAudit };
