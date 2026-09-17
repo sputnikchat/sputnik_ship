@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const { readDB, update } = require('../services/store');
 const { requireAuth } = require('../middleware/auth');
 const { getTrackingUpdate, CARRIERS } = require('../services/carrierProviders');
-const { pushNotification, pushNotificationToUsers } = require('../services/notify');
+const { pushNotification, pushNotificationToUsers, pushSystemMessage } = require('../services/notify');
 const { refreshAllShipments } = require('../services/scheduler');
 const { getSpaceUserIds } = require('../services/space');
 const { checkDelay } = require('../services/delayDetector');
@@ -103,6 +103,7 @@ router.post('/', async (req, res) => {
         estimatedDelivery: result.estimatedDelivery,
         lastCheckedAt: new Date().toISOString(),
       });
+      pushSystemMessage(s, `Initial status: ${result.statusLabel}`);
       pushNotification(data, {
         userId: s.userId,
         shipmentId: s.id,
@@ -190,6 +191,7 @@ router.post('/:id/refresh', async (req, res) => {
         lastCheckedAt: new Date().toISOString(),
       });
       if (statusChanged) {
+        pushSystemMessage(s, `Status: ${result.statusLabel}`);
         pushNotification(data, {
           userId: s.userId,
           shipmentId: s.id,
@@ -201,6 +203,7 @@ router.post('/:id/refresh', async (req, res) => {
       }
       const delayReason = checkDelay(s);
       if (delayReason) {
+        pushSystemMessage(s, `Possible delay: ${delayReason}`);
         pushNotification(data, {
           userId: s.userId,
           shipmentId: s.id,
@@ -271,6 +274,9 @@ router.post('/:id/messages', async (req, res) => {
   const isOwnerSide = spaceUserIds.includes(shipment.userId);
   const isFollower = (shipment.followers || []).includes(req.user.id);
   if (!isOwnerSide && !isFollower) return res.status(404).json({ error: 'Shipment not found.' });
+  if (shipment.status === 'delivered') {
+    return res.status(403).json({ error: 'This shipment was delivered - the conversation is closed.' });
+  }
 
   let updated = null;
   await update((data) => {

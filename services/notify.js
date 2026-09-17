@@ -3,6 +3,15 @@ const webpush = require('web-push');
 const { update: storeUpdate } = require('./store');
 const { getSpaceUserIds } = require('./space');
 
+// Status changes, delays, and delivery drop an automatic entry into a
+// shipment's own chat thread (shared by both routes/shipments.js and the
+// scheduler's bulk auto-refresh) - the thread then reads as the
+// shipment's whole timeline, not two things to cross-reference.
+function pushSystemMessage(shipment, text) {
+  shipment.messages ||= [];
+  shipment.messages.push({ id: uuidv4(), type: 'system', text, createdAt: new Date().toISOString() });
+}
+
 const VAPID_READY = Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
 if (VAPID_READY) {
   webpush.setVapidDetails(
@@ -108,4 +117,4 @@ function maybeSendWebPush(data, notification) {
   });
 }
 
-module.exports = { pushNotification, pushNotificationToUsers };
+module.exports = { pushNotification, pushNotificationToUsers, pushSystemMessage };

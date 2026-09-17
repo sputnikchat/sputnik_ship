@@ -1,7 +1,7 @@
 const cron = require('node-cron');
 const { update } = require('./store');
 const { getTrackingUpdate } = require('./carrierProviders');
-const { pushNotification } = require('./notify');
+const { pushNotification, pushSystemMessage } = require('./notify');
 const { checkDelay } = require('./delayDetector');
 const { sendDailyDigest } = require('./digest');
 
@@ -27,6 +27,7 @@ async function refreshAllShipments() {
         });
 
         if (statusChanged) {
+          pushSystemMessage(shipment, `Status: ${result.statusLabel}`);
           pushNotification(data, {
             userId: shipment.userId,
             shipmentId: shipment.id,
@@ -39,6 +40,7 @@ async function refreshAllShipments() {
 
         const delayReason = checkDelay(shipment);
         if (delayReason) {
+          pushSystemMessage(shipment, `Possible delay: ${delayReason}`);
           pushNotification(data, {
             userId: shipment.userId,
             shipmentId: shipment.id,

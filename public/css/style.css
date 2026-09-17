@@ -394,6 +394,10 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .chat-msg.mine { align-self: flex-end; background: rgba(198, 241, 53, 0.1); border-color: rgba(198, 241, 53, 0.3); }
 .chat-msg-meta { font-size: 11px; color: var(--muted); margin-bottom: 2px; display: flex; gap: 6px; }
 .chat-msg-text { font-size: 14px; color: var(--text); word-break: break-word; }
+/* Status changes, delays, delivery - centered, no bubble, muted - read as
+   timeline events rather than something someone typed. */
+.chat-msg-system { align-self: center; font-size: 12px; color: var(--muted); text-align: center; padding: 2px 8px; }
+.chat-closed-note { text-align: center; font-size: 12px; color: var(--muted); margin: 4px 0 0; }
 /* Sticky just above the fixed bottom-nav, so it's reachable without
    scrolling past every checkpoint/message first. On iOS specifically,
    position:fixed elements (the nav) don't reliably track the visual

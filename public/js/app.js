@@ -1122,16 +1122,25 @@
     const messages = s.messages || [];
     if (!messages.length) {
       list.innerHTML = `<div class="empty small" style="padding:16px 10px;">No messages yet. Leave a note for whoever else is tracking this.</div>`;
-      return;
+    } else {
+      const wasNearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+      // System messages (status changes, delays, delivery) live in the same
+      // array as human ones, in the order they happened, so the thread
+      // reads as one timeline instead of two things to cross-reference.
+      list.innerHTML = messages.map((m) => m.type === 'system' ? `
+        <div class="chat-msg-system">${escapeHtml(m.text)} · ${fmtDate(m.createdAt)}</div>
+      ` : `
+        <div class="chat-msg ${m.userId === state.user?.id ? 'mine' : ''}">
+          <div class="chat-msg-meta"><span>@${escapeHtml(m.handle)}</span><span>${fmtDate(m.createdAt)}</span></div>
+          <div class="chat-msg-text">${escapeHtml(m.text)}</div>
+        </div>
+      `).join('');
+      if (wasNearBottom) list.scrollTop = list.scrollHeight;
     }
-    const wasNearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
-    list.innerHTML = messages.map((m) => `
-      <div class="chat-msg ${m.userId === state.user?.id ? 'mine' : ''}">
-        <div class="chat-msg-meta"><span>@${escapeHtml(m.handle)}</span><span>${fmtDate(m.createdAt)}</span></div>
-        <div class="chat-msg-text">${escapeHtml(m.text)}</div>
-      </div>
-    `).join('');
-    if (wasNearBottom) list.scrollTop = list.scrollHeight;
+
+    const closed = s.status === 'delivered';
+    $('#chat-form').hidden = closed;
+    $('#chat-closed-note').hidden = !closed;
   }
 
   guardSubmit($('#chat-form'), async (e) => {
