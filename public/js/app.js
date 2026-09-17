@@ -1151,6 +1151,20 @@
     }
   });
 
+  // iOS doesn't reliably keep a position:fixed element (the bottom nav)
+  // clear of the on-screen keyboard - hiding the nav while the chat input
+  // is focused removes the thing it was colliding with, and the sticky
+  // .chat-form (see style.css) then sits right above the keyboard on its
+  // own. The scrollIntoView is a second safety net for the case where the
+  // keyboard's opening animation still leaves the input just out of view.
+  $('#chat-input').addEventListener('focus', (e) => {
+    document.body.classList.add('chat-input-focused');
+    setTimeout(() => e.target.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300);
+  });
+  $('#chat-input').addEventListener('blur', () => {
+    document.body.classList.remove('chat-input-focused');
+  });
+
   // containerSel/mapKey let this be reused for the read-only shared view
   // (its own #shared-map container, its own state.sharedMap instance) as
   // well as the normal logged-in shipment detail (#map / state.map).
@@ -1204,21 +1218,45 @@
     map.fitBounds(bounds, { padding: [30, 30] });
   }
 
+  // Only the 6 most recent updates show by default - a shipment that's
+  // changed hands a dozen times otherwise turns the whole page into a
+  // wall of checkpoints. "Show earlier updates" reveals the rest without
+  // a real network fetch (they're already in `shipment`), so this is a
+  // plain expand/collapse rather than a real loading state.
+  const CHECKPOINT_LIMIT = 6;
+
   function renderCheckpoints(shipment, containerSel = '#checkpoints-list') {
     const list = $(containerSel);
-    const checkpoints = shipment.checkpoints || [];
+    const checkpoints = (shipment.checkpoints || []).slice().reverse();
     if (!checkpoints.length) {
       list.innerHTML = '';
       return;
     }
-    list.innerHTML = checkpoints.slice().reverse().map((c) => `
-      <div class="checkpoint">
-        <div>
-          <div class="checkpoint-label">${escapeHtml(c.label)}</div>
-          <div class="checkpoint-time">${fmtDate(c.timestamp)}</div>
+    let expanded = false;
+
+    function draw() {
+      const items = expanded ? checkpoints : checkpoints.slice(0, CHECKPOINT_LIMIT);
+      const hiddenCount = checkpoints.length - CHECKPOINT_LIMIT;
+      const rows = items.map((c) => `
+        <div class="checkpoint">
+          <div>
+            <div class="checkpoint-label">${escapeHtml(c.label)}</div>
+            <div class="checkpoint-time">${fmtDate(c.timestamp)}</div>
+          </div>
         </div>
-      </div>
-    `).join('');
+      `).join('');
+      const moreBtn = hiddenCount > 0
+        ? `<button type="button" class="link-btn checkpoint-more-btn">${expanded ? 'Show less' : `Show ${hiddenCount} earlier update${hiddenCount === 1 ? '' : 's'}`}</button>`
+        : '';
+      list.innerHTML = rows + moreBtn;
+      if (moreBtn) {
+        $('.checkpoint-more-btn', list).addEventListener('click', () => {
+          expanded = !expanded;
+          draw();
+        });
+      }
+    }
+    draw();
   }
 
   // ---------------- notifications ----------------

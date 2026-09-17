@@ -276,6 +276,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .data-strip .data-tracking .tn { font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; word-break: break-all; }
 
 .checkpoints { display: flex; flex-direction: column; gap: 0; padding: 0 4px; }
+.checkpoint-more-btn { margin-top: 8px; }
 .checkpoint {
   display: flex; gap: 12px; padding: 10px 0; border-left: 2px solid var(--border); margin-left: 6px; padding-left: 16px; position: relative;
 }
@@ -393,7 +394,22 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .chat-msg.mine { align-self: flex-end; background: rgba(198, 241, 53, 0.1); border-color: rgba(198, 241, 53, 0.3); }
 .chat-msg-meta { font-size: 11px; color: var(--muted); margin-bottom: 2px; display: flex; gap: 6px; }
 .chat-msg-text { font-size: 14px; color: var(--text); word-break: break-word; }
-.chat-form { display: flex; gap: 8px; }
+/* Sticky just above the fixed bottom-nav, so it's reachable without
+   scrolling past every checkpoint/message first. On iOS specifically,
+   position:fixed elements (the nav) don't reliably track the visual
+   viewport once the on-screen keyboard opens - the nav can end up
+   floating over the keyboard, hiding this input behind it. The
+   .chat-input-focused state below (toggled from JS on focus/blur) hides
+   the nav entirely while typing, so there's nothing left to fight the
+   keyboard for space and this sticks to the true bottom instead. */
+.chat-form {
+  display: flex; gap: 8px; position: sticky; z-index: 5;
+  bottom: calc(62px + env(safe-area-inset-bottom));
+  background: var(--bg); padding: 8px 0 4px;
+}
+body.chat-input-focused .bottom-nav { display: none; }
+body.chat-input-focused .app { padding-bottom: 0; }
+body.chat-input-focused .chat-form { bottom: 0; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
 .chat-form input {
   flex: 1; background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
   padding: 10px 12px; border-radius: var(--radius-sm); font-size: 16px;
