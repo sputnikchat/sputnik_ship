@@ -8,6 +8,8 @@ const { pushNotification, pushNotificationToUsers, pushSystemMessage } = require
 const { refreshAllShipments } = require('../services/scheduler');
 const { getSpaceUserIds } = require('../services/space');
 const { checkDelay } = require('../services/delayDetector');
+const { encryptField, decryptField } = require('../services/encryption');
+const { logAudit } = require('../services/audit');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -25,12 +27,24 @@ function sanitizeForFollower(shipment) {
   return { ...safe, viewerRole: 'follower' };
 }
 
+// The owner-facing counterpart: photo and cost are stored encrypted (see
+// services/encryption.js) and need to come back out in plain form for the
+// person who's actually allowed to see them.
+function decryptForOwner(shipment) {
+  return {
+    ...shipment,
+    photo: decryptField(shipment.photo),
+    cost: shipment.cost === null || shipment.cost === undefined ? shipment.cost : Number(decryptField(shipment.cost)),
+    viewerRole: 'owner',
+  };
+}
+
 router.get('/', async (req, res) => {
   const db = await readDB();
   const spaceUserIds = getSpaceUserIds(db, req.user.id);
   const owned = db.shipments
     .filter((s) => spaceUserIds.includes(s.userId))
-    .map((s) => ({ ...s, viewerRole: 'owner' }));
+    .map(decryptForOwner);
   const followed = db.shipments
     .filter((s) => !spaceUserIds.includes(s.userId) && (s.followers || []).includes(req.user.id))
     .map(sanitizeForFollower);
@@ -58,10 +72,10 @@ router.post('/', async (req, res) => {
     contactId: contactId || null,
     label: label || '',
     notes: notes || '',
-    cost: parsedCost,
+    cost: parsedCost !== null ? encryptField(String(parsedCost)) : null,
     currency: parsedCost !== null ? (currency || 'USD').toUpperCase() : null,
     category: CATEGORIES.includes(category) ? category : 'other',
-    photo: photo || null,
+    photo: photo ? encryptField(photo) : null,
     status: 'label_created',
     statusLabel: 'Label created',
     checkpointIndex: -1,
@@ -86,7 +100,7 @@ router.post('/', async (req, res) => {
   // seconds, and there's no reason to make the user stare at a spinner
   // for it. The shipment shows as "Label created" until that finishes
   // (or until the next scheduler cycle / a manual refresh).
-  res.status(201).json({ ...shipment, viewerRole: 'owner' });
+  res.status(201).json(decryptForOwner(shipment));
 
   try {
     const result = await getTrackingUpdate(shipment.carrier, shipment.trackingNumber, shipment);
@@ -141,6 +155,7 @@ router.post('/follow', async (req, res) => {
     s.followers ||= [];
     if (!s.followers.includes(req.user.id)) s.followers.push(req.user.id);
     updated = s;
+    logAudit(data, { userId: req.user.id, action: 'accept_invite', shipmentId: s.id, req });
   });
   res.json(sanitizeForFollower(updated));
 });
@@ -162,7 +177,14 @@ router.get('/:id', async (req, res) => {
   const spaceUserIds = getSpaceUserIds(db, req.user.id);
   const shipment = db.shipments.find((s) => s.id === req.params.id);
   if (!shipment) return res.status(404).json({ error: 'Shipment not found.' });
-  if (spaceUserIds.includes(shipment.userId)) return res.json({ ...shipment, viewerRole: 'owner' });
+  if (spaceUserIds.includes(shipment.userId)) {
+    // Only the owner side is audited - this is about who saw the private
+    // fields (photo, cost), and followers never receive those anyway.
+    await update((data) => {
+      logAudit(data, { userId: req.user.id, action: 'view_shipment', shipmentId: shipment.id, req });
+    });
+    return res.json(decryptForOwner(shipment));
+  }
   if ((shipment.followers || []).includes(req.user.id)) return res.json(sanitizeForFollower(shipment));
   return res.status(404).json({ error: 'Shipment not found.' });
 });
@@ -215,7 +237,7 @@ router.post('/:id/refresh', async (req, res) => {
       }
       updated = s;
     });
-    res.json({ ...updated, viewerRole: 'owner' });
+    res.json(decryptForOwner(updated));
   } catch (err) {
     res.status(502).json({ error: `Could not update tracking: ${err.message}` });
   }
@@ -231,13 +253,14 @@ router.post('/:id/share', async (req, res) => {
   if (!shipment) return res.status(404).json({ error: 'Shipment not found.' });
 
   let token = shipment.shareToken;
-  if (!token) {
-    await update((data) => {
+  await update((data) => {
+    if (!token) {
       const s = data.shipments.find((x) => x.id === shipment.id);
       s.shareToken = crypto.randomBytes(9).toString('base64url');
       token = s.shareToken;
-    });
-  }
+    }
+    logAudit(data, { userId: req.user.id, action: 'create_share_link', shipmentId: shipment.id, req });
+  });
 
   res.json({ shareToken: token, url: `/s/${token}` });
 });
@@ -256,7 +279,7 @@ router.post('/:id/archive', async (req, res) => {
     s.archived = !s.archived;
     updated = s;
   });
-  res.json({ ...updated, viewerRole: 'owner' });
+  res.json(decryptForOwner(updated));
 });
 
 // A per-shipment message thread. Open to the owner's whole space AND to
@@ -320,7 +343,7 @@ router.post('/:id/messages', async (req, res) => {
     }
     updated = s;
   });
-  res.json(isOwnerSide ? { ...updated, viewerRole: 'owner' } : sanitizeForFollower(updated));
+  res.json(isOwnerSide ? decryptForOwner(updated) : sanitizeForFollower(updated));
 });
 
 router.delete('/:id', async (req, res) => {
@@ -343,7 +366,7 @@ router.post('/refresh-all/now', async (req, res) => {
   await refreshAllShipments();
   const db = await readDB();
   const spaceUserIds = getSpaceUserIds(db, req.user.id);
-  const shipments = db.shipments.filter((s) => spaceUserIds.includes(s.userId));
+  const shipments = db.shipments.filter((s) => spaceUserIds.includes(s.userId)).map(decryptForOwner);
   res.json({ ok: true, shipments });
 });
 

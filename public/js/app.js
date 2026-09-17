@@ -1473,6 +1473,7 @@
       cta.innerHTML = `
         <div class="auth-card shared-auth-card">
           <p class="small muted" style="margin:0 0 14px;">Logged in as @${escapeHtml(state.user.handle)}</p>
+          <p class="small muted" style="margin:0 0 10px;">By following, you'll get read-only access to this shipment's tracking and can message the person who shared it. You can unfollow any time.</p>
           <button type="button" class="btn-primary" id="shared-follow-btn" style="width:100%; margin-bottom:10px;">Follow &amp; chat about this shipment</button>
           <a href="/" class="btn-secondary" style="display:block; text-align:center; text-decoration:none;">Go to my shipments</a>
         </div>
