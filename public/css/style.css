@@ -248,6 +248,10 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 
 /* ---------- Shipment detail / map ---------- */
 .map { height: 260px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); margin-bottom: 14px; }
+/* Leaflet's own default is a light grey (#ddd) background, meant to
+   show briefly while tiles are still loading - against this app's dark
+   theme that reads as a broken/blank box instead of a loading state. */
+.leaflet-container { background: var(--surface-2); }
 
 .shipment-hero {
   background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius);

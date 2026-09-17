@@ -1181,6 +1181,18 @@
     const container = $(containerSel);
     const route = shipment.fullRoute && shipment.fullRoute.length ? shipment.fullRoute : null;
 
+    // Tear down any previous Leaflet instance on this container FIRST,
+    // regardless of which branch below runs. Leaflet's own .remove()
+    // strips the leaflet-* classes it added (including the one that
+    // sets a light-grey background) - skipping this when falling back
+    // to the empty/no-route state left that grey background stuck on
+    // the container instead of matching the dark theme, since only
+    // innerHTML was cleared, never the container's own classes.
+    if (state[mapKey]) {
+      state[mapKey].remove();
+      state[mapKey] = null;
+    }
+
     if (!route) {
       container.innerHTML = '<div class="empty" style="padding:20px;">The map will appear as soon as the courier reports the first checkpoint.</div>';
       return;
@@ -1190,11 +1202,6 @@
       return;
     }
     container.innerHTML = '';
-
-    if (state[mapKey]) {
-      state[mapKey].remove();
-      state[mapKey] = null;
-    }
 
     const map = L.map(container, { zoomControl: true, attributionControl: true });
     state[mapKey] = map;
