@@ -43,6 +43,43 @@
     return data;
   }
 
+  // Wraps a form's submit handler so the submit button is disabled (and
+  // shows a busy label) for the whole duration of an in-flight request,
+  // re-enabled whether it succeeds or fails. Without this, tapping "Save"
+  // twice on a slow connection - the request is still running, nothing on
+  // screen says so - fires the submit twice and creates duplicates (this
+  // is a real bug users hit, not a hypothetical).
+  function guardSubmit(form, handler) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = form.querySelector('button[type="submit"]');
+      if (btn && btn.disabled) return; // a request from the previous tap is still running
+      const originalText = btn ? btn.textContent : null;
+      if (btn) { btn.disabled = true; btn.textContent = 'Please wait…'; }
+      try {
+        await handler(e);
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = originalText; }
+      }
+    });
+  }
+
+  // Same idea for a plain action button (not a form submit) - Archive,
+  // Delete, Follow, etc. - that fires a network request on click.
+  function guardClick(button, handler) {
+    button.addEventListener('click', async (...args) => {
+      if (button.disabled) return;
+      const originalText = button.textContent;
+      button.disabled = true;
+      try {
+        await handler(...args);
+      } finally {
+        button.disabled = false;
+        if (document.body.contains(button)) button.textContent = originalText;
+      }
+    });
+  }
+
   const CARRIER_LABEL = { fedex: 'FedEx', ups: 'UPS', dhl: 'DHL', usps: 'USPS' };
 
   // Kept in sync by hand with CATEGORIES in routes/shipments.js.
@@ -156,7 +193,7 @@
     showAuth();
   }
 
-  $('#login-form').addEventListener('submit', async (e) => {
+  guardSubmit($('#login-form'), async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const errEl = $('#login-error');
@@ -171,7 +208,7 @@
     }
   });
 
-  $('#signup-form').addEventListener('submit', async (e) => {
+  guardSubmit($('#signup-form'), async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const errEl = $('#signup-error');
@@ -211,7 +248,7 @@
     $('#login-form').hidden = false;
   });
 
-  $('#recovery-form').addEventListener('submit', async (e) => {
+  guardSubmit($('#recovery-form'), async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const errEl = $('#recovery-error');
@@ -333,7 +370,7 @@
       btn.addEventListener('click', (e) => { e.stopPropagation(); openContactModal(btn.dataset.id); })
     );
     $all('.delete-contact', list).forEach((btn) =>
-      btn.addEventListener('click', async (e) => {
+      guardClick(btn, async (e) => {
         e.stopPropagation();
         if (!confirm('Delete this contact?')) return;
         await api(`/contacts/${btn.dataset.id}`, { method: 'DELETE' });
@@ -391,7 +428,7 @@
   $('#contact-cancel').addEventListener('click', () => { $('#contact-modal').hidden = true; });
   $('#contact-modal').addEventListener('click', (e) => { if (e.target.id === 'contact-modal') $('#contact-modal').hidden = true; });
 
-  $('#contact-form').addEventListener('submit', async (e) => {
+  guardSubmit($('#contact-form'), async (e) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(e.target));
     try {
@@ -745,7 +782,7 @@
     }
   });
 
-  $('#shipment-form').addEventListener('submit', async (e) => {
+  guardSubmit($('#shipment-form'), async (e) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(e.target));
     try {
@@ -774,7 +811,7 @@
     }
   });
 
-  $('#refresh-now-btn').addEventListener('click', async () => {
+  guardClick($('#refresh-now-btn'), async () => {
     toast('Refreshing shipments…');
     try {
       await api('/shipments/refresh-all/now', { method: 'POST' });
@@ -1002,7 +1039,7 @@
     `;
 
     if (s.viewerRole === 'follower') {
-      $('#unfollow-shipment-btn').addEventListener('click', async () => {
+      guardClick($('#unfollow-shipment-btn'), async () => {
         if (!confirm('Stop following this shipment?')) return;
         await api(`/shipments/${s.id}/unfollow`, { method: 'POST' });
         toast('Unfollowed');
@@ -1014,7 +1051,7 @@
       $('#share-shipment-btn').addEventListener('click', () => shareShipment(s.id));
       $('#qr-shipment-btn').addEventListener('click', () => showShipmentQr(s.id));
 
-      $('#archive-shipment-btn').addEventListener('click', async () => {
+      guardClick($('#archive-shipment-btn'), async () => {
         const updated = await api(`/shipments/${s.id}/archive`, { method: 'POST' });
         const idx = state.shipments.findIndex((x) => x.id === s.id);
         if (idx >= 0) state.shipments[idx] = updated;
@@ -1022,7 +1059,7 @@
         renderShipmentDetail();
       });
 
-      $('#delete-shipment-btn').addEventListener('click', async () => {
+      guardClick($('#delete-shipment-btn'), async () => {
         if (!confirm('Delete this shipment?')) return;
         await api(`/shipments/${s.id}`, { method: 'DELETE' });
         toast('Shipment deleted');
@@ -1086,7 +1123,7 @@
     if (wasNearBottom) list.scrollTop = list.scrollHeight;
   }
 
-  $('#chat-form').addEventListener('submit', async (e) => {
+  guardSubmit($('#chat-form'), async (e) => {
     e.preventDefault();
     const input = $('#chat-input');
     const text = input.value.trim();
@@ -1203,7 +1240,7 @@
     );
   }
 
-  $('#mark-all-read-btn').addEventListener('click', async () => {
+  guardClick($('#mark-all-read-btn'), async () => {
     await api('/notifications/read-all', { method: 'POST' });
     loadNotifications();
   });
@@ -1280,7 +1317,7 @@
     btn.textContent = subscribed ? 'Notifications enabled ✓' : 'Enable notifications';
   }
 
-  $('#push-toggle-btn').addEventListener('click', async () => {
+  guardClick($('#push-toggle-btn'), async () => {
     if (!pushSupported()) return;
     try {
       const reg = await navigator.serviceWorker.ready;
@@ -1382,7 +1419,7 @@
           <a href="/" class="btn-secondary" style="display:block; text-align:center; text-decoration:none;">Go to my shipments</a>
         </div>
       `;
-      $('#shared-follow-btn').addEventListener('click', async () => {
+      guardClick($('#shared-follow-btn'), async () => {
         try {
           const followed = await api('/shipments/follow', { method: 'POST', body: { shareToken: token } });
           toast('Now following this shipment');
@@ -1430,7 +1467,7 @@
       });
     });
 
-    $('#shared-login-form').addEventListener('submit', async (e) => {
+    guardSubmit($('#shared-login-form'), async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
       const errEl = $('#shared-login-error');
@@ -1446,7 +1483,7 @@
       }
     });
 
-    $('#shared-signup-form').addEventListener('submit', async (e) => {
+    guardSubmit($('#shared-signup-form'), async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
       const errEl = $('#shared-signup-error');
@@ -1530,7 +1567,7 @@
     $('#change-password-modal').hidden = false;
   });
   $('#change-password-cancel').addEventListener('click', () => { $('#change-password-modal').hidden = true; });
-  $('#change-password-form').addEventListener('submit', async (e) => {
+  guardSubmit($('#change-password-form'), async (e) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(e.target));
     const errEl = $('#change-password-error');
@@ -1552,7 +1589,7 @@
     $('#regen-recovery-modal').hidden = false;
   });
   $('#regen-recovery-cancel').addEventListener('click', () => { $('#regen-recovery-modal').hidden = true; });
-  $('#regen-recovery-form').addEventListener('submit', async (e) => {
+  guardSubmit($('#regen-recovery-form'), async (e) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(e.target));
     const errEl = $('#regen-recovery-error');
@@ -1568,7 +1605,7 @@
   });
 
   // ---- invite / join / leave a shared space ----
-  $('#invite-btn').addEventListener('click', async () => {
+  guardClick($('#invite-btn'), async () => {
     try {
       const { code } = await api('/account/invite', { method: 'POST' });
       $('#invite-code-display').textContent = code;
@@ -1587,7 +1624,7 @@
   });
   $('#invite-code-close-btn').addEventListener('click', () => { $('#invite-code-modal').hidden = true; });
 
-  $('#join-space-form').addEventListener('submit', async (e) => {
+  guardSubmit($('#join-space-form'), async (e) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(e.target));
     try {
@@ -1601,7 +1638,7 @@
     }
   });
 
-  $('#leave-space-btn').addEventListener('click', async () => {
+  guardClick($('#leave-space-btn'), async () => {
     if (!confirm('Leave this shared space? You’ll only see your own shipments and contacts afterward.')) return;
     try {
       await api('/account/leave-space', { method: 'POST' });

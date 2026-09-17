@@ -82,8 +82,12 @@ router.post('/', async (req, res) => {
     data.shipments.push(shipment);
   });
 
-  // Fetch tracking immediately so the shipment doesn't sit empty until
-  // the next scheduler cycle (every 30 min by default).
+  // Respond right away - the live carrier lookup below can take a few
+  // seconds, and there's no reason to make the user stare at a spinner
+  // for it. The shipment shows as "Label created" until that finishes
+  // (or until the next scheduler cycle / a manual refresh).
+  res.status(201).json({ ...shipment, viewerRole: 'owner' });
+
   try {
     const result = await getTrackingUpdate(shipment.carrier, shipment.trackingNumber, shipment);
     await update((data) => {
@@ -111,9 +115,6 @@ router.post('/', async (req, res) => {
   } catch (err) {
     console.error('Could not fetch initial tracking:', err.message);
   }
-
-  const db = await readDB();
-  res.status(201).json({ ...db.shipments.find((s) => s.id === shipment.id), viewerRole: 'owner' });
 });
 
 // Joins someone else's shared shipment (from its /s/:token public link) as
