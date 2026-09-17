@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const path = require('path');
 
 const authRoutes = require('./routes/auth');
@@ -21,6 +22,40 @@ if (!process.env.JWT_SECRET) {
 }
 
 const app = express();
+
+// Render (and most hosts) sit behind a reverse proxy - without this,
+// express-rate-limit sees every request as coming from the same internal
+// IP and either rate-limits everyone together or refuses to start.
+app.set('trust proxy', 1);
+
+// Security headers (clickjacking, MIME-sniffing, forced HTTPS, etc.).
+// The default Content-Security-Policy is replaced with one that actually
+// matches what this app loads - Leaflet + its tiles, Google Fonts, the
+// QR code image API - a generic default would silently break all three.
+// crossOriginEmbedderPolicy is off because it requires every cross-origin
+// resource (fonts, map tiles) to opt in with CORP headers we don't
+// control and don't need the isolation guarantees it buys.
+app.use(
+  helmet({
+    crossOriginEmbedderPolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", 'https://cdnjs.cloudflare.com'],
+        // Inline style="" attributes are used throughout the frontend, so
+        // style-src can't be locked down further without a larger rewrite.
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com'],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+        imgSrc: ["'self'", 'data:', 'https://*.tile.openstreetmap.org', 'https://api.qrserver.com'],
+        connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        frameAncestors: ["'self'"],
+      },
+    },
+  })
+);
+
 app.use(cors());
 app.use(express.json());
 

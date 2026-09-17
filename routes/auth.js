@@ -2,11 +2,25 @@ const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
 const { readDB, update } = require('../services/store');
 const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Signup/login/recover are the only routes anyone can hit without already
+// having a valid token - the ones worth protecting against someone
+// script-guessing passwords or recovery codes. 20 tries per 15 minutes per
+// IP is generous for real use (typos, a couple of people on one wifi)
+// but shuts down brute-forcing.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Please wait a few minutes and try again.' },
+});
 
 const HANDLE_RE = /^[a-z0-9_]{3,20}$/i;
 // Avoids visually ambiguous characters (0/O, 1/I/L) since this is meant to
@@ -47,7 +61,7 @@ function normalizeRecoveryCode(code) {
 // no identity verification (KYC). Anyone with the server link can create
 // an account unless you decide to close public signup (see README,
 // "Closing signup" section).
-router.post('/signup', async (req, res) => {
+router.post('/signup', authLimiter, async (req, res) => {
   const { handle, password } = req.body || {};
   if (!handle || !password) {
     return res.status(400).json({ error: 'Missing data: username and password are required.' });
@@ -86,7 +100,7 @@ router.post('/signup', async (req, res) => {
   res.status(201).json({ token, user: { id: user.id, handle: user.handle }, recoveryCode });
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   const { handle, password } = req.body || {};
   if (!handle || !password) {
     return res.status(400).json({ error: 'Missing data: username and password.' });
@@ -107,7 +121,7 @@ router.post('/login', async (req, res) => {
 // Recovers a locked-out account with the one-time code shown at signup.
 // Issues a new password AND rotates the recovery code (the old one is
 // treated as spent, same as a used one-time backup code anywhere else).
-router.post('/recover', async (req, res) => {
+router.post('/recover', authLimiter, async (req, res) => {
   const { handle, recoveryCode, newPassword } = req.body || {};
   if (!handle || !recoveryCode || !newPassword) {
     return res.status(400).json({ error: 'Missing data: username, recovery code, and new password.' });
