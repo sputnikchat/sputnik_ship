@@ -15,6 +15,23 @@ const accountRoutes = require('./routes/account');
 const statsRoutes = require('./routes/stats');
 const { startScheduler } = require('./services/scheduler');
 
+// Safety net for the whole app: an async route handler that throws
+// without its own try/catch (still common across routes/*.js) rejects a
+// promise Express 4 never awaits or catches - by default Node treats
+// that as fatal and kills the entire process, taking down every other
+// in-flight request along with it. This has happened for real: a
+// transient "Connection terminated unexpectedly" from Supabase's pooler
+// during one ordinary GET /api/notifications crashed the whole server.
+// Logging and continuing means that one request still fails for that
+// one user, instead of every user losing the app for the ~15 seconds
+// Render takes to notice and restart it.
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled promise rejection (request failed, server kept running):', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception (kept running):', err);
+});
+
 if (!process.env.JWT_SECRET) {
   console.warn(
     '[WARNING] No JWT_SECRET set in the environment. Copy .env.example to .env and set one before using this in production.'
