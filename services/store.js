@@ -25,9 +25,6 @@ function defaultData() {
     notifications: [],
     pushSubscriptions: [],
     spaceInvites: [],
-    // Append-only - see services/audit.js. Never trimmed like
-    // notifications is, and never mutated or removed once written.
-    auditLog: [],
   };
 }
 

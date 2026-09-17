@@ -1,20 +1,36 @@
+// Append-only audit log, enforced by Postgres itself - not by code
+// convention. Lives in its own `audit_log` table (see the one-time setup,
+// scripts/setup-audit-role.js), written through a SEPARATE
+// connection authenticated as `sputnik_audit_writer`, a role that only
+// has INSERT on this one table (no SELECT/UPDATE/DELETE/TRUNCATE,
+// verified directly against Postgres - see the encryption/audit-log
+// conversation this came out of). The app's regular DATABASE_URL role
+// keeps full access, since that's still the admin credential used for
+// setup; this only locks down the credential the running app actually
+// holds day to day, and only for this one table.
+//
+// Honest limit: this stops a code bug or a leak of just
+// AUDIT_DATABASE_URL from tampering with the log. It does NOT stop
+// someone who has DATABASE_URL itself (Supabase's project-owner role),
+// since that role can always re-grant itself privileges. True immunity
+// to that would mean the running app never holding an admin-level
+// credential at all - a bigger change than this table asked for.
 const { v4: uuidv4 } = require('uuid');
+const { Pool } = require('pg');
 
-// Append-only: nothing in this codebase should ever remove or edit an
-// entry once it's written (unlike data.notifications, which is trimmed).
-// Call inside an existing services/store.js update(data => ...) so the
-// entry lands in the same write as whatever action triggered it.
-function logAudit(data, { userId, action, shipmentId = null, req = null }) {
-  data.auditLog ||= [];
-  data.auditLog.push({
-    id: uuidv4(),
-    userId,
-    action,
-    shipmentId,
-    ip: req?.ip || null,
-    userAgent: req?.headers?.['user-agent'] || null,
-    createdAt: new Date().toISOString(),
-  });
+if (!process.env.AUDIT_DATABASE_URL) {
+  throw new Error(
+    'AUDIT_DATABASE_URL is not set. Run scratch/setup-audit-role.js once (with DATABASE_URL pointing at an admin-level Postgres role) to create the audit_log table and its restricted role, then put the connection string it writes into .env.'
+  );
+}
+
+const pool = new Pool({ connectionString: process.env.AUDIT_DATABASE_URL, ssl: { rejectUnauthorized: false } });
+
+async function logAudit({ userId, action, shipmentId = null, req = null }) {
+  await pool.query(
+    'INSERT INTO audit_log (id, user_id, action, shipment_id, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6)',
+    [uuidv4(), userId, action, shipmentId, req?.ip || null, req?.headers?.['user-agent'] || null]
+  );
 }
 
 module.exports = { logAudit };

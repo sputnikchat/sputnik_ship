@@ -157,8 +157,8 @@ router.post('/follow', async (req, res) => {
     s.followers ||= [];
     if (!s.followers.includes(req.user.id)) s.followers.push(req.user.id);
     updated = s;
-    logAudit(data, { userId: req.user.id, action: 'accept_invite', shipmentId: s.id, req });
   });
+  await logAudit({ userId: req.user.id, action: 'accept_invite', shipmentId: shipment.id, req });
   res.json(sanitizeForFollower(updated));
 });
 
@@ -182,9 +182,7 @@ router.get('/:id', async (req, res) => {
   if (spaceUserIds.includes(shipment.userId)) {
     // Only the owner side is audited - this is about who saw the private
     // fields (photo, cost), and followers never receive those anyway.
-    await update((data) => {
-      logAudit(data, { userId: req.user.id, action: 'view_shipment', shipmentId: shipment.id, req });
-    });
+    await logAudit({ userId: req.user.id, action: 'view_shipment', shipmentId: shipment.id, req });
     return res.json(decryptForOwner(shipment));
   }
   if ((shipment.followers || []).includes(req.user.id)) return res.json(sanitizeForFollower(shipment));
@@ -256,14 +254,14 @@ router.post('/:id/share', async (req, res) => {
   if (!shipment) return res.status(404).json({ error: 'Shipment not found.' });
 
   let token = shipment.shareToken;
-  await update((data) => {
-    if (!token) {
+  if (!token) {
+    await update((data) => {
       const s = data.shipments.find((x) => x.id === shipment.id);
       s.shareToken = crypto.randomBytes(9).toString('base64url');
       token = s.shareToken;
-    }
-    logAudit(data, { userId: req.user.id, action: 'create_share_link', shipmentId: shipment.id, req });
-  });
+    });
+  }
+  await logAudit({ userId: req.user.id, action: 'create_share_link', shipmentId: shipment.id, req });
 
   res.json({ shareToken: token, url: `/s/${token}` });
 });
