@@ -27,7 +27,9 @@
 
   async function api(path, { method = 'GET', body } = {}) {
     const headers = { 'Content-Type': 'application/json' };
-    if (state.token) headers.Authorization = `Bearer ${state.token}`;
+    // The session itself travels in an httpOnly cookie the browser attaches
+    // automatically to this same-origin request - nothing here can read or
+    // resend it, which is the point (see routes/auth.js for why).
     const res = await fetch(API + path, {
       method,
       headers,
@@ -178,18 +180,27 @@
     }
   }
 
+  // The real token lives only in the httpOnly cookie the server just set
+  // (see routes/auth.js) - this app never stores or reads the actual
+  // secret. `state.token` is just a "there's an active session" marker so
+  // the UI can decide what to show on boot without a network round-trip.
   function saveSession(token, user) {
-    state.token = token;
+    state.token = true;
     state.user = user;
-    localStorage.setItem('sputnikship_token', token);
+    localStorage.setItem('sputnikship_token', '1');
     localStorage.setItem('sputnikship_user', JSON.stringify(user));
   }
 
-  function logout() {
+  async function logout() {
     state.token = null;
     state.user = null;
     localStorage.removeItem('sputnikship_token');
     localStorage.removeItem('sputnikship_user');
+    try {
+      await fetch(API + '/auth/logout', { method: 'POST' });
+    } catch (err) {
+      // Best-effort - the local session is already cleared either way.
+    }
     showAuth();
   }
 
@@ -1598,6 +1609,33 @@
       const data = await api('/auth/regenerate-recovery-code', { method: 'POST', body: fd });
       $('#regen-recovery-modal').hidden = true;
       showRecoveryCode(data.recoveryCode);
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.hidden = false;
+    }
+  });
+
+  // ---- delete account ----
+  $('#delete-account-btn').addEventListener('click', () => {
+    $('#delete-account-form').reset();
+    $('#delete-account-error').hidden = true;
+    $('#delete-account-modal').hidden = false;
+  });
+  $('#delete-account-cancel').addEventListener('click', () => { $('#delete-account-modal').hidden = true; });
+  guardSubmit($('#delete-account-form'), async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(e.target));
+    const errEl = $('#delete-account-error');
+    errEl.hidden = true;
+    try {
+      await api('/account', { method: 'DELETE', body: fd });
+      $('#delete-account-modal').hidden = true;
+      state.token = null;
+      state.user = null;
+      localStorage.removeItem('sputnikship_token');
+      localStorage.removeItem('sputnikship_user');
+      toast('Account deleted');
+      showAuth();
     } catch (err) {
       errEl.textContent = err.message;
       errEl.hidden = false;

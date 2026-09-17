@@ -1,8 +1,14 @@
 const jwt = require('jsonwebtoken');
 
+// Accepts the token from either place: an httpOnly cookie (the main web
+// app, set by routes/auth.js - not readable by JS, so it survives an XSS
+// bug that a header stashed in localStorage wouldn't) or an Authorization
+// header (the browser extension and the public share page's own client,
+// which aren't in a position to receive a same-site cookie from a plain
+// login response the way the main app's own pages are).
 function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  const token = (header.startsWith('Bearer ') ? header.slice(7) : null) || req.cookies?.sputnikship_token || null;
   if (!token) return res.status(401).json({ error: 'Not authenticated. Missing token.' });
 
   try {

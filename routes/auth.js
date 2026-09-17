@@ -35,6 +35,25 @@ function sign(user) {
   );
 }
 
+// The main web app's own session lives in this httpOnly cookie instead of
+// a token the page's own JavaScript can read (e.g. from localStorage) -
+// so a future XSS bug in this app or a compromised third-party script it
+// loads can't walk off with a logged-in session. httpOnly means client
+// JS genuinely cannot read or set this cookie; only the server can.
+// The browser extension and any other non-browser client still get the
+// token in the response body and send it as a Bearer header instead,
+// since a cross-origin client was never going to receive this cookie.
+const AUTH_COOKIE = 'sputnikship_token';
+function setAuthCookie(req, res, token) {
+  res.cookie(AUTH_COOKIE, token, {
+    httpOnly: true,
+    secure: req.secure,
+    sameSite: 'lax',
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days, matches the JWT's own expiry
+    path: '/',
+  });
+}
+
 // Wallet-style account, no email on file - so there's no "reset link" a
 // normal app could send. This is the equivalent of a seed phrase: a
 // one-time code shown right after it's generated, hashed at rest like a
@@ -96,6 +115,7 @@ router.post('/signup', authLimiter, async (req, res) => {
   });
 
   const token = sign(user);
+  setAuthCookie(req, res, token);
   // recoveryCode is returned exactly once - the server keeps only its hash.
   res.status(201).json({ token, user: { id: user.id, handle: user.handle }, recoveryCode });
 });
@@ -115,6 +135,7 @@ router.post('/login', authLimiter, async (req, res) => {
   if (!ok) return res.status(401).json({ error: 'Incorrect username or password.' });
 
   const token = sign(user);
+  setAuthCookie(req, res, token);
   res.json({ token, user: { id: user.id, handle: user.handle } });
 });
 
@@ -149,7 +170,15 @@ router.post('/recover', authLimiter, async (req, res) => {
   });
 
   const token = sign(user);
+  setAuthCookie(req, res, token);
   res.json({ token, user: { id: user.id, handle: user.handle }, recoveryCode: newRecoveryCode });
+});
+
+// Clears the session cookie. Doesn't require a valid session itself - a
+// stale or already-expired cookie should still be clearable.
+router.post('/logout', (req, res) => {
+  res.clearCookie(AUTH_COOKIE, { httpOnly: true, secure: req.secure, sameSite: 'lax', path: '/' });
+  res.status(204).end();
 });
 
 router.use(requireAuth);
