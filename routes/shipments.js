@@ -1,5 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
 const { readDB, update } = require('../services/store');
 const { requireAuth } = require('../middleware/auth');
@@ -15,6 +16,31 @@ const router = express.Router();
 router.use(requireAuth);
 
 const CATEGORIES = ['electronics', 'documents', 'gifts', 'clothing', 'food', 'other'];
+
+// Generous for real use (nobody adds/messages 60 times in 15 minutes by
+// hand) but stops a script from creating shipments or chat messages
+// without limit - these were the only mutating routes in the app with
+// no rate limit at all until now.
+const writeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please wait a few minutes and try again.' },
+});
+
+// Tighter limit specifically for refreshing tracking: each call fans out
+// to the real Ship24 API for every active shipment, so spamming this
+// burns through the account's API quota (and could get the app's own
+// Ship24 account rate-limited or blocked) far faster than any other
+// route in the app.
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many refresh requests. Please wait a few minutes and try again.' },
+});
 
 // A follower (someone on a different account/space who joined via a share
 // link - see POST /follow) gets read access to a shipment plus its chat,
@@ -52,7 +78,7 @@ router.get('/', async (req, res) => {
   res.json(shipments);
 });
 
-router.post('/', async (req, res) => {
+router.post('/', writeLimiter, async (req, res) => {
   const { carrier, trackingNumber, contactId, label, notes, cost, currency, category, photo } = req.body || {};
   if (!carrier || !CARRIERS.includes(String(carrier).toLowerCase())) {
     return res.status(400).json({ error: `Courier must be one of: ${CARRIERS.join(', ')}` });
@@ -62,6 +88,12 @@ router.post('/', async (req, res) => {
   const parsedCost = cost !== undefined && cost !== null && cost !== '' ? Number(cost) : null;
   if (parsedCost !== null && !Number.isFinite(parsedCost)) {
     return res.status(400).json({ error: 'Cost must be a number.' });
+  }
+  // photo is rendered back out as an <img src="..."> - reject anything
+  // that isn't actually an image data URI up front, rather than relying
+  // only on the frontend escaping it at render time.
+  if (photo && !/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/]+=*$/.test(photo)) {
+    return res.status(400).json({ error: 'Photo must be a valid image.' });
   }
 
   const shipment = {
@@ -190,7 +222,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Force a manual refresh of ONE shipment (besides the automatic refresh every 30 min).
-router.post('/:id/refresh', async (req, res) => {
+router.post('/:id/refresh', refreshLimiter, async (req, res) => {
   const db = await readDB();
   const spaceUserIds = getSpaceUserIds(db, req.user.id);
   const shipment = db.shipments.find((s) => s.id === req.params.id && spaceUserIds.includes(s.userId));
@@ -287,7 +319,7 @@ router.post('/:id/archive', async (req, res) => {
 // anyone following the shipment via its share link (see POST /follow) -
 // this is the "communicator" feature: two different Sputnik Ship accounts
 // can talk about one shipment, e.g. "left it with the doorman".
-router.post('/:id/messages', async (req, res) => {
+router.post('/:id/messages', writeLimiter, async (req, res) => {
   const { text } = req.body || {};
   if (!text || !String(text).trim()) return res.status(400).json({ error: 'Message text is required.' });
 
@@ -363,7 +395,7 @@ router.delete('/:id', async (req, res) => {
 
 // Manually triggers the refresh cycle for ALL shipments (the same thing
 // the scheduler does every 30 min). Useful for testing without waiting.
-router.post('/refresh-all/now', async (req, res) => {
+router.post('/refresh-all/now', refreshLimiter, async (req, res) => {
   await refreshAllShipments();
   const db = await readDB();
   const spaceUserIds = getSpaceUserIds(db, req.user.id);

@@ -32,11 +32,15 @@ process.on('uncaughtException', (err) => {
   console.error('Uncaught exception (kept running):', err);
 });
 
+// This used to silently fall back to a hardcoded 'change-me-dev-secret'
+// if unset - anyone who ever read this file could forge a valid session
+// token for any account. Same fail-fast treatment as DATABASE_URL/
+// ENCRYPTION_KEY/AUDIT_DATABASE_URL: refuse to start rather than run
+// insecurely without anyone noticing.
 if (!process.env.JWT_SECRET) {
-  console.warn(
-    '[WARNING] No JWT_SECRET set in the environment. Copy .env.example to .env and set one before using this in production.'
+  throw new Error(
+    'JWT_SECRET is not set. Copy .env.example to .env and set one (a long random string) before starting the server.'
   );
-  process.env.JWT_SECRET = process.env.JWT_SECRET || 'change-me-dev-secret';
 }
 
 const app = express();
@@ -84,7 +88,11 @@ app.use(
 );
 
 app.use(cors());
-app.use(express.json());
+// Express's default json() body limit is 100kb - a compressed shipment
+// photo (see compressImage() in public/js/app.js) sits right around
+// that line, so some real photos were silently getting rejected with a
+// 413 the client just reported as a generic "Network error".
+app.use(express.json({ limit: '5mb' }));
 app.use(cookieParser());
 
 app.use('/api/auth', authRoutes);

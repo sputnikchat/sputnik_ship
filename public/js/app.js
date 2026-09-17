@@ -1036,7 +1036,7 @@
       <p class="small muted" style="margin:8px 0 0;">Last checked: ${fmtDate(s.lastCheckedAt)}</p>
       ${contact ? `<p class="small" style="margin-top:10px; display:flex; align-items:center; gap:6px;">${ICONS.contact} ${escapeHtml(contact.name)}</p>` : ''}
       ${s.notes ? `<p class="small" style="margin-top:10px; white-space:pre-wrap;">${escapeHtml(s.notes)}</p>` : ''}
-      ${s.photo ? `<img class="shipment-photo" src="${s.photo}" alt="Shipment photo" />` : ''}
+      ${s.photo ? `<img class="shipment-photo" src="${escapeHtml(s.photo)}" alt="Shipment photo" />` : ''}
       <div class="modal-actions" style="justify-content:flex-start; margin-top:14px; flex-wrap:wrap;">
         ${s.viewerRole === 'follower' ? `
           <button class="btn-secondary small" id="unfollow-shipment-btn">Unfollow</button>
