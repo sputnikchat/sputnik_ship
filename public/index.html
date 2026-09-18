@@ -24,7 +24,7 @@
   <header class="topbar">
     <div class="brand-mini">
       <div class="brand-badge">
-        <img class="logo-mark" src="/icons/logo-mark.png" alt="" />
+        <img class="logo-mark" src="/icons/logo-mark.svg" alt="" />
       </div>
       <span>Sputnik Ship</span>
     </div>
@@ -37,69 +37,137 @@
   </main>
 </div>
 
-<!-- Login / signup screen -->
+<!-- Login / signup screen: landing hero (docs/design/sputnik-hero.html) + auth card -->
 <div id="auth-screen" class="auth-screen">
-  <div class="auth-card">
-    <div class="brand">
-      <div class="brand-badge">
-        <img class="logo-mark" src="/icons/logo-mark.png" alt="" />
+  <div class="hero-bg" aria-hidden="true">
+    <div class="hero-grid"></div>
+    <div class="hero-glow1"></div>
+    <div class="hero-glow2"></div>
+    <svg class="hero-route" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+      <path d="M-40 720 C 260 640, 420 560, 700 520 S 1100 380, 1500 220" stroke="rgba(139,124,246,.14)" stroke-width="1.5" fill="none" class="route-dash"/>
+      <path d="M-40 800 C 300 760, 520 700, 820 640 S 1200 520, 1500 400" stroke="rgba(94,106,210,.09)" stroke-width="1" fill="none"/>
+    </svg>
+  </div>
+
+  <header class="hero-nav">
+    <div class="brand-mini">
+      <div class="brand-badge"><img class="logo-mark" src="/icons/logo-mark.svg" alt="" /></div>
+      <span>Sputnik Ship</span>
+    </div>
+    <a class="btn-primary small hero-nav-cta" href="#auth-card">Track a shipment</a>
+  </header>
+
+  <div class="hero">
+    <div class="hero-copy">
+      <span class="eyebrow"><i class="eyebrow-dot"></i>Live tracking<span class="eyebrow-more"> · FedEx · UPS · DHL · USPS · Correos</span></span>
+      <h1 class="hero-h1">From the shipping label to the <em>entire journey.</em></h1>
+      <p class="hero-lede">Every shipment becomes a live thread — the courier's tracking, the map, the photo and the chat with whoever's receiving it, in one place.</p>
+
+      <div class="auth-card" id="auth-card">
+        <div class="tabs">
+          <button class="tab active" data-tab="login">Log in</button>
+          <button class="tab" data-tab="signup">Sign up</button>
+        </div>
+
+        <form id="login-form" class="auth-form">
+          <label>Username
+            <div class="handle-input">
+              <span>@</span>
+              <input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourusername" />
+            </div>
+          </label>
+          <label>Password
+            <input type="password" name="password" required autocomplete="current-password" />
+          </label>
+          <button type="submit" class="btn-primary">Log in</button>
+          <p class="error" id="login-error" hidden></p>
+          <button type="button" class="link-btn" id="forgot-password-btn">Forgot password?</button>
+        </form>
+
+        <form id="recovery-form" class="auth-form" hidden>
+          <p class="small muted" style="margin:0;">Enter your username, your recovery code (shown once when you signed up), and a new password.</p>
+          <label>Username
+            <div class="handle-input">
+              <span>@</span>
+              <input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourusername" />
+            </div>
+          </label>
+          <label>Recovery code
+            <input type="text" name="recoveryCode" required placeholder="XXXX-XXXX-XXXX" style="text-transform:uppercase;" />
+          </label>
+          <label>New password
+            <input type="password" name="newPassword" required minlength="6" autocomplete="new-password" />
+          </label>
+          <button type="submit" class="btn-primary">Reset password</button>
+          <p class="error" id="recovery-error" hidden></p>
+          <button type="button" class="link-btn" id="recovery-back-btn">Back to log in</button>
+        </form>
+
+        <form id="signup-form" class="auth-form" hidden>
+          <label>Username
+            <div class="handle-input">
+              <span>@</span>
+              <input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourusername" />
+            </div>
+          </label>
+          <label>Password
+            <input type="password" name="password" required minlength="6" autocomplete="new-password" />
+          </label>
+          <button type="submit" class="btn-primary">Create account</button>
+          <p class="error" id="signup-error" hidden></p>
+        </form>
+        <p class="hint">No account details beyond a handle. No ID required.</p>
       </div>
-      <h1>Sputnik Ship</h1>
-    </div>
-    <p class="muted">Contacts and shipment tracking, all in one place.</p>
 
-    <div class="tabs">
-      <button class="tab active" data-tab="login">Log in</button>
-      <button class="tab" data-tab="signup">Sign up</button>
+      <div class="carriers">Works with <b>FedEx</b>·<b>UPS</b>·<b>DHL</b>·<b>USPS</b>·<b>Correos</b>·<b>SEUR</b>·<b>GLS</b>· + more</div>
     </div>
 
-    <form id="login-form" class="auth-form">
-      <label>Username
-        <div class="handle-input">
-          <span>@</span>
-          <input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourusername" />
-        </div>
-      </label>
-      <label>Password
-        <input type="password" name="password" required autocomplete="current-password" />
-      </label>
-      <button type="submit" class="btn-primary">Log in</button>
-      <p class="error" id="login-error" hidden></p>
-      <button type="button" class="link-btn" id="forgot-password-btn">Forgot password?</button>
-    </form>
+    <div class="hero-stage" aria-hidden="true">
+      <div class="hero-halo"></div>
 
-    <form id="recovery-form" class="auth-form" hidden>
-      <p class="small muted" style="margin:0;">Enter your username, your recovery code (shown once when you signed up), and a new password.</p>
-      <label>Username
-        <div class="handle-input">
-          <span>@</span>
-          <input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourusername" />
-        </div>
-      </label>
-      <label>Recovery code
-        <input type="text" name="recoveryCode" required placeholder="XXXX-XXXX-XXXX" style="text-transform:uppercase;" />
-      </label>
-      <label>New password
-        <input type="password" name="newPassword" required minlength="6" autocomplete="new-password" />
-      </label>
-      <button type="submit" class="btn-primary">Reset password</button>
-      <p class="error" id="recovery-error" hidden></p>
-      <button type="button" class="link-btn" id="recovery-back-btn">Back to log in</button>
-    </form>
+      <div class="hero-float f1"><div class="ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7 9 18l-5-5"/></svg></div><div><b>Package scanned</b><span>Brooklyn NY · 17:02</span></div></div>
+      <div class="hero-float f2"><div class="ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div><div><b>Departed JFK</b><span>22:10 · in flight</span></div></div>
+      <div class="hero-float f3"><div class="ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/></svg></div><div><b>Customs cleared</b><span>Paris CDG · 09:35</span></div></div>
 
-    <form id="signup-form" class="auth-form" hidden>
-      <label>Username
-        <div class="handle-input">
-          <span>@</span>
-          <input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourusername" />
+      <div class="hero-phone">
+        <div class="hero-screen">
+          <div class="hero-notch"></div>
+          <div class="hero-sbar"><span>14:02</span><span>●●●</span></div>
+          <div class="hero-apphead">
+            <div><div class="t">Live shipment</div><div class="n">Birthday gift for mamá</div></div>
+            <div class="avatar avatar-sm" style="width:30px;height:30px;font-size:12px">M</div>
+          </div>
+          <div class="hero-map">
+            <canvas class="hero-mapcanvas" width="752" height="500"></canvas>
+            <svg viewBox="0 0 376 250" style="position:absolute;inset:0">
+              <defs><linearGradient id="hero-lg" x1="0" x2="1"><stop offset="0" stop-color="#8b7cf6"/><stop offset="1" stop-color="#5e6ad2"/></linearGradient></defs>
+              <path d="M75 133 C 130 40, 240 30, 296 96" stroke="rgba(255,255,255,.18)" stroke-width="2" fill="none" class="route-dash"/>
+              <path d="M75 133 C 130 40, 240 30, 296 96" stroke="url(#hero-lg)" stroke-width="3" fill="none" stroke-linecap="round" class="route-fill"/>
+              <circle cx="75" cy="133" r="4" fill="#3ecf8e"/>
+              <circle cx="188" cy="58" r="9" fill="rgba(94,106,210,.5)" class="pin-ping"/>
+              <circle cx="188" cy="58" r="5.5" fill="#fff" stroke="#5e6ad2" stroke-width="3"/>
+              <circle cx="296" cy="96" r="4" fill="none" stroke="#c7ccff" stroke-width="1.5"/>
+              <text x="24" y="152" fill="#9a9fac" font-size="10" font-family="IBM Plex Mono,monospace">New York · JFK</text>
+              <text x="140" y="44" fill="#f2f3f7" font-size="10" font-family="IBM Plex Mono,monospace">In flight · N. Atlantic</text>
+              <text x="268" y="114" fill="#f2f3f7" font-size="10" font-family="IBM Plex Mono,monospace">Paris · CDG</text>
+            </svg>
+            <div class="hero-chip"><i></i> In transit · NY → Paris</div>
+            <div class="hero-eta"><span>ETA Paris</span><b>Tomorrow · 14:20</b></div>
+          </div>
+          <div class="hero-meta">
+            <div class="row"><span class="badge status-in_transit">Out for delivery</span><span class="carrier-chip">FedEx International</span></div>
+            <div class="data-strip" style="margin:0"><div class="data-row"><span class="data-label">Tracking</span><span class="tn">SPK-839201 · 7749 0213 8850</span></div></div>
+            <div class="hero-tl">
+              <div class="done"><i></i>Package scanned<em>Brooklyn</em></div>
+              <div class="done"><i></i>Departed JFK<em>22:10</em></div>
+              <div class="cur"><i></i>In flight<em>→ CDG</em></div>
+              <div class="next"><i></i>Delivered<em>ETA 14:20</em></div>
+            </div>
+            <div class="chat-msg"><span class="chat-msg-meta">@marina</span><div class="chat-msg-text">Leave it with the concierge, 3rd floor 📦</div></div>
+          </div>
         </div>
-      </label>
-      <label>Password
-        <input type="password" name="password" required minlength="6" autocomplete="new-password" />
-      </label>
-      <button type="submit" class="btn-primary">Create account</button>
-      <p class="error" id="signup-error" hidden></p>
-    </form>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -108,7 +176,7 @@
   <header class="topbar">
     <div class="brand-mini">
       <div class="brand-badge">
-        <img class="logo-mark" src="/icons/logo-mark.png" alt="" />
+        <img class="logo-mark" src="/icons/logo-mark.svg" alt="" />
       </div>
       <span>Sputnik Ship</span>
     </div>
@@ -653,6 +721,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="/js/scan.js"></script>
+<script src="/js/hero.js"></script>
 <script src="/js/app.js"></script>
 </body>
 </html>

@@ -507,7 +507,7 @@
         ? `<div class="card-following-icon" title="Following">${ICONS.chat}</div>`
         : `<div class="card-category-icon">${CATEGORY_ICON[s.category] || CATEGORY_ICON.other}</div>`;
       return `
-        <div class="card ${s.archived ? 'archived' : ''}" data-id="${s.id}">
+        <div class="card status-${s.status || 'pending'} ${s.archived ? 'archived' : ''}" data-id="${s.id}">
           <div class="card-row">
             <div class="card-lead">
               ${leadIcon}
@@ -1080,7 +1080,7 @@
     return `
       <div class="status-timeline">
         ${STATUS_TIMELINE_FLOW.map((key, i) => `
-          <div class="status-timeline-step ${i < currentIndex ? 'done' : i === currentIndex ? 'current' : 'pending'}">
+          <div class="status-timeline-step step-${key} ${i < currentIndex ? 'done' : i === currentIndex ? 'current' : 'pending'}">
             <span class="status-timeline-dot"></span>
             <span class="status-timeline-label">${STATUS_TIMELINE_LABELS[key]}</span>
             <span class="status-timeline-time">${escapeHtml(timeFor(key, i))}</span>
@@ -1426,6 +1426,7 @@
 
   function renderCheckpoints(shipment, containerSel = '#checkpoints-list') {
     const list = $(containerSel);
+    list.className = 'checkpoints' + (shipment.status ? ' ship-' + shipment.status : '');
     const checkpoints = (shipment.checkpoints || []).slice().reverse();
     if (!checkpoints.length) {
       list.innerHTML = '';
@@ -1436,8 +1437,8 @@
     function draw() {
       const items = expanded ? checkpoints : checkpoints.slice(0, CHECKPOINT_LIMIT);
       const hiddenCount = checkpoints.length - CHECKPOINT_LIMIT;
-      const rows = items.map((c) => `
-        <div class="checkpoint">
+      const rows = items.map((c, i) => `
+        <div class="checkpoint${i === 0 ? ' latest' : ''}${c.status ? ' cp-' + c.status : ''}">
           <div>
             <div class="checkpoint-label">${escapeHtml(c.label)}</div>
             <div class="checkpoint-time">${fmtDate(c.timestamp)}</div>
