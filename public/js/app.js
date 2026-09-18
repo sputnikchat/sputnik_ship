@@ -1212,18 +1212,22 @@
 
     const latlngs = route.map((p) => [p.lat, p.lng]);
     const doneIndex = shipment.checkpointIndex ?? -1;
+    // Leaflet needs a real color string, not a CSS var - read the current
+    // --accent from the page instead of hardcoding the old lime, so this
+    // doesn't go stale again the next time the accent color changes.
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#5e6ad2';
 
     L.polyline(latlngs, { color: '#3a3a38', weight: 3, dashArray: '6 6' }).addTo(map);
     if (doneIndex >= 0) {
-      L.polyline(latlngs.slice(0, doneIndex + 1), { color: '#c6f135', weight: 4 }).addTo(map);
+      L.polyline(latlngs.slice(0, doneIndex + 1), { color: accent, weight: 4 }).addTo(map);
     }
 
     route.forEach((p, i) => {
       const isDone = i <= doneIndex;
       const marker = L.circleMarker([p.lat, p.lng], {
         radius: i === doneIndex ? 9 : 6,
-        color: isDone ? '#c6f135' : '#3a3a38',
-        fillColor: isDone ? '#c6f135' : '#232323',
+        color: isDone ? accent : '#3a3a38',
+        fillColor: isDone ? accent : '#232323',
         fillOpacity: 1,
         weight: 2,
       }).addTo(map);
