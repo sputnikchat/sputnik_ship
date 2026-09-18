@@ -472,6 +472,11 @@
   }
 
   // ---------------- render: shipments ----------------
+  // How far along the journey a shipment is, for the thin progress track
+  // under each card (same five stops as the status timeline).
+  const STATUS_PROGRESS = { pending: 6, info_received: 6, label_created: 10, picked_up: 32, in_transit: 58, out_for_delivery: 86, available_for_pickup: 86, delivered: 100, exception: 58, failed_attempt: 86 };
+  function statusProgress(s) { return STATUS_PROGRESS[s.status] != null ? STATUS_PROGRESS[s.status] : 6; }
+
   function renderShipments() {
     renderGreeting();
     const list = $('#shipments-list');
@@ -524,8 +529,9 @@
             ${s.archived ? '<span class="badge">Archived</span>' : ''}
             ${isFollower ? '<span class="badge">Following</span>' : ''}
             ${costText ? `<span class="badge mono">${costText}</span>` : ''}
-            <span class="card-checked">Last checked <span class="mono">${fmtDate(s.lastCheckedAt)}</span></span>
+            <span class="card-checked">${s.estimatedDelivery ? `ETA <span class="mono">${fmtDate(s.estimatedDelivery)}</span>` : `Checked <span class="mono">${fmtDate(s.lastCheckedAt)}</span>`}</span>
           </div>
+          <div class="card-progress" aria-hidden="true"><i style="width:${statusProgress(s)}%"></i></div>
         </div>
       `;
     }).join('');
@@ -847,7 +853,8 @@
   });
 
   guardClick($('#refresh-now-btn'), async () => {
-    toast('Refreshing shipments…');
+    const btn = $('#refresh-now-btn');
+    btn.classList.add('spinning');
     try {
       await api('/shipments/refresh-all/now', { method: 'POST' });
       await loadShipments();
@@ -855,6 +862,8 @@
       toast('Shipments updated');
     } catch (err) {
       toast(err.message);
+    } finally {
+      btn.classList.remove('spinning');
     }
   });
 
@@ -1096,9 +1105,23 @@
     const contact = state.contacts.find((c) => c.id === s.contactId);
     const costText = s.cost != null ? `${escapeHtml(s.currency || '')} ${s.cost.toFixed(2)}` : '';
 
+    // Status + ETA chips floating over the map (mockup .chip / .eta).
+    const mapEl = $('#map');
+    if (mapEl) {
+      let ov = mapEl.querySelector('.map-overlay');
+      if (!ov) { ov = document.createElement('div'); ov.className = 'map-overlay'; mapEl.appendChild(ov); }
+      ov.innerHTML = `
+        <div class="map-chip status-${s.status}"><i></i>${escapeHtml(s.statusLabel || s.status)}</div>
+        ${s.estimatedDelivery ? `<div class="map-eta"><span>ETA</span><b>${fmtDate(s.estimatedDelivery)}</b></div>` : ''}
+      `;
+    }
+
     $('#shipment-detail-body').innerHTML = `
       <div class="hero-top">
-        <h2>${escapeHtml(s.label || s.trackingNumber)}</h2>
+        <div>
+          <div class="section-k">Live shipment</div>
+          <h2>${escapeHtml(s.label || s.trackingNumber)}</h2>
+        </div>
         ${courierBadge(s.carrier)}
       </div>
       <div class="hero-tags">

@@ -957,3 +957,102 @@ body.chat-input-focused .chat-form { bottom: 0; padding-bottom: max(8px, env(saf
   .route-fill { stroke-dashoffset: 0; }
   .hero-phone, .hero-float, .pin-ping, .route-dash { animation: none; }
 }
+
+/* ======================================================================
+   App UI pass: Home command bar, section eyebrows, card progress, map
+   chips. Same tokens as the landing hero (docs/design/sputnik-hero.html).
+   ====================================================================== */
+
+/* App ground: the hero's atmosphere, much quieter */
+.app {
+  background:
+    radial-gradient(ellipse 90% 36% at 50% -8%, rgba(94,106,210,.16), transparent 70%),
+    var(--bg);
+}
+.topbar .brand-badge { background: var(--surface); }
+.topbar .brand-badge img.logo-mark { height: 20px; }
+
+/* Greeting: bigger name, mono sub-line */
+.greeting h1 { font-size: 24px; letter-spacing: -0.02em; }
+.greeting p { font-family: var(--font-mono); font-size: 11.5px; color: var(--dim); letter-spacing: .02em; }
+
+/* Section eyebrow (mockup .k / .stxt .k) */
+.section-row { display: flex; align-items: center; justify-content: space-between; margin: 18px 0 4px; }
+.section-k { font-family: var(--font-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent2); }
+.view-header h2 { font-size: 24px; letter-spacing: -0.02em; }
+.hero-top .section-k { margin-bottom: 4px; }
+.shipment-hero h2 { font-size: 22px; letter-spacing: -0.02em; }
+
+/* Command bar (mockup .cmd): search + refresh + new, one object */
+.cmd {
+  margin: 14px 0 0; background: rgba(15,16,23,.85); border: 1px solid var(--line2); border-radius: var(--radius);
+  box-shadow: 0 30px 80px -30px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.02) inset; overflow: hidden;
+  transition: border-color .15s, box-shadow .15s;
+}
+.cmd:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft), 0 30px 80px -30px rgba(0,0,0,.8); }
+.cmd-in { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 14px; }
+.cmd-in > svg { width: 18px; height: 18px; flex: none; color: var(--dim); }
+.cmd-in .search {
+  flex: 1; min-width: 0; background: transparent; border: 0; padding: 12px 0; border-radius: 0;
+  font-family: var(--font-mono); font-size: 14px; letter-spacing: .04em; color: var(--text);
+}
+.cmd-in .search:focus { box-shadow: none; }
+.cmd-in .search::-webkit-search-cancel-button { -webkit-appearance: none; }
+.cmd-refresh {
+  flex: none; width: 40px; height: 40px; border-radius: var(--radius-sm); background: transparent; border: 1px solid transparent;
+  color: var(--dim); display: grid; place-items: center; cursor: pointer; transition: color .15s, border-color .15s, background .15s;
+}
+.cmd-refresh:hover { color: var(--text); border-color: var(--line2); background: rgba(255,255,255,.03); }
+.cmd-refresh svg { width: 16px; height: 16px; }
+.cmd-refresh.spinning svg { animation: spin 1s linear infinite; }
+.cmd-go {
+  flex: none; height: 40px; padding: 0 14px 0 10px; border-radius: var(--radius-sm); background: var(--accent); color: #fff; border: 0;
+  display: inline-flex; align-items: center; gap: 6px; font-weight: 500; font-size: 13px; cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.08) inset, var(--btn-glow); transition: background .15s, transform .15s;
+}
+.cmd-go:hover { background: #6b77e0; transform: translateY(-1px); }
+.cmd-go svg { width: 16px; height: 16px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Shipment cards: progress track + ETA */
+.card { padding: 14px 14px 0; overflow: hidden; }
+.card .card-foot { margin-bottom: 12px; }
+.card-progress { height: 3px; margin: 0 -14px; background: var(--surface-2); }
+.card-progress i {
+  display: block; height: 100%; width: 0; border-radius: 0 2px 2px 0;
+  background: linear-gradient(90deg, var(--accent2), var(--accent)); transition: width .6s cubic-bezier(.4,0,.2,1);
+}
+.card.status-delivered .card-progress i { background: var(--ok); }
+.card.status-out_for_delivery .card-progress i { background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+.card.status-exception .card-progress i, .card.status-failed_attempt .card-progress i { background: var(--danger); }
+.card-checked { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .02em; }
+.card-title { font-size: 15px; }
+.contact-card, .notif-card, .card.account-card { padding-bottom: 14px; }
+.contact-card .card-progress, .notif-card .card-progress { display: none; }
+
+/* Chips over the shipment map (mockup .chip / .eta) */
+.map-overlay { position: absolute; inset: 0; z-index: 460; pointer-events: none; }
+.map-chip {
+  position: absolute; left: 12px; top: 12px; display: inline-flex; align-items: center; gap: 7px;
+  background: rgba(7,8,12,.8); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--line2); border-radius: 999px; padding: 6px 11px 6px 8px; font-size: 11px; font-weight: 500; color: var(--text);
+}
+.map-chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent2); box-shadow: 0 0 0 0 rgba(139,124,246,.55); animation: pulseDot 2s infinite; }
+.map-chip.status-delivered i { background: var(--ok); animation: none; }
+.map-chip.status-exception i, .map-chip.status-failed_attempt i { background: var(--danger); animation: none; }
+.map-eta {
+  position: absolute; right: 12px; bottom: 26px; background: rgba(7,8,12,.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--line2); border-radius: 10px; padding: 8px 11px; font-family: var(--font-mono); font-size: 10px; line-height: 1.35;
+}
+.map-eta span { color: var(--dim); letter-spacing: .08em; text-transform: uppercase; }
+.map-eta b { display: block; color: var(--text); font-size: 12.5px; font-weight: 600; }
+.leaflet-control-zoom { z-index: 470 !important; }
+.map .leaflet-top.leaflet-left { top: 48px; }
+
+/* Filter pills sit closer to the section eyebrow */
+#shipment-filter-tabs { margin: 8px 0 10px; }
+
+@media (max-width: 640px) {
+  .cmd-go span { display: none; }
+  .cmd-go { padding: 0 11px; }
+}
