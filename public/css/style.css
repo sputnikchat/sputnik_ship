@@ -384,6 +384,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .notif-card.unread { border-color: rgba(94,106,210,.5); }
 .notif-dotmark { width: 8px; height: 8px; border-radius: 50%; background: var(--accent2); margin-top: 6px; flex-shrink: 0; }
 .notif-dotmark.read { background: transparent; }
+.notif-time { margin: 4px 0 0; font-family: var(--font-mono); font-size: 11px; color: var(--dim); }
 
 /* ---------- Modal ---------- */
 .modal {

@@ -1475,7 +1475,7 @@
         <div>
           <p class="card-title">${escapeHtml(n.title)}</p>
           <p class="card-sub">${escapeHtml(n.message)}</p>
-          <p class="card-sub">${fmtDate(n.createdAt)}</p>
+          <p class="notif-time">${fmtDate(n.createdAt)}</p>
         </div>
       </div>
     `).join('');
@@ -1654,18 +1654,19 @@
             <h2>${escapeHtml(s.label || s.trackingNumber)}</h2>
             ${courierBadge(s.carrier)}
           </div>
-          <span class="badge status-${s.status}" style="margin-top:10px; display:inline-block;">${escapeHtml(s.statusLabel || s.status)}</span>
+          <div class="hero-tags"><span class="badge status-${s.status}">${escapeHtml(s.statusLabel || s.status)}</span></div>
           <div class="data-strip">
             <div class="data-row data-eta">
               <small class="data-label">Estimated delivery</small>
-              ${fmtDate(s.estimatedDelivery)}
+              <span class="data-value">${fmtDate(s.estimatedDelivery)}</span>
             </div>
             <div class="data-row data-tracking">
               <small class="data-label">Tracking #</small>
               <span class="tn">${escapeHtml(s.trackingNumber)}</span>
             </div>
           </div>
-          <p class="small muted" style="margin:8px 0 0;">Last checked: ${fmtDate(s.lastCheckedAt)}</p>
+          ${renderStatusTimeline(s)}
+          <p class="last-checked">Last checked: <span class="last-checked-value">${fmtDate(s.lastCheckedAt)}</span></p>
         </div>
       `;
       $('#shared-map').hidden = false;
