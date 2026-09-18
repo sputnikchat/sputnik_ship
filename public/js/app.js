@@ -509,22 +509,22 @@
       return `
         <div class="card ${s.archived ? 'archived' : ''}" data-id="${s.id}">
           <div class="card-row">
-            <div class="card-row" style="gap:10px; align-items:flex-start;">
+            <div class="card-lead">
               ${leadIcon}
-              <div>
+              <div class="card-body">
                 <p class="card-title">${escapeHtml(s.label || s.trackingNumber)}</p>
-                <p class="card-sub">${escapeHtml(s.trackingNumber)}${contact ? ' · ' + escapeHtml(contact.name) : ''}</p>
+                <p class="card-sub"><span class="mono">${escapeHtml(s.trackingNumber)}</span>${contact ? ' · ' + escapeHtml(contact.name) : ''}</p>
               </div>
             </div>
             ${courierBadge(s.carrier)}
           </div>
-          <div class="card-row" style="margin-top:8px; align-items:center; flex-wrap:wrap; gap:6px;">
+          <div class="card-foot">
             <span class="badge status-${s.status}">${escapeHtml(s.statusLabel || s.status)}</span>
             ${s.delayFlagged ? '<span class="badge badge-delay">Possible delay</span>' : ''}
             ${s.archived ? '<span class="badge">Archived</span>' : ''}
             ${isFollower ? '<span class="badge">Following</span>' : ''}
-            ${costText ? `<span class="badge">${costText}</span>` : ''}
-            <span class="card-sub">Last checked: ${fmtDate(s.lastCheckedAt)}</span>
+            ${costText ? `<span class="badge mono">${costText}</span>` : ''}
+            <span class="card-checked">Last checked <span class="mono">${fmtDate(s.lastCheckedAt)}</span></span>
           </div>
         </div>
       `;
@@ -612,6 +612,30 @@
     }
   });
   $('#shipment-photo-remove').addEventListener('click', resetPhotoPicker);
+
+  // Same client-side compress+strip as the shipment's own photo above -
+  // re-encoding through a canvas drops all EXIF (GPS, device model) before
+  // the image leaves the browser; the server strips again on save
+  // (services/imageMeta.js) so it never relies on the client having done it.
+  function resetChatPhotoPicker() {
+    $('#chat-photo-input').value = '';
+    $('#chat-photo-file').value = '';
+    $('#chat-photo-preview').hidden = true;
+  }
+  $('#chat-photo-btn').addEventListener('click', () => $('#chat-photo-file').click());
+  $('#chat-photo-file').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const dataUrl = await compressImage(file);
+      $('#chat-photo-input').value = dataUrl;
+      $('#chat-photo-preview-img').src = dataUrl;
+      $('#chat-photo-preview').hidden = false;
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+  $('#chat-photo-remove').addEventListener('click', resetChatPhotoPicker);
 
   // ---------------- paste-and-go ----------------
   // On opening a blank "New shipment" form, silently checks the clipboard
@@ -835,18 +859,21 @@
   });
 
   // ---------------- calendar ----------------
-  let calendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  let calendarSelectedDay = null; // 'YYYY-MM-DD' or null
+  // One week at a time (Monday-first), the selected day's shipments listed
+  // underneath. Opens on today's week with today selected.
+  function startOfWeek(d) {
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+    return x;
+  }
+  let calendarCursor = startOfWeek(new Date());
+  let calendarSelectedDay = dateKey(new Date()); // 'YYYY-MM-DD'
 
   function dateKey(d) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
   function renderCalendar() {
-    const year = calendarCursor.getFullYear();
-    const month = calendarCursor.getMonth();
-    $('#calendar-month-label').textContent = calendarCursor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
     const todayKey = dateKey(new Date());
     const byDay = {};
     for (const s of state.shipments) {
@@ -868,68 +895,75 @@
       }
     }
 
-    const firstOfMonth = new Date(year, month, 1);
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(calendarCursor);
+      d.setDate(calendarCursor.getDate() + i);
+      days.push(d);
+    }
+    const selected = new Date(calendarSelectedDay + 'T00:00:00');
+    $('#calendar-month-label').textContent = selected.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    $('#calendar-today-label').textContent = `${calendarSelectedDay === todayKey ? 'Today' : 'Selected'} · ${selected.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })}`;
 
-    const cells = [];
-    for (let i = 0; i < firstOfMonth.getDay(); i++) cells.push(null);
-    for (let day = 1; day <= daysInMonth; day++) cells.push(new Date(year, month, day));
-
-    $('#calendar-grid').innerHTML = cells.map((d) => {
-      if (!d) return '<div class="calendar-day outside"></div>';
+    $('#calendar-grid').innerHTML = days.map((d) => {
       const key = dateKey(d);
       const info = byDay[key];
-      const classes = ['calendar-day'];
+      const classes = ['day'];
+      if (info) classes.push('has');
+      if (info && info.delay) classes.push('delay');
       if (key === todayKey) classes.push('today');
       if (key === calendarSelectedDay) classes.push('selected');
-      const dots = info
-        ? `<div class="calendar-day-dots">${info.items.slice(0, 4).map(() => `<span class="calendar-day-dot ${info.delay ? 'delay' : ''}"></span>`).join('')}</div>`
-        : '';
-      return `<div class="${classes.join(' ')}" data-date="${key}">${d.getDate()}${dots}</div>`;
+      const letter = d.toLocaleDateString('en-US', { weekday: 'narrow' });
+      return `<button type="button" class="${classes.join(' ')}" data-date="${key}">${letter}<b>${d.getDate()}</b></button>`;
     }).join('');
 
-    $all('.calendar-day[data-date]').forEach((cell) => {
+    $all('.day[data-date]').forEach((cell) => {
       cell.addEventListener('click', () => {
-        calendarSelectedDay = calendarSelectedDay === cell.dataset.date ? null : cell.dataset.date;
+        calendarSelectedDay = cell.dataset.date;
         renderCalendar();
       });
     });
 
+    const outToday = state.shipments.filter((s) => !s.archived && s.status === 'out_for_delivery').length;
+    $('#calendar-alert').hidden = outToday === 0;
+    $('#calendar-alert-text').textContent = `${outToday} package${outToday === 1 ? '' : 's'} out for delivery today`;
+
     renderCalendarDayList(byDay);
   }
 
+  const CARRIER_CODE = { fedex: 'FDX', ups: 'UPS', dhl: 'DHL', usps: 'USPS' };
+
   function renderCalendarDayList(byDay) {
     const list = $('#calendar-day-list');
-    if (!calendarSelectedDay) { list.innerHTML = ''; return; }
     const info = byDay[calendarSelectedDay];
     if (!info || !info.items.length) {
       list.innerHTML = '<div class="empty">No shipments expected this day.</div>';
       return;
     }
-    list.innerHTML = info.items.map((s) => `
-      <div class="card" data-id="${s.id}">
-        <div class="card-row">
-          <div>
-            <p class="card-title">${escapeHtml(s.label || s.trackingNumber)}</p>
-            <p class="card-sub">${escapeHtml(s.trackingNumber)}</p>
-          </div>
-          ${courierBadge(s.carrier)}
+    list.innerHTML = info.items.map((s) => {
+      const contact = state.contacts.find((c) => c.id === s.contactId);
+      const pill = s.delayFlagged
+        ? '<span class="badge badge-delay">Delayed</span>'
+        : `<span class="badge status-${s.status}">${s.status === 'out_for_delivery' ? 'Out today' : escapeHtml(s.statusLabel || s.status)}</span>`;
+      const when = s.estimatedDelivery ? `by ${fmtShort(s.estimatedDelivery)}` : '';
+      const sub = [when, contact ? escapeHtml(contact.name) : ''].filter(Boolean).join(' · ') || escapeHtml(s.trackingNumber);
+      return `
+        <div class="cal-item" data-id="${s.id}">
+          <div class="c">${CARRIER_CODE[s.carrier] || escapeHtml(String(s.carrier || '').toUpperCase().slice(0, 4))}</div>
+          <div class="t"><b>${escapeHtml(s.label || s.trackingNumber)}</b><span>${sub}</span></div>
+          ${pill}
         </div>
-        <div class="card-row" style="margin-top:8px; align-items:center; gap:6px;">
-          <span class="badge status-${s.status}">${escapeHtml(s.statusLabel || s.status)}</span>
-          ${s.delayFlagged ? '<span class="badge badge-delay">Possible delay</span>' : ''}
-        </div>
-      </div>
-    `).join('');
-    $all('.card', list).forEach((card) => card.addEventListener('click', () => openShipmentDetail(card.dataset.id)));
+      `;
+    }).join('');
+    $all('.cal-item', list).forEach((card) => card.addEventListener('click', () => openShipmentDetail(card.dataset.id)));
   }
 
   $('#calendar-prev').addEventListener('click', () => {
-    calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() - 1, 1);
+    calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth(), calendarCursor.getDate() - 7);
     renderCalendar();
   });
   $('#calendar-next').addEventListener('click', () => {
-    calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + 1, 1);
+    calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth(), calendarCursor.getDate() + 7);
     renderCalendar();
   });
 
@@ -1005,6 +1039,57 @@
   $('#qr-close-btn').addEventListener('click', () => { $('#qr-modal').hidden = true; });
   $('#qr-modal').addEventListener('click', (e) => { if (e.target.id === 'qr-modal') $('#qr-modal').hidden = true; });
 
+  // Mirrors services/carrierProviders.js's own STATUS_FLOW/STATUS_LABELS
+  // exactly (not a separate vocabulary) - this only visualizes the same
+  // status the server already tracks, as a 5-stage timeline under the
+  // tracking card.
+  const STATUS_TIMELINE_FLOW = ['label_created', 'picked_up', 'in_transit', 'out_for_delivery', 'delivered'];
+  const STATUS_TIMELINE_LABELS = {
+    label_created: 'Label created',
+    picked_up: 'Picked up',
+    in_transit: 'In transit',
+    out_for_delivery: 'Out for delivery',
+    delivered: 'Delivered',
+  };
+  // Short technical time for timeline rows: clock only when it's today,
+  // otherwise "Sep 18".
+  function fmtShort(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const now = new Date();
+    const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    return sameDay
+      ? d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+      : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  function renderStatusTimeline(s) {
+    const currentIndex = STATUS_TIMELINE_FLOW.indexOf(s.status);
+    // Statuses outside this 5-stage flow (customs holds, courier-specific
+    // exception codes) don't map onto a position here - skip rather than
+    // guess where they'd sit.
+    if (currentIndex === -1) return '';
+    const checkpoints = s.checkpoints || [];
+    const timeFor = (key, i) => {
+      if (i > currentIndex) return key === 'delivered' && s.estimatedDelivery ? `ETA ${fmtShort(s.estimatedDelivery)}` : '';
+      const cp = checkpoints[i];
+      if (cp && cp.timestamp) return fmtShort(cp.timestamp);
+      if (i === 0 && s.createdAt) return fmtShort(s.createdAt);
+      return '';
+    };
+    return `
+      <div class="status-timeline">
+        ${STATUS_TIMELINE_FLOW.map((key, i) => `
+          <div class="status-timeline-step ${i < currentIndex ? 'done' : i === currentIndex ? 'current' : 'pending'}">
+            <span class="status-timeline-dot"></span>
+            <span class="status-timeline-label">${STATUS_TIMELINE_LABELS[key]}</span>
+            <span class="status-timeline-time">${escapeHtml(timeFor(key, i))}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
   function renderShipmentDetail() {
     const s = state.shipments.find((x) => x.id === state.currentShipmentId);
     if (!s) return;
@@ -1016,28 +1101,29 @@
         <h2>${escapeHtml(s.label || s.trackingNumber)}</h2>
         ${courierBadge(s.carrier)}
       </div>
-      <div class="card-row" style="align-items:center; flex-wrap:wrap; gap:6px; margin-top:10px;">
+      <div class="hero-tags">
         <span class="badge status-${s.status}">${escapeHtml(s.statusLabel || s.status)}</span>
         ${s.delayFlagged ? '<span class="badge badge-delay">Possible delay</span>' : ''}
         ${s.archived ? '<span class="badge">Archived</span>' : ''}
         <span class="badge">${CATEGORY_ICON[s.category] || CATEGORY_ICON.other} ${escapeHtml((CATEGORIES.find((c) => c.value === s.category) || {}).label || 'Other')}</span>
-        ${costText ? `<span class="badge">${costText}</span>` : ''}
+        ${costText ? `<span class="badge mono">${costText}</span>` : ''}
       </div>
       <div class="data-strip">
         <div class="data-row data-eta">
           <small class="data-label">Estimated delivery</small>
-          ${fmtDate(s.estimatedDelivery)}
+          <span class="data-value">${fmtDate(s.estimatedDelivery)}</span>
         </div>
         <div class="data-row data-tracking">
           <small class="data-label">Tracking #</small>
           <span class="tn">${escapeHtml(s.trackingNumber)}</span>
         </div>
       </div>
-      <p class="small muted" style="margin:8px 0 0;">Last checked: ${fmtDate(s.lastCheckedAt)}</p>
+      ${renderStatusTimeline(s)}
+      <p class="last-checked">Last checked: <span class="last-checked-value">${fmtDate(s.lastCheckedAt)}</span></p>
       ${contact ? `<p class="small" style="margin-top:10px; display:flex; align-items:center; gap:6px;">${ICONS.contact} ${escapeHtml(contact.name)}</p>` : ''}
       ${s.notes ? `<p class="small" style="margin-top:10px; white-space:pre-wrap;">${escapeHtml(s.notes)}</p>` : ''}
       ${s.photo ? `<img class="shipment-photo" src="${escapeHtml(s.photo)}" alt="Shipment photo" />` : ''}
-      <div class="modal-actions" style="justify-content:flex-start; margin-top:14px; flex-wrap:wrap;">
+      <div class="hero-actions">
         ${s.viewerRole === 'follower' ? `
           <button class="btn-secondary small" id="unfollow-shipment-btn">Unfollow</button>
         ` : `
@@ -1128,11 +1214,20 @@
       // array as human ones, in the order they happened, so the thread
       // reads as one timeline instead of two things to cross-reference.
       list.innerHTML = messages.map((m) => m.type === 'system' ? `
-        <div class="chat-msg-system">${linkify(escapeHtml(m.text))} · ${fmtDate(m.createdAt)}</div>
+        <div class="chat-msg-system">${linkify(escapeHtml(m.text))} · ${fmtShort(m.createdAt)}</div>
       ` : `
-        <div class="chat-msg ${m.userId === state.user?.id ? 'mine' : ''}">
-          <div class="chat-msg-meta"><span>@${escapeHtml(m.handle)}</span><span>${fmtDate(m.createdAt)}</span></div>
-          <div class="chat-msg-text">${escapeHtml(m.text)}</div>
+        <div class="chat-msg ${m.userId === state.user?.id ? 'mine' : ''} ${m.photo ? 'has-photo' : ''}">
+          ${m.photo ? `
+            <div class="chat-msg-photo-wrap">
+              <img class="chat-msg-photo" src="${escapeHtml(m.photo)}" alt="Shared photo" />
+              <span class="chat-msg-photo-badge">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Metadata removed
+              </span>
+            </div>
+          ` : ''}
+          ${m.text ? `<div class="chat-msg-text">${escapeHtml(m.text)}</div>` : ''}
+          <small class="chat-msg-meta">${m.userId === state.user?.id ? 'you' : '@' + escapeHtml(m.handle)} · ${fmtShort(m.createdAt)}</small>
         </div>
       `).join('');
       if (wasNearBottom) list.scrollTop = list.scrollHeight;
@@ -1147,10 +1242,13 @@
     e.preventDefault();
     const input = $('#chat-input');
     const text = input.value.trim();
-    if (!text || !state.currentShipmentId) return;
+    const photo = $('#chat-photo-input').value || null;
+    if (!text && !photo) return;
+    if (!state.currentShipmentId) return;
     input.value = '';
+    resetChatPhotoPicker();
     try {
-      const updated = await api(`/shipments/${state.currentShipmentId}/messages`, { method: 'POST', body: { text } });
+      const updated = await api(`/shipments/${state.currentShipmentId}/messages`, { method: 'POST', body: { text, photo } });
       const idx = state.shipments.findIndex((x) => x.id === state.currentShipmentId);
       if (idx >= 0) state.shipments[idx] = updated;
       renderChatMessages(updated);
@@ -1205,9 +1303,9 @@
 
     const map = L.map(container, { zoomControl: true, attributionControl: true });
     state[mapKey] = map;
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 18,
-      attribution: '&copy; OpenStreetMap contributors',
+    L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 16,
+      attribution: '&copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors',
     }).addTo(map);
 
     const latlngs = route.map((p) => [p.lat, p.lng]);
@@ -1217,25 +1315,106 @@
     // doesn't go stale again the next time the accent color changes.
     const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#5e6ad2';
 
-    L.polyline(latlngs, { color: '#3a3a38', weight: 3, dashArray: '6 6' }).addTo(map);
+    const accent2 = getComputedStyle(document.documentElement).getPropertyValue('--accent2').trim() || '#8b7cf6';
+    const ok = getComputedStyle(document.documentElement).getPropertyValue('--ok').trim() || '#3ecf8e';
+
+    // Remaining leg: faint dashed line that drifts (mockup .route-line);
+    // traveled leg: 3px round-capped accent2->accent gradient, applied to
+    // the SVG path after fitBounds below.
+    L.polyline(latlngs, { color: 'rgba(255,255,255,.18)', weight: 2, className: 'map-route-pending' }).addTo(map);
+    let donePolyline = null;
     if (doneIndex >= 0) {
-      L.polyline(latlngs.slice(0, doneIndex + 1), { color: accent, weight: 4 }).addTo(map);
+      donePolyline = L.polyline(latlngs.slice(0, doneIndex + 1), { color: accent, weight: 3, lineCap: 'round', lineJoin: 'round' }).addTo(map);
     }
 
     route.forEach((p, i) => {
       const isDone = i <= doneIndex;
+      const isCurrent = i === doneIndex;
+      if (isCurrent) {
+        // The current checkpoint gets a pulsing pin (DivIcon, plain CSS
+        // animation) instead of a plain dot, so it's obvious at a glance
+        // where the package actually is right now.
+        const icon = L.divIcon({
+          className: '',
+          html: '<div class="map-pulse-marker"><div class="map-pulse-ring"></div><div class="map-pulse-dot"></div></div>',
+          iconSize: [22, 22],
+          iconAnchor: [11, 11],
+        });
+        const marker = L.marker([p.lat, p.lng], { icon }).addTo(map);
+        marker.bindPopup(`<b>${escapeHtml(p.label)}</b>`);
+        return;
+      }
+      // Origin reads as the green "start" dot, later done stops in accent,
+      // pending stops as a hollow ring (mockup's route markers).
       const marker = L.circleMarker([p.lat, p.lng], {
-        radius: i === doneIndex ? 9 : 6,
-        color: isDone ? accent : '#3a3a38',
-        fillColor: isDone ? accent : '#232323',
-        fillOpacity: 1,
-        weight: 2,
+        radius: 4,
+        color: i === 0 ? ok : isDone ? accent : '#c7ccff',
+        fillColor: i === 0 ? ok : accent,
+        fillOpacity: isDone ? 1 : 0,
+        weight: isDone ? 2 : 1.5,
       }).addTo(map);
       marker.bindPopup(`<b>${escapeHtml(p.label)}</b>`);
     });
 
     const bounds = L.latLngBounds(latlngs);
     map.fitBounds(bounds, { padding: [30, 30] });
+
+    // Draw the "traveled so far" line in, rather than having it just
+    // appear - a plain CSS stroke-dashoffset animation on the SVG path
+    // Leaflet renders underneath. This has to run after fitBounds - Leaflet
+    // re-applies each path's own style (including stroke-dasharray) as
+    // part of that redraw, which was silently wiping this out when it ran
+    // beforehand. 'moveend' doesn't reliably fire after fitBounds() on a
+    // brand-new map in this app (even though fitBounds did already resize
+    // the view correctly), so a short delay is used instead of that event.
+    // Skipped for prefers-reduced-motion, and harmless if
+    // getElement()/getTotalLength() aren't available (falls back to a
+    // fully-drawn static line, same as before this was added).
+    if (donePolyline) {
+      const animateDrawIn = () => {
+        const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const pathEl = donePolyline.getElement && donePolyline.getElement();
+        if (!pathEl) return;
+        applyRouteGradient(pathEl, accent2, accent);
+        if (prefersReducedMotion || typeof pathEl.getTotalLength !== 'function') return;
+        const length = pathEl.getTotalLength();
+        pathEl.style.transition = 'none';
+        pathEl.style.strokeDasharray = `${length} ${length}`;
+        pathEl.style.strokeDashoffset = String(length);
+        pathEl.getBoundingClientRect(); // force layout so the transition below doesn't get coalesced with the initial style
+        pathEl.style.transition = 'stroke-dashoffset 1.4s ease-out';
+        requestAnimationFrame(() => { pathEl.style.strokeDashoffset = '0'; });
+      };
+      setTimeout(animateDrawIn, 60);
+    }
+  }
+
+  // Paints the traveled route with an SVG gradient (accent2 -> accent).
+  // objectBoundingBox units survive Leaflet's zoom re-projection; a path
+  // whose bbox collapses on one axis (perfectly vertical/horizontal route)
+  // would render invisible with a gradient, so those keep the flat color.
+  function applyRouteGradient(pathEl, fromColor, toColor) {
+    const svg = pathEl.ownerSVGElement;
+    if (!svg || typeof pathEl.getBBox !== 'function') return;
+    const box = pathEl.getBBox();
+    const horizontal = box.width >= 2;
+    if (!horizontal && box.height < 2) return;
+    const id = 'route-grad-' + Math.random().toString(36).slice(2, 8);
+    const ns = 'http://www.w3.org/2000/svg';
+    let defs = svg.querySelector('defs');
+    if (!defs) { defs = document.createElementNS(ns, 'defs'); svg.insertBefore(defs, svg.firstChild); }
+    const grad = document.createElementNS(ns, 'linearGradient');
+    grad.setAttribute('id', id);
+    grad.setAttribute('x1', '0'); grad.setAttribute('y1', '0');
+    grad.setAttribute('x2', horizontal ? '1' : '0'); grad.setAttribute('y2', horizontal ? '0' : '1');
+    [[0, fromColor], [1, toColor]].forEach(([offset, color]) => {
+      const stop = document.createElementNS(ns, 'stop');
+      stop.setAttribute('offset', String(offset));
+      stop.setAttribute('stop-color', color);
+      grad.appendChild(stop);
+    });
+    defs.appendChild(grad);
+    pathEl.setAttribute('stroke', `url(#${id})`);
   }
 
   // Only the 6 most recent updates show by default - a shipment that's
@@ -1849,6 +2028,37 @@
       loadNotifications().catch(() => {});
     }
   }, 2 * 60 * 1000);
+
+  // ---------------- motion: reveal cards as they enter the viewport ----------------
+  // Lists re-render via innerHTML, so a MutationObserver picks up every new
+  // card and hands it to one IntersectionObserver; CSS (.rv/.rv.in) does the
+  // fade + 12px lift and drops it under prefers-reduced-motion.
+  (function initReveal() {
+    if (!('IntersectionObserver' in window) || !('MutationObserver' in window)) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const REVEAL = '.card, .cal-item, .shipment-hero, .cal-alert, .account-block, .pp-stat';
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return;
+        e.target.classList.add('in');
+        io.unobserve(e.target);
+      });
+    }, { threshold: 0.08 });
+    const watch = (root) => {
+      if (!(root instanceof Element)) return;
+      const nodes = root.matches(REVEAL) ? [root] : [];
+      nodes.push(...root.querySelectorAll(REVEAL));
+      nodes.forEach((el) => {
+        if (el.classList.contains('rv')) return;
+        el.classList.add('rv');
+        io.observe(el);
+      });
+    };
+    new MutationObserver((records) => {
+      records.forEach((r) => r.addedNodes.forEach(watch));
+    }).observe(document.body, { childList: true, subtree: true });
+    watch(document.body);
+  })();
 
   // ---------------- boot ----------------
   const sharedMatch = location.pathname.match(/^\/s\/([A-Za-z0-9_-]+)$/);

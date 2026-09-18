@@ -11,6 +11,7 @@ const { getSpaceUserIds } = require('../services/space');
 const { checkDelay } = require('../services/delayDetector');
 const { encryptField, decryptField } = require('../services/encryption');
 const { logAudit } = require('../services/audit');
+const { stripImageMetadata } = require('../services/imageMeta');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -107,7 +108,7 @@ router.post('/', writeLimiter, async (req, res) => {
     cost: parsedCost !== null ? encryptField(String(parsedCost)) : null,
     currency: parsedCost !== null ? (currency || 'USD').toUpperCase() : null,
     category: CATEGORIES.includes(category) ? category : 'other',
-    photo: photo ? encryptField(photo) : null,
+    photo: photo ? encryptField(stripImageMetadata(photo)) : null,
     status: 'label_created',
     statusLabel: 'Label created',
     checkpointIndex: -1,
@@ -320,8 +321,13 @@ router.post('/:id/archive', async (req, res) => {
 // this is the "communicator" feature: two different Sputnik Ship accounts
 // can talk about one shipment, e.g. "left it with the doorman".
 router.post('/:id/messages', writeLimiter, async (req, res) => {
-  const { text } = req.body || {};
-  if (!text || !String(text).trim()) return res.status(400).json({ error: 'Message text is required.' });
+  const { text, photo } = req.body || {};
+  const trimmedText = text ? String(text).trim() : '';
+  if (!trimmedText && !photo) return res.status(400).json({ error: 'Write a message or attach a photo.' });
+  // Same allowlist as a shipment's own photo field (see POST / above).
+  if (photo && !/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/]+=*$/.test(photo)) {
+    return res.status(400).json({ error: 'Photo must be a valid image.' });
+  }
 
   const db = await readDB();
   const spaceUserIds = getSpaceUserIds(db, req.user.id);
@@ -342,14 +348,16 @@ router.post('/:id/messages', writeLimiter, async (req, res) => {
       id: uuidv4(),
       userId: req.user.id,
       handle: author ? author.handle : 'unknown',
-      text: String(text).trim().slice(0, 2000),
+      text: trimmedText.slice(0, 2000),
+      photo: photo ? stripImageMetadata(photo) : null,
       createdAt: new Date().toISOString(),
     };
     s.messages ||= [];
     s.messages.push(msg);
+    if (photo) pushSystemMessage(s, 'Photo delivered · location and device data stripped.');
 
     const title = `New message on ${s.label || s.trackingNumber}`;
-    const message = `@${msg.handle}: ${msg.text}`;
+    const message = `@${msg.handle}: ${photo ? (trimmedText || '📷 Photo') : msg.text}`;
     // The owner's space (everyone but the sender, if the sender is on that side).
     pushNotification(data, {
       userId: s.userId,

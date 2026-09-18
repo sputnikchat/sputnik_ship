@@ -77,7 +77,7 @@ app.use(
         // style-src can't be locked down further without a larger rewrite.
         styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-        imgSrc: ["'self'", 'data:', 'blob:', 'https://*.tile.openstreetmap.org', 'https://api.qrserver.com'],
+        imgSrc: ["'self'", 'data:', 'blob:', 'https://services.arcgisonline.com', 'https://api.qrserver.com'],
         connectSrc: ["'self'", 'https://cdnjs.cloudflare.com', 'https://cdn.jsdelivr.net', 'blob:'],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
