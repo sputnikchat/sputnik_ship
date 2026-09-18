@@ -80,6 +80,7 @@ function pushNotificationToUsers(data, { userIds, shipmentId, title, message, le
       title,
       message,
       level, // info | success | warning
+      type, // status | delay | digest | chat | customs | null - kept for debugging/future filtering, not just the prefs check above
       read: false,
       createdAt: new Date().toISOString(),
     };
