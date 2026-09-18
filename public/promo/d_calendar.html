@@ -1,0 +1,32 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/tokens.css"><link rel="stylesheet" href="../css/style.css">
+<style>
+html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:var(--bg)}
+body{position:relative}
+.bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 50% at 50% 30%,rgba(94,106,210,.22),transparent 70%),var(--bg)}
+.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:96px 96px;-webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 45%,#000 20%,transparent 75%)}
+.stagewrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.phonewrap{width:760px}
+.phonewrap .app{min-height:0;padding:0;background:transparent}
+.phonewrap .content{max-width:none;padding:0}
+.device{width:760px;background:#0a0b10;border:2px solid #262937;border-radius:80px;padding:22px;box-shadow:0 0 0 2px rgba(255,255,255,.04) inset,0 120px 200px -60px rgba(94,106,210,.55),0 40px 80px -20px rgba(0,0,0,.9)}
+.screen{background:#07080c;border-radius:62px;overflow:hidden;position:relative;min-height:1500px}
+.notch{position:absolute;top:18px;left:50%;transform:translateX(-50%);width:200px;height:52px;border-radius:999px;background:#000;z-index:5}
+.sbar{display:flex;justify-content:space-between;padding:26px 48px 0;font-size:22px;font-weight:600;font-family:var(--font-mono)}
+.inner{transform:scale(1.72);transform-origin:top left;width:calc(760px/1.72 - 26px);padding:0 0 0 0;margin:24px 0 0 22px}
+.rv{opacity:1;transform:none}
+</style></head><body><div class="bg"></div><div class="grid"></div><style>.cal-item{transition:opacity .45s, transform .45s}</style><div class="stagewrap"><div class="phonewrap"><div class="device"><div class="screen"><div class="notch"></div><div class="sbar"><span>14:02</span><span>●●●</span></div><div class="inner"><div class="app"><div class="content">
+<div class="view-header"><h2>Calendar</h2></div>
+<div class="cal-head"><div><div class="cal-month">September 2026</div><div class="cal-today">Today · Fri 18</div></div></div>
+<div class="week">
+<button class="day">M<b>14</b></button><button class="day has">T<b>15</b></button><button class="day">W<b>16</b></button><button class="day has">T<b>17</b></button><button class="day today has">F<b>18</b></button><button class="day">S<b>19</b></button><button class="day has delay">S<b>20</b></button></div>
+<div class="cal-alert" id="alert" style="opacity:0;transform:translateY(8px);transition:all .5s"><i></i>3 packages out for delivery today</div>
+<div class="cal-list" id="cl">
+<div class="cal-item" style="opacity:0"><div class="c">FDX</div><div class="t"><b>Birthday gift for mamá</b><span>by 18:00 · Marina · Paris</span></div><span class="badge status-out_for_delivery">Out today</span></div>
+<div class="cal-item" style="opacity:0"><div class="c">UPS</div><div class="t"><b>Desk lamp, office move</b><span>by 20:00</span></div><span class="badge status-out_for_delivery">Out today</span></div>
+<div class="cal-item" style="opacity:0"><div class="c">SEUR</div><div class="t"><b>Replacement charger</b><span>rescheduled → Sat 20</span></div><span class="badge badge-delay">Delayed</span></div>
+</div></div></div></div></div></div></div></div><script>
+setTimeout(()=>{const a=document.getElementById('alert');a.style.opacity=1;a.style.transform='none';},700);
+document.querySelectorAll('.cal-item').forEach((el,i)=>setTimeout(()=>{el.style.opacity=1},1200+i*350));
+</script></body></html>

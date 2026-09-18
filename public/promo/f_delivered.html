@@ -1,0 +1,70 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/tokens.css"><link rel="stylesheet" href="../css/style.css">
+<style>
+html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:var(--bg)}
+body{position:relative}
+.bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 50% at 50% 30%,rgba(94,106,210,.22),transparent 70%),var(--bg)}
+.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:96px 96px;-webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 45%,#000 20%,transparent 75%)}
+.stagewrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.phonewrap{width:760px}
+.phonewrap .app{min-height:0;padding:0;background:transparent}
+.phonewrap .content{max-width:none;padding:0}
+.device{width:760px;background:#0a0b10;border:2px solid #262937;border-radius:80px;padding:22px;box-shadow:0 0 0 2px rgba(255,255,255,.04) inset,0 120px 200px -60px rgba(94,106,210,.55),0 40px 80px -20px rgba(0,0,0,.9)}
+.screen{background:#07080c;border-radius:62px;overflow:hidden;position:relative;min-height:1500px}
+.notch{position:absolute;top:18px;left:50%;transform:translateX(-50%);width:200px;height:52px;border-radius:999px;background:#000;z-index:5}
+.sbar{display:flex;justify-content:space-between;padding:26px 48px 0;font-size:22px;font-weight:600;font-family:var(--font-mono)}
+.inner{transform:scale(1.72);transform-origin:top left;width:calc(760px/1.72 - 26px);padding:0 0 0 0;margin:24px 0 0 22px}
+.rv{opacity:1;transform:none}
+</style></head><body><div class="bg"></div><div class="grid"></div><style></style><div class="stagewrap"><div class="phonewrap"><div class="device"><div class="screen"><div class="notch"></div><div class="sbar"><span>14:02</span><span>●●●</span></div><div class="inner"><div class="app"><div class="content">
+<div class="map" style="height:520px"><div class="map-overlay"><div class="map-chip status-out_for_delivery" id="chip"><i></i><span id="chiptxt">Out for delivery</span></div><div class="map-eta"><span>ETA</span><b id="eta">Today · 14:20</b></div></div>
+<canvas class="hero-mapcanvas" width="752" height="500" style="position:absolute;inset:0;width:100%;height:100%"></canvas></div>
+<div class="shipment-hero"><div class="hero-top"><div><div class="section-k">Live shipment</div><h2>Birthday gift for mamá</h2></div><div class="courier-badge" style="background:rgba(94,106,210,.16);color:#c3c8f0;font-family:var(--font-mono);font-size:9px;font-weight:600">FDX</div></div>
+<div class="hero-tags"><span class="badge status-out_for_delivery" id="badge">Out for delivery</span></div>
+<div class="data-strip"><div class="data-row data-eta"><small class="data-label">Estimated delivery</small><span class="data-value" id="dv">Today, 14:20</span></div><div class="data-row"><small class="data-label">Tracking #</small><span class="tn">7749 0213 8850</span></div></div>
+<div class="status-timeline" id="tl"><div class="status-timeline-step step-label_created" data-i="0"><span class="status-timeline-dot"></span><span>Label created</span><span class="status-timeline-time">Sep 16, 17:02</span></div><div class="status-timeline-step step-picked_up" data-i="1"><span class="status-timeline-dot"></span><span>Picked up</span><span class="status-timeline-time">Sep 16, 22:10</span></div><div class="status-timeline-step step-in_transit" data-i="2"><span class="status-timeline-dot"></span><span>In transit</span><span class="status-timeline-time">Sep 17, 09:35</span></div><div class="status-timeline-step step-out_for_delivery" data-i="3"><span class="status-timeline-dot"></span><span>Out for delivery</span><span class="status-timeline-time">Today, 09:12</span></div><div class="status-timeline-step step-delivered" data-i="4"><span class="status-timeline-dot"></span><span>Delivered</span><span class="status-timeline-time"></span></div></div></div></div></div></div></div></div></div></div><script>
+function setCur(n){document.querySelectorAll('.status-timeline-step').forEach((s,i)=>{s.classList.remove('done','current','pending');s.classList.add(i<n?'done':i===n?'current':'pending');});}
+setCur(3);
+setTimeout(()=>{setCur(4);document.querySelector('.step-delivered .status-timeline-time').textContent='Today, 14:07';
+ const b=document.getElementById('badge');b.className='badge status-delivered';b.textContent='Delivered';
+ const c=document.getElementById('chip');c.className='map-chip status-delivered';document.getElementById('chiptxt').textContent='Delivered';
+ document.getElementById('eta').textContent='Today · 14:07';document.getElementById('dv').textContent='Delivered 14:07';},2200);
+// Landing hero: dot-matrix North Atlantic map behind the NY → Paris route.
+// Same drawing as docs/design/sputnik-hero.html; purely decorative.
+(function () {
+  var cv = document.querySelector('.hero-mapcanvas');
+  if (!cv || !cv.getContext) return;
+  var ctx = cv.getContext('2d'), W = cv.width, H = cv.height, s = 2;
+  function X(lon) { return (lon + 100) * 2.89 * s; }
+  function Y(lat) { return (70 - lat) * 4.545 * s; }
+  ctx.fillStyle = '#0a0c14'; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(255,255,255,.045)'; ctx.lineWidth = 1;
+  for (var lon = -100; lon <= 30; lon += 10) { ctx.beginPath(); ctx.moveTo(X(lon), 0); ctx.lineTo(X(lon), H); ctx.stroke(); }
+  for (var lat = 20; lat <= 70; lat += 10) { ctx.beginPath(); ctx.moveTo(0, Y(lat)); ctx.lineTo(W, Y(lat)); ctx.stroke(); }
+  var land = [
+    [[-100,72],[-85,70],[-75,64],[-64,60],[-56,52],[-53,47],[-60,46],[-66,44.5],[-70,42],[-74,40.5],[-75.5,38],[-76,35],[-79,33],[-81,30],[-80,25.5],[-82,27],[-84,30],[-89,30],[-94,29],[-97.5,26],[-100,20]],
+    [[-56,60],[-44,60],[-40,65],[-22,70],[-20,74],[-60,74]],
+    [[-24,63.5],[-14,64],[-13,66],[-22,66.5]],
+    [[-5.5,50],[1.5,51],[1.7,53],[-2,56],[-3,58.6],[-6.2,58],[-5,54.5],[-3.2,53.5],[-5,51.5]],
+    [[-10.3,51.6],[-6,52],[-5.5,55],[-8,55.3],[-10.3,54]],
+    [[-9.5,43.5],[-1.5,43.4],[-2,47],[-4.7,48.5],[-1.5,49.6],[2,51],[4.5,53.2],[8.5,54],[8.2,57],[10.5,57.7],[12.5,56],[13,55.5],[18,58.5],[22,63],[25,65.5],[30,70],[30,45],[18,40],[16,38],[12,42],[10,44],[7,43.7],[3.5,43.3],[3,42],[0,38.5],[-2,36.7],[-6,36],[-9,37]],
+    [[-17,14],[-17,21],[-13,28],[-10,31],[-6,35.5],[-2,35],[10,37],[11,33],[20,31],[30,31],[30,14]],
+    [[-85,22],[-75,20],[-74,21.5],[-84,23]]
+  ];
+  function trace() {
+    ctx.beginPath();
+    land.forEach(function (poly) {
+      poly.forEach(function (pt, i) { i ? ctx.lineTo(X(pt[0]), Y(pt[1])) : ctx.moveTo(X(pt[0]), Y(pt[1])); });
+      ctx.closePath();
+    });
+  }
+  ctx.save(); trace(); ctx.fillStyle = '#12141f'; ctx.fill(); ctx.clip();
+  ctx.fillStyle = 'rgba(160,166,190,.42)';
+  for (var y = 3; y < H; y += 6 * s) { for (var x = 3; x < W; x += 6 * s) { ctx.beginPath(); ctx.arc(x, y, 1.3 * s, 0, 6.283); ctx.fill(); } }
+  ctx.restore();
+  trace(); ctx.strokeStyle = 'rgba(139,124,246,.22)'; ctx.lineWidth = 1.2 * s; ctx.stroke();
+  var g = ctx.createRadialGradient(W * 0.5, H * 0.35, H * 0.2, W * 0.5, H * 0.35, W * 0.75);
+  g.addColorStop(0, 'rgba(7,8,12,0)'); g.addColorStop(1, 'rgba(7,8,12,.55)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+})();
+</script></body></html>

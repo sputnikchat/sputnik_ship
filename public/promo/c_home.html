@@ -1,0 +1,48 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/tokens.css"><link rel="stylesheet" href="../css/style.css">
+<style>
+html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:var(--bg)}
+body{position:relative}
+.bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 50% at 50% 30%,rgba(94,106,210,.22),transparent 70%),var(--bg)}
+.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:96px 96px;-webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 45%,#000 20%,transparent 75%)}
+.stagewrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.phonewrap{width:760px}
+.phonewrap .app{min-height:0;padding:0;background:transparent}
+.phonewrap .content{max-width:none;padding:0}
+.device{width:760px;background:#0a0b10;border:2px solid #262937;border-radius:80px;padding:22px;box-shadow:0 0 0 2px rgba(255,255,255,.04) inset,0 120px 200px -60px rgba(94,106,210,.55),0 40px 80px -20px rgba(0,0,0,.9)}
+.screen{background:#07080c;border-radius:62px;overflow:hidden;position:relative;min-height:1500px}
+.notch{position:absolute;top:18px;left:50%;transform:translateX(-50%);width:200px;height:52px;border-radius:999px;background:#000;z-index:5}
+.sbar{display:flex;justify-content:space-between;padding:26px 48px 0;font-size:22px;font-weight:600;font-family:var(--font-mono)}
+.inner{transform:scale(1.72);transform-origin:top left;width:calc(760px/1.72 - 26px);padding:0 0 0 0;margin:24px 0 0 22px}
+.rv{opacity:1;transform:none}
+</style></head><body><div class="bg"></div><div class="grid"></div><style></style><div class="stagewrap"><div class="phonewrap"><div class="device"><div class="screen"><div class="notch"></div><div class="sbar"><span>14:02</span><span>●●●</span></div><div class="inner"><div class="app"><div class="content">
+<div class="greeting-row"><div class="greeting-with-avatar"><div class="avatar avatar-lg">M</div><div class="greeting"><h1>@maptest01</h1><p>You have 3 shipments on the way.</p></div></div>
+<div class="stat-pill"><span class="stat-pill-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h10v9H3z"/><path d="M13 11h4l3 3v2h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17.5" cy="18" r="1.6"/></svg></span><span class="stat-pill-text"><span class="stat-pill-num">3</span> in progress</span></div></div>
+<div class="cmd"><div class="cmd-in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+<input id="q" class="search" type="text" placeholder="Tracking number or search…"><button class="cmd-refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button><button class="cmd-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg><span>New</span></button></div></div>
+<div class="section-row"><span class="section-k">Shipments</span></div>
+<div class="tabs"><button class="tab active">Active</button><button class="tab">Delayed</button><button class="tab">All</button><button class="tab">Archived</button></div>
+<div class="cards" id="list">
+<div class="card status-in_transit"><div class="card-row"><div class="card-lead">
+<div class="card-category-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 3 7.5v9L12 21l9-4.5v-9L12 3Z"/></svg></div>
+<div class="card-body"><p class="card-title">Birthday gift for mamá</p><p class="card-sub"><span class="mono">7749 0213 8850</span> · Marina Costa</p></div></div>
+<div class="courier-badge" style="background:rgba(94,106,210,.16);color:#c3c8f0;font-family:var(--font-mono);font-size:9px;font-weight:600">FDX</div></div>
+<div class="card-foot"><span class="badge status-in_transit">in transit</span><span class="card-checked">ETA <span class="mono">Sep 20, 14:20</span></span></div>
+<div class="card-progress"><i style="width:58%"></i></div></div>
+<div class="card status-out_for_delivery"><div class="card-row"><div class="card-lead">
+<div class="card-category-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 3 7.5v9L12 21l9-4.5v-9L12 3Z"/></svg></div>
+<div class="card-body"><p class="card-title">Desk lamp, office move</p><p class="card-sub"><span class="mono">1Z999AA10123456784</span> · Marina Costa</p></div></div>
+<div class="courier-badge" style="background:rgba(94,106,210,.16);color:#c3c8f0;font-family:var(--font-mono);font-size:9px;font-weight:600">UPS</div></div>
+<div class="card-foot"><span class="badge status-out_for_delivery">out for delivery</span><span class="card-checked">ETA <span class="mono">Today, 18:00</span></span></div>
+<div class="card-progress"><i style="width:86%"></i></div></div>
+<div class="card status-delivered"><div class="card-row"><div class="card-lead">
+<div class="card-category-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 3 7.5v9L12 21l9-4.5v-9L12 3Z"/></svg></div>
+<div class="card-body"><p class="card-title">Replacement charger</p><p class="card-sub"><span class="mono">JD014600003456</span> · Marina Costa</p></div></div>
+<div class="courier-badge" style="background:rgba(94,106,210,.16);color:#c3c8f0;font-family:var(--font-mono);font-size:9px;font-weight:600">DHL</div></div>
+<div class="card-foot"><span class="badge status-delivered">delivered</span><span class="card-checked">ETA <span class="mono">Sep 17, 11:05</span></span></div>
+<div class="card-progress"><i style="width:100%"></i></div></div></div>
+</div></div></div></div></div></div></div><script>
+const t='7749 0213 8850'; let i=0; const q=document.getElementById('q');
+setTimeout(function step(){ if(i<=t.length){ q.value=t.slice(0,i++); setTimeout(step, 90);} else { document.querySelectorAll('#list .card').forEach((c,k)=>{ if(k>0) c.style.transition='opacity .4s'; if(k>0) c.style.opacity='0.15'; }); document.querySelector('.cmd').style.borderColor='var(--accent)'; } }, 900);
+</script></body></html>

@@ -1,0 +1,39 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/tokens.css"><link rel="stylesheet" href="../css/style.css">
+<style>
+html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:var(--bg)}
+body{position:relative}
+.bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 50% at 50% 30%,rgba(94,106,210,.22),transparent 70%),var(--bg)}
+.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:96px 96px;-webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 45%,#000 20%,transparent 75%)}
+.stagewrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.phonewrap{width:760px}
+.phonewrap .app{min-height:0;padding:0;background:transparent}
+.phonewrap .content{max-width:none;padding:0}
+.device{width:760px;background:#0a0b10;border:2px solid #262937;border-radius:80px;padding:22px;box-shadow:0 0 0 2px rgba(255,255,255,.04) inset,0 120px 200px -60px rgba(94,106,210,.55),0 40px 80px -20px rgba(0,0,0,.9)}
+.screen{background:#07080c;border-radius:62px;overflow:hidden;position:relative;min-height:1500px}
+.notch{position:absolute;top:18px;left:50%;transform:translateX(-50%);width:200px;height:52px;border-radius:999px;background:#000;z-index:5}
+.sbar{display:flex;justify-content:space-between;padding:26px 48px 0;font-size:22px;font-weight:600;font-family:var(--font-mono)}
+.inner{transform:scale(1.72);transform-origin:top left;width:calc(760px/1.72 - 26px);padding:0 0 0 0;margin:24px 0 0 22px}
+.rv{opacity:1;transform:none}
+</style></head><body><div class="bg"></div><div class="grid"></div><style>.scan-frame-corner{width:40px;height:40px}#shipment-form label{opacity:0;transform:translateY(6px);transition:all .4s}</style><div class="stagewrap"><div class="phonewrap"><div class="device"><div class="screen"><div class="notch"></div><div class="sbar"><span>14:02</span><span>●●●</span></div><div class="inner"><div class="app"><div class="content">
+<div class="view-header"><h2 class="section-k" style="font-size:11px">New shipment</h2></div>
+<div id="cam" style="position:relative;height:640px;background:#141516;border-radius:18px;overflow:hidden;display:flex;align-items:center;justify-content:center;border:1px solid var(--line)">
+ <div style="width:70%;position:relative;aspect-ratio:1.4">
+  <div style="position:absolute;inset:14px;background:#f5f6fa;border-radius:6px;padding:12px 14px;font-family:var(--font-mono);color:#0b0c12;font-size:10px;line-height:1.5;box-shadow:0 8px 30px rgba(0,0,0,.4)"><div style="height:18px;background:repeating-linear-gradient(90deg,#000 0 2px,transparent 2px 4px,#000 4px 5px,transparent 5px 8px);margin-bottom:8px"></div><b>TO:</b> Marina Costa<br>14 Rue de Bretagne, 75003 Paris<br><b>FROM:</b> J. Alvarez, Brooklyn NY<br><b>TRACKING:</b> 7749 0213 8850<br>EXPRESS · 2.3 KG</div>
+  <div class="scan-frame-corner tl"></div><div class="scan-frame-corner tr"></div><div class="scan-frame-corner bl"></div><div class="scan-frame-corner br"></div>
+  <div class="scan-line" id="line"></div>
+ </div>
+ <div class="scan-status-pill" style="position:absolute;top:16px;left:16px">Scanning label</div>
+ <div id="flash" style="position:absolute;inset:0;background:var(--accent);opacity:0;transition:opacity .3s"></div>
+</div>
+<div id="form" style="opacity:0;transition:opacity .5s;margin-top:14px">
+<div style="display:flex;align-items:center;gap:6px;background:var(--accent-soft);border:1px solid rgba(94,106,210,.35);border-radius:9px;padding:10px 12px;font-size:12.5px;color:#c3c8f0;margin-bottom:10px">✓ Label detected — filled in below</div>
+<form id="shipment-form">
+<label>Courier<input value="FedEx International"></label>
+<label>Tracking number<input class="mono" value="7749 0213 8850"></label>
+<label>Recipient<input value="Marina Costa · 14 Rue de Bretagne, 75003 Paris"></label>
+<div class="field-row"><label>Weight<input class="mono" value="2.3 kg"></label><label>Value<input class="mono" value="€45.90"></label></div>
+</form></div></div></div></div></div></div></div></div><script>
+setTimeout(()=>{document.getElementById('flash').style.opacity=.55; setTimeout(()=>{document.getElementById('flash').style.opacity=0;document.getElementById('cam').style.height='300px';document.getElementById('cam').style.transition='height .5s';document.getElementById('form').style.opacity=1;document.querySelectorAll('#shipment-form label').forEach((l,i)=>setTimeout(()=>{l.style.opacity=1;l.style.transform='none'},300+i*220));},300)},2000);
+</script></body></html>

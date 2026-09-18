@@ -1,0 +1,33 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/tokens.css"><link rel="stylesheet" href="../css/style.css">
+<style>
+html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:var(--bg)}
+body{position:relative}
+.bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 50% at 50% 30%,rgba(94,106,210,.22),transparent 70%),var(--bg)}
+.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:96px 96px;-webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 45%,#000 20%,transparent 75%)}
+.stagewrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.phonewrap{width:760px}
+.phonewrap .app{min-height:0;padding:0;background:transparent}
+.phonewrap .content{max-width:none;padding:0}
+.device{width:760px;background:#0a0b10;border:2px solid #262937;border-radius:80px;padding:22px;box-shadow:0 0 0 2px rgba(255,255,255,.04) inset,0 120px 200px -60px rgba(94,106,210,.55),0 40px 80px -20px rgba(0,0,0,.9)}
+.screen{background:#07080c;border-radius:62px;overflow:hidden;position:relative;min-height:1500px}
+.notch{position:absolute;top:18px;left:50%;transform:translateX(-50%);width:200px;height:52px;border-radius:999px;background:#000;z-index:5}
+.sbar{display:flex;justify-content:space-between;padding:26px 48px 0;font-size:22px;font-weight:600;font-family:var(--font-mono)}
+.inner{transform:scale(1.72);transform-origin:top left;width:calc(760px/1.72 - 26px);padding:0 0 0 0;margin:24px 0 0 22px}
+.rv{opacity:1;transform:none}
+</style></head><body><div class="bg"></div><div class="grid"></div><style>.chat-msg.mine.has-photo .chat-msg-text{color:#fff}</style><div class="stagewrap"><div class="phonewrap"><div class="device"><div class="screen"><div class="notch"></div><div class="sbar"><span>14:02</span><span>●●●</span></div><div class="inner"><div class="app"><div class="content">
+<div class="chat-head" style="display:flex;align-items:center;gap:10px;padding:8px 0 12px;border-bottom:1px solid var(--line)"><div class="avatar avatar-sm">M</div><div><b style="display:block;font-size:14px">Marina Costa</b><span style="font-size:11px;color:var(--dim);font-family:var(--font-mono)">SPK-839201 · recipient</span></div></div>
+<div class="chat-messages" style="max-height:none;margin-top:12px">
+<div class="chat-msg"><div class="chat-msg-text">Is it on its way? 🙈</div><span class="chat-msg-meta">Marina · 16:31</span></div>
+<div class="chat-msg mine has-photo" id="ph" style="opacity:0;transform:translateY(10px);transition:all .5s"><div class="chat-msg-photo-wrap"><img class="chat-msg-photo" src="../pkg.jpg"><div class="chat-msg-photo-badge" id="badge" style="opacity:0;transition:opacity .4s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Metadata removed</div></div><div class="chat-msg-text">Just dropped it at the counter in Brooklyn 📦</div><span class="chat-msg-meta">you · 16:39</span></div>
+<div class="chat-msg-system" id="sys" style="opacity:0;transition:opacity .4s">photo delivered · EXIF stripped · end-to-end</div>
+<div class="chat-msg" id="reply" style="opacity:0;transition:opacity .4s"><div class="chat-msg-text">Parfait! Leave it with the concierge, 3rd floor 🙏</div><span class="chat-msg-meta">Marina · 16:40</span></div>
+</div>
+<div class="chat-form" style="position:static;margin-top:14px"><button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="14" rx="2"/><circle cx="12" cy="13" r="3.5"/><path d="M8 6l1.5-2h5L16 6"/></svg></button><input placeholder="Write a message…"><button class="btn-primary">➤</button></div>
+</div></div></div></div></div></div></div><script>
+setTimeout(()=>{const p=document.getElementById('ph');p.style.opacity=1;p.style.transform='none';},500);
+setTimeout(()=>{document.getElementById('badge').style.opacity=1},1500);
+setTimeout(()=>{document.getElementById('sys').style.opacity=1},2100);
+setTimeout(()=>{document.getElementById('reply').style.opacity=1},3000);
+</script></body></html>
