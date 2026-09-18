@@ -9,8 +9,13 @@
   --muted: #8a8a85;
   --muted-2: #7a7a75;
   --placeholder: #6e6e6a;
-  --accent: #c6f135;
-  --accent-ink: #0d0d0d;
+  /* Linear-inspired accent (was the lime #c6f135) - see the "Linear
+     Redesign Mockup" artifact this replaced. accent-rgb backs every
+     translucent rgba(var(--accent-rgb), alpha) use below; keep it in
+     sync with --accent by hand, since CSS can't derive one from the other. */
+  --accent: #5e6ad2;
+  --accent-rgb: 94, 106, 210;
+  --accent-ink: #ffffff;
   /* Reserved exclusively for delay/exception states and form errors -
      never decorative. A red with a slight warm/orange lean (not the old
      Cargo Bright orange, which was a background color, not an alert one). */
@@ -24,7 +29,7 @@
   --radius: 12px;
   --radius-sm: 10px;
   --radius-badge: 6px;
-  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font: "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -112,7 +117,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
    the text field, not the "@" prefix beside it) - this rings the whole
    pill instead, so focus is still visible. */
 .handle-input:focus-within {
-  border-color: var(--accent); box-shadow: 0 0 0 2px rgba(198, 241, 53, 0.25);
+  border-color: var(--accent); box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.25);
 }
 .handle-input span {
   padding: 10px 0 10px 12px; color: var(--muted); font-weight: 500; font-size: 16px;
@@ -228,7 +233,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   background: var(--surface-2); color: var(--muted);
   letter-spacing: 0.01em;
 }
-.badge.status-delivered, .badge.status-out_for_delivery { color: var(--accent); background: rgba(198, 241, 53, 0.12); }
+.badge.status-delivered, .badge.status-out_for_delivery { color: var(--accent); background: rgba(var(--accent-rgb), 0.12); }
 .badge.status-in_transit, .badge.status-label_created, .badge.status-picked_up,
 .badge.status-pending, .badge.status-info_received, .badge.status-available_for_pickup { color: var(--muted); background: var(--surface-2); }
 .badge.status-exception, .badge.status-failed_attempt { color: var(--danger); background: rgba(255, 92, 92, 0.12); }
@@ -351,7 +356,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
   padding: 0 12px; transition: border-color 0.15s, box-shadow 0.15s;
 }
-.icon-field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(198, 241, 53, 0.25); }
+.icon-field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.25); }
 .icon-field svg.icon { color: var(--muted); flex-shrink: 0; }
 .icon-field input, .icon-field textarea {
   flex: 1; background: none; border: none; padding: 10px 0; font-size: 16px; color: var(--text); outline: none;
@@ -370,7 +375,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   border-radius: var(--radius-badge); padding: 8px 12px; font-size: 13px; font-weight: 500; cursor: pointer;
 }
 .category-chip svg.icon { width: 15px; height: 15px; }
-.category-chip.active { background: rgba(198, 241, 53, 0.12); border-color: var(--accent); color: var(--accent); }
+.category-chip.active { background: rgba(var(--accent-rgb), 0.12); border-color: var(--accent); color: var(--accent); }
 
 /* ---------- Photo attachment ---------- */
 .photo-preview { position: relative; width: 96px; margin-top: 10px; }
@@ -395,7 +400,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .chat-heading { font-size: 15px; font-weight: 500; margin: 0 0 10px; color: var(--text); }
 .chat-messages { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; max-height: 340px; overflow-y: auto; }
 .chat-msg { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; max-width: 85%; }
-.chat-msg.mine { align-self: flex-end; background: rgba(198, 241, 53, 0.1); border-color: rgba(198, 241, 53, 0.3); }
+.chat-msg.mine { align-self: flex-end; background: rgba(var(--accent-rgb), 0.1); border-color: rgba(var(--accent-rgb), 0.3); }
 .chat-msg-meta { font-size: 11px; color: var(--muted); margin-bottom: 2px; display: flex; gap: 6px; }
 .chat-msg-text { font-size: 14px; color: var(--text); word-break: break-word; }
 /* Status changes, delays, delivery - centered, no bubble, muted - read as
@@ -552,7 +557,7 @@ body.chat-input-focused .chat-form { bottom: 0; padding-bottom: max(8px, env(saf
 .pp-hero-num { font-size: 36px; font-weight: 500; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; }
 .pp-hero-label { font-size: 11px; font-weight: 500; color: var(--card-light-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 6px; }
 .pp-hero-icon {
-  width: 44px; height: 44px; border-radius: 50%; background: rgba(198,241,53,0.16);
+  width: 44px; height: 44px; border-radius: 50%; background: rgba(var(--accent-rgb),0.16);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #6b8f0a;
 }
 .pp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px; }
@@ -590,7 +595,7 @@ body.chat-input-focused .chat-form { bottom: 0; padding-bottom: max(8px, env(saf
   content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
   background: var(--muted); transition: transform 0.15s, background-color 0.15s;
 }
-.toggle-switch input:checked + .toggle-slider { background: rgba(198, 241, 53, 0.18); border-color: var(--accent); }
+.toggle-switch input:checked + .toggle-slider { background: rgba(var(--accent-rgb), 0.18); border-color: var(--accent); }
 .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); background: var(--accent); }
 
 /* ---------- QR modal ---------- */
@@ -612,7 +617,7 @@ body.chat-input-focused .chat-form { bottom: 0; padding-bottom: max(8px, env(saf
 }
 .calendar-day.outside { opacity: 0.3; cursor: default; }
 .calendar-day.today { border-color: var(--accent); }
-.calendar-day.selected { background: rgba(198, 241, 53, 0.14); border-color: var(--accent); }
+.calendar-day.selected { background: rgba(var(--accent-rgb), 0.14); border-color: var(--accent); }
 .calendar-day-dots { display: flex; gap: 2px; }
 .calendar-day-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
 .calendar-day-dot.delay { background: var(--danger); }
