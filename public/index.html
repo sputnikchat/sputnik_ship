@@ -2,9 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
 <title>Sputnik Ship — Contacts &amp; Shipments</title>
 <meta name="theme-color" content="#050507" />
+<meta name="color-scheme" content="dark" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Sputnik Ship" />
 <link rel="manifest" href="/manifest.json" />
 <link rel="icon" href="/icons/icon-192.png" />
 <link rel="apple-touch-icon" href="/icons/icon-192.png" />
@@ -80,7 +84,7 @@
           <label>Username
             <div class="handle-input">
               <span>@</span>
-              <input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourusername" />
+              <input type="text" name="handle" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourusername" />
             </div>
           </label>
           <label>Password
@@ -96,11 +100,11 @@
           <label>Username
             <div class="handle-input">
               <span>@</span>
-              <input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourusername" />
+              <input type="text" name="handle" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourusername" />
             </div>
           </label>
           <label>Recovery code
-            <input type="text" name="recoveryCode" required placeholder="XXXX-XXXX-XXXX" style="text-transform:uppercase;" />
+            <input type="text" name="recoveryCode" required autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="next" placeholder="XXXX-XXXX-XXXX" style="text-transform:uppercase;" />
           </label>
           <label>New password
             <input type="password" name="newPassword" required minlength="6" autocomplete="new-password" />
@@ -114,7 +118,7 @@
           <label>Username
             <div class="handle-input">
               <span>@</span>
-              <input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourusername" />
+              <input type="text" name="handle" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourusername" />
             </div>
           </label>
           <label>Password
@@ -234,7 +238,7 @@
       <div class="cmd">
         <div class="cmd-in">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-          <input id="shipment-search" class="search" type="search" autocomplete="off" spellcheck="false" placeholder="Paste a tracking number or search…" aria-label="Search shipments" />
+          <input id="shipment-search" class="search" type="search" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="search" placeholder="Paste a tracking number or search…" aria-label="Search shipments" />
           <button id="refresh-now-btn" class="cmd-refresh" type="button" title="Refresh now" aria-label="Refresh now">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
           </button>
@@ -293,7 +297,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.5"/></svg>
           </button>
           <input type="file" accept="image/*" id="chat-photo-file" hidden />
-          <input type="text" id="chat-input" placeholder="Message…" autocomplete="off" maxlength="2000" />
+          <input type="text" id="chat-input" placeholder="Message…" autocomplete="off" autocapitalize="sentences" enterkeyhint="send" maxlength="2000" />
           <button type="submit" class="btn-primary small" aria-label="Send">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
           </button>
@@ -381,7 +385,7 @@
           <button type="button" class="btn-secondary small" id="leave-space-btn" hidden>Leave shared space</button>
         </div>
         <form id="join-space-form" class="join-space-form">
-          <input type="text" name="code" placeholder="Enter invite code" style="text-transform:uppercase;" />
+          <input type="text" name="code" placeholder="Enter invite code" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go" style="text-transform:uppercase;" />
           <button type="submit" class="btn-secondary small">Join</button>
         </form>
         <p class="field-hint" id="account-space-hint"></p>
@@ -646,7 +650,7 @@
         </select>
       </label>
       <label>Tracking number *
-        <input type="text" name="trackingNumber" class="mono" required autocomplete="off" placeholder="7749 0213 8850" />
+        <input type="text" name="trackingNumber" class="mono" required autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="next" placeholder="7749 0213 8850" />
         <span class="field-hint" id="carrier-detect-hint"></span>
       </label>
       <label>Linked contact
