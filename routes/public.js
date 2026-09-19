@@ -14,7 +14,12 @@ router.get('/shipments/:token', async (req, res) => {
   const shipment = db.shipments.find((s) => s.shareToken === req.params.token);
   if (!shipment) return res.status(404).json({ error: 'This share link is no longer valid.' });
 
+  // The sender's @handle is already what followers see on every chat
+  // message, so showing it on the invitation reveals nothing new - and
+  // "@joice sent you a package" is the whole reason to open the link.
+  const owner = db.users.find((u) => u.id === shipment.userId);
   res.json({
+    sharedBy: owner ? owner.handle : null,
     carrier: shipment.carrier,
     trackingNumber: shipment.trackingNumber,
     label: shipment.label,

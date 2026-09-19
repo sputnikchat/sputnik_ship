@@ -1155,3 +1155,28 @@ body.chat-input-focused .chat-form { bottom: 0; padding-bottom: max(8px, env(saf
 .th-more .shipment-hero { padding: 12px 14px 4px; }
 .th-more .checkpoints { padding: 0 14px 12px; }
 .thread .chat-form input { font-size: 16px; }
+
+/* ---------- Invitation (/s/:token) ---------- */
+.content.invite { max-width: 520px; padding-bottom: 40px; }
+.inv-from { display: grid; gap: 12px; padding: 8px 0 16px; }
+.inv-who { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+.inv-who .avatar { width: 34px; height: 34px; font-size: 13px; }
+.inv-who b { display: block; color: var(--text); font-size: 15px; font-weight: 600; }
+.inv-h { margin: 0; font-size: clamp(24px, 6.5vw, 30px); line-height: 1.05; letter-spacing: -.03em; font-weight: 600; text-wrap: balance; }
+.inv-h em { font-style: normal; color: var(--accent2); }
+.invite .live-card { margin-bottom: 14px; }
+.invite .live-card .map { height: 170px; }
+.invite .live-row .k { text-transform: none; letter-spacing: 0; font-family: var(--font); font-size: 12.5px; color: var(--muted); }
+.inv-steps { display: grid; gap: 8px; margin: 2px 0 14px; }
+.inv-steps div { display: flex; gap: 10px; align-items: center; font-size: 13.5px; color: var(--muted); }
+.inv-steps i { width: 22px; height: 22px; border-radius: 50%; background: rgba(62,207,142,.14); color: var(--ok); display: grid; place-items: center; flex: none; }
+.inv-steps i svg { width: 11px; height: 11px; }
+.inv-cta { display: grid; gap: 8px; margin-bottom: 14px; }
+.inv-cta .btn-primary { width: 100%; padding: 13px; font-size: 15px; border-radius: 12px; }
+.inv-hint { text-align: center; font-family: var(--mono); font-size: 10.5px; color: var(--dim); }
+.shared-auth-card { margin: 0 0 14px; }
+.inv-install { display: grid; gap: 4px; padding: 12px 14px; border: 1px dashed var(--line2); border-radius: var(--radius-md); font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+.inv-install b { color: var(--text); font-weight: 600; }
+.inv-install svg { width: 13px; height: 13px; vertical-align: -2px; margin: 0 2px; }
+.inv-install em { font-style: normal; color: var(--accent-text); }
+.inv-foot { text-align: center; font-family: var(--mono); font-size: 10.5px; color: var(--dim); margin: 6px 0 0; }

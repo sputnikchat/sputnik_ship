@@ -103,6 +103,7 @@
     phone: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h3l1.5 4-2 1.5a11 11 0 0 0 5.5 5.5l1.5-2 4 1.5v3a2 2 0 0 1-2.2 2A17 17 0 0 1 3 5.2 2 2 0 0 1 5 4Z"/></svg>',
     email: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>',
     chat: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4V5Z"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7 9 18l-5-5"/></svg>',
   };
 
   // Official brand marks (Simple Icons, https://simpleicons.org) with each
@@ -1829,35 +1830,32 @@
     $('#auth-screen').hidden = true;
     $('#app').hidden = true;
     $('#shared-view').hidden = false;
-    $('#shared-body').innerHTML = '<p class="empty">Loading shipment…</p>';
+    $('#shared-from').innerHTML = '';
+    $('#shared-body').innerHTML = '<p class="empty small" style="padding:14px;">Loading shipment…</p>';
     $('#shared-checkpoints').innerHTML = '';
     $('#shared-map').hidden = true;
+    let shipment = null;
 
     try {
       const res = await fetch(`${API}/public/shipments/${token}`);
       const s = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(s.error || 'This share link is no longer valid.');
+      shipment = s;
 
+      const from = s.sharedBy ? '@' + escapeHtml(s.sharedBy) : 'Someone';
+      const initial = s.sharedBy ? s.sharedBy[0].toUpperCase() : '?';
+      const delivered = s.status === 'delivered';
+      $('#shared-from').innerHTML = `
+        <div class="inv-who"><div class="avatar avatar-sm">${initial}</div><div><b>${from}</b>${delivered ? 'shared a delivered package' : 'sent you a package'}</div></div>
+        <h1 class="inv-h">${delivered ? 'It arrived. ' : 'Track it here, and '}<em>${delivered ? 'See the whole journey' : 'talk to ' + from}</em>${delivered ? '.' : ' while it\'s on the way.'}</h1>
+      `;
+      const etaLabel = delivered ? 'Delivered' : s.estimatedDelivery ? (isToday(s.estimatedDelivery) ? 'ETA today' : 'Estimated delivery') : 'Last checked';
+      const etaValue = delivered
+        ? fmtDate((s.checkpoints || []).slice(-1)[0]?.timestamp || s.lastCheckedAt)
+        : s.estimatedDelivery ? (isToday(s.estimatedDelivery) ? fmtShort(s.estimatedDelivery) : fmtDate(s.estimatedDelivery)) : fmtDate(s.lastCheckedAt);
       $('#shared-body').innerHTML = `
-        <div class="shipment-hero">
-          <div class="hero-top">
-            <h2>${escapeHtml(s.label || s.trackingNumber)}</h2>
-            ${courierBadge(s.carrier)}
-          </div>
-          <div class="hero-tags"><span class="badge status-${s.status}">${escapeHtml(s.statusLabel || s.status)}</span></div>
-          <div class="data-strip">
-            <div class="data-row data-eta">
-              <small class="data-label">Estimated delivery</small>
-              <span class="data-value">${fmtDate(s.estimatedDelivery)}</span>
-            </div>
-            <div class="data-row data-tracking">
-              <small class="data-label">Tracking #</small>
-              <span class="tn">${escapeHtml(s.trackingNumber)}</span>
-            </div>
-          </div>
-          ${renderStatusTimeline(s)}
-          <p class="last-checked">Last checked: <span class="last-checked-value">${fmtDate(s.lastCheckedAt)}</span></p>
-        </div>
+        <div><span class="k">${escapeHtml(s.label || s.trackingNumber)}</span><b>${etaLabel} · ${etaValue}</b></div>
+        <span class="badge status-${s.status}">${escapeHtml(s.statusLabel || s.status)}</span>
       `;
       $('#shared-map').hidden = false;
       try {
@@ -1866,23 +1864,55 @@
         $('#shared-map').innerHTML = '<div class="empty" style="padding:20px;">Could not load the map.</div>';
       }
       renderCheckpoints(s, '#shared-checkpoints');
+      $('#shared-more').hidden = !(s.checkpoints || []).length;
     } catch (err) {
-      $('#shared-body').innerHTML = `<div class="empty">${escapeHtml(err.message)}</div>`;
+      $('#shared-from').innerHTML = `<h1 class="inv-h">This link doesn't work anymore.</h1>`;
+      $('#shared-body').innerHTML = `<div class="empty small" style="padding:14px;">${escapeHtml(err.message)}</div>`;
+      $('#shared-more').hidden = true;
     }
 
-    renderSharedCta(token);
+    renderSharedCta(token, shipment);
   }
 
-  function renderSharedCta(token) {
+  // The invitation's whole point: once there's a session, follow the
+  // shipment and land in its thread - no second click.
+  async function followAfterAuth(token) {
+    try {
+      const followed = await api('/shipments/follow', { method: 'POST', body: { shareToken: token } });
+      location.href = `/?openShipment=${followed.id}`;
+    } catch (err) {
+      toast(err.message);
+      location.href = '/';
+    }
+  }
+
+  // iOS Safari only gets push once the PWA is on the Home Screen, and the
+  // person who opened this link has never heard of that. Say it here, once.
+  function installHint() {
+    const ua = navigator.userAgent;
+    const iOS = /iPhone|iPad|iPod/.test(ua);
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+    if (!iOS || standalone) return '';
+    return `<div class="inv-install"><b>Want the "out for delivery" ping on this phone?</b><span>Tap Share <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4M5 12v8h14v-8"/></svg> then <em>Add to Home Screen</em>. Takes 5 seconds.</span></div>`;
+  }
+
+  function renderSharedCta(token, shipment) {
     const cta = $('#shared-cta');
+    const from = shipment?.sharedBy ? '@' + escapeHtml(shipment.sharedBy) : 'the sender';
+    const benefits = `
+      <div class="inv-steps">
+        <div><i>${ICONS.check}</i>Live status and map, no account needed</div>
+        <div><i>${ICONS.check}</i>A ping when it's out for delivery</div>
+        <div><i>${ICONS.check}</i>Pick a handle to reply to ${from} - no email, no ID</div>
+      </div>`;
 
     if (state.token && state.user) {
       cta.innerHTML = `
-        <div class="auth-card shared-auth-card">
-          <p class="small muted" style="margin:0 0 14px;">Logged in as @${escapeHtml(state.user.handle)}</p>
-          <p class="small muted" style="margin:0 0 10px;">By following, you'll get read-only access to this shipment's tracking and can message the person who shared it. You can unfollow any time.</p>
-          <button type="button" class="btn-primary" id="shared-follow-btn" style="width:100%; margin-bottom:10px;">Follow &amp; chat about this shipment</button>
-          <a href="/" class="btn-secondary" style="display:block; text-align:center; text-decoration:none;">Go to my shipments</a>
+        ${benefits}
+        <div class="inv-cta">
+          <button type="button" class="btn-primary" id="shared-follow-btn">Follow this shipment</button>
+          <span class="inv-hint">Logged in as @${escapeHtml(state.user.handle)} · read-only tracking + chat, unfollow any time</span>
+          <a href="/" class="link-btn" style="text-align:center;">Go to my inbox</a>
         </div>
       `;
       guardClick($('#shared-follow-btn'), async () => {
@@ -1898,30 +1928,41 @@
     }
 
     cta.innerHTML = `
-      <div class="auth-card shared-auth-card">
-        <p class="small muted" style="margin:0 0 14px;">Create a free account to track your own shipments.</p>
+      ${benefits}
+      <div class="inv-cta">
+        <button type="button" class="btn-primary" id="shared-start-btn">Follow this shipment</button>
+        <span class="inv-hint">@handle + password · 20 seconds</span>
+      </div>
+      <div class="auth-card shared-auth-card" id="shared-auth" hidden>
         <div class="tabs">
-          <button type="button" class="tab active" data-tab="login">Log in</button>
-          <button type="button" class="tab" data-tab="signup">Sign up</button>
+          <button type="button" class="tab active" data-tab="signup">Create handle</button>
+          <button type="button" class="tab" data-tab="login">I have one</button>
         </div>
-        <form id="shared-login-form" class="auth-form">
-          <label>Username
-            <div class="handle-input"><span>@</span><input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourusername" /></div>
-          </label>
-          <label>Password<input type="password" name="password" required autocomplete="current-password" /></label>
-          <button type="submit" class="btn-primary">Log in</button>
-          <p class="error" id="shared-login-error" hidden></p>
-        </form>
-        <form id="shared-signup-form" class="auth-form" hidden>
-          <label>Username
-            <div class="handle-input"><span>@</span><input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourusername" /></div>
+        <form id="shared-signup-form" class="auth-form">
+          <label>Pick a handle
+            <div class="handle-input"><span>@</span><input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourname" /></div>
           </label>
           <label>Password<input type="password" name="password" required minlength="6" autocomplete="new-password" /></label>
-          <button type="submit" class="btn-primary">Create account</button>
+          <button type="submit" class="btn-primary">Create &amp; follow</button>
           <p class="error" id="shared-signup-error" hidden></p>
         </form>
+        <form id="shared-login-form" class="auth-form" hidden>
+          <label>Username
+            <div class="handle-input"><span>@</span><input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourname" /></div>
+          </label>
+          <label>Password<input type="password" name="password" required autocomplete="current-password" /></label>
+          <button type="submit" class="btn-primary">Log in &amp; follow</button>
+          <p class="error" id="shared-login-error" hidden></p>
+        </form>
       </div>
+      ${installHint()}
     `;
+
+    $('#shared-start-btn').addEventListener('click', () => {
+      $('#shared-auth').hidden = false;
+      $('#shared-start-btn').closest('.inv-cta').hidden = true;
+      $('#shared-signup-form input[name="handle"]').focus();
+    });
 
     $all('.tab', cta).forEach((tab) => {
       tab.addEventListener('click', () => {
@@ -1942,7 +1983,7 @@
         const data = await api('/auth/login', { method: 'POST', body: Object.fromEntries(fd) });
         saveSession(data.token, data.user);
         toast(`Welcome back, @${data.user.handle}`);
-        renderSharedCta(token); // stays on this same page, now signed in
+        await followAfterAuth(token);
       } catch (err) {
         errEl.textContent = err.message;
         errEl.hidden = false;
@@ -1957,8 +1998,8 @@
       try {
         const data = await api('/auth/signup', { method: 'POST', body: Object.fromEntries(fd) });
         saveSession(data.token, data.user);
-        toast(`Welcome, @${data.user.handle}`);
-        renderSharedCta(token);
+        if (data.recoveryCode) alert(`Your recovery code (write it down, it's shown once):\n\n${data.recoveryCode}`);
+        await followAfterAuth(token);
       } catch (err) {
         errEl.textContent = err.message;
         errEl.hidden = false;
