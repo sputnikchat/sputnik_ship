@@ -9,7 +9,7 @@
 // `liveProviders` (fedex, ups, dhl, usps). Each one already has a
 // comment with the general flow and a link to the official docs.
 
-const CARRIERS = ['fedex', 'ups', 'dhl', 'usps', 'air_cargo'];
+const CARRIERS = ['fedex', 'ups', 'dhl', 'usps', 'air_cargo', 'ocean_cargo'];
 
 const STATUS_FLOW = [
   'label_created',
@@ -259,6 +259,10 @@ const liveProviders = {
   // aggregator endpoint, which auto-detects the airline from the AWB's
   // own 3-digit prefix - no separate integration needed.
   async air_cargo(trackingNumber) { return ship24Provider(trackingNumber); },
+  // Ocean/container freight - tracked by container number (ISO 6346,
+  // e.g. "MSCU1234567") or a carrier's Master Bill of Lading number.
+  // Same Ship24 endpoint again; it auto-detects the shipping line.
+  async ocean_cargo(trackingNumber) { return ship24Provider(trackingNumber); },
 };
 
 async function getTrackingUpdate(carrier, trackingNumber, shipment) {

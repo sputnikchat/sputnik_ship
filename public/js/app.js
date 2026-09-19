@@ -82,7 +82,7 @@
     });
   }
 
-  const CARRIER_LABEL = { fedex: 'FedEx', ups: 'UPS', dhl: 'DHL', usps: 'USPS', air_cargo: 'Air Cargo (AWB)' };
+  const CARRIER_LABEL = { fedex: 'FedEx', ups: 'UPS', dhl: 'DHL', usps: 'USPS', air_cargo: 'Air Cargo (AWB)', ocean_cargo: 'Ocean Cargo (MBL)' };
 
   // Kept in sync by hand with CATEGORIES in routes/shipments.js.
   const CATEGORIES = [
@@ -137,6 +137,14 @@
       iconColor: '#fff',
       path: 'M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2.5 1.8V22l3.5-1 3.5 1v-1.2L13 19v-5.5l8 2.5z',
     },
+    // Same idea as air_cargo: no single shipping line fits ocean freight,
+    // so this uses a generic container glyph in a teal accent instead of
+    // one carrier's brand.
+    ocean_cargo: {
+      color: '#1f8a6f',
+      iconColor: '#fff',
+      path: 'M3 16h18l-2 4H5l-2-4zm2-2V8a1 1 0 0 1 1-1h3V4h6v3h3a1 1 0 0 1 1 1v6H5zm3-6v4h2V8H8zm5 0v4h2V8h-2z',
+    },
   };
 
   function courierBadge(carrier) {
@@ -162,6 +170,12 @@
     // un-hyphenated AWB - requiring the hyphen keeps auto-detection
     // unambiguous; without one, pick "Air Cargo (AWB)" by hand.
     if (/^\d{3}-\d{8}$/.test(t)) return 'air_cargo';
+    // ISO 6346 container number: 3-letter owner code + category id
+    // (U/J/Z) + 6-digit serial + check digit (e.g. "MSCU1234567"). MBL
+    // numbers themselves vary too much per shipping line to pattern-match
+    // reliably, so detection goes by the container number instead - pick
+    // "Ocean Cargo (MBL)" by hand when only the MBL number is on hand.
+    if (/^[A-Z]{3}[UJZ]\d{7}$/.test(t)) return 'ocean_cargo';
     if (/^\d{10}$|^\d{11}$/.test(t)) return 'dhl';
     if (/^\d{12}$|^\d{15}$|^96\d{20}$/.test(t)) return 'fedex';
     return null;
