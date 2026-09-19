@@ -506,68 +506,133 @@
   const STATUS_PROGRESS = { pending: 6, info_received: 6, label_created: 10, picked_up: 32, in_transit: 58, out_for_delivery: 86, available_for_pickup: 86, delivered: 100, exception: 58, failed_attempt: 86 };
   function statusProgress(s) { return STATUS_PROGRESS[s.status] != null ? STATUS_PROGRESS[s.status] : 6; }
 
+  // ---------------- inbox (home) ----------------
+  // "Seen" is per device on purpose: it's a reading cursor, not data the
+  // server needs, and keeping it in localStorage means no API/data-shape
+  // change for the inbox. Unread = messages from someone else newer than
+  // the last time this device opened the thread.
+  const SEEN_KEY = 'sputnikship_seen';
+  function readSeen() { try { return JSON.parse(localStorage.getItem(SEEN_KEY) || '{}'); } catch { return {}; } }
+  function markSeen(shipmentId) {
+    try { const m = readSeen(); m[shipmentId] = new Date().toISOString(); localStorage.setItem(SEEN_KEY, JSON.stringify(m)); } catch { /* private mode etc. */ }
+  }
+  function unreadCount(s, seen) {
+    // Courier (system) messages count too - the courier is a participant.
+    // A thread this device has never opened only counts the last 48h, so
+    // an old inbox doesn't light up entirely the first time it's seen.
+    const since = seen[s.id] ? new Date(seen[s.id]) : new Date(Date.now() - 48 * 3600 * 1000);
+    return (s.messages || []).filter((m) => m.userId !== state.user?.id && new Date(m.createdAt) > since).length;
+  }
+  function isToday(iso) {
+    if (!iso) return false;
+    const d = new Date(iso), n = new Date();
+    return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+  }
+  // What the second line of a row says: the newest message if there is
+  // one (a human line in muted text, a courier line in the status colour),
+  // otherwise the shipment's own status.
+  function lastLine(s) {
+    const msgs = s.messages || [];
+    const m = msgs[msgs.length - 1];
+    const cls = s.delayFlagged ? 'warn' : s.status === 'delivered' ? 'ok' : s.status === 'exception' || s.status === 'failed_attempt' ? 'danger' : s.status === 'out_for_delivery' ? 'vio' : 'acc';
+    if (m && m.type !== 'system') {
+      const who = m.userId === state.user?.id ? 'you' : '@' + escapeHtml(m.handle || '');
+      const body = m.photo ? (m.text ? escapeHtml(m.text) : 'Photo') : escapeHtml(m.text || '');
+      return { html: `${who}: ${body}`, cls: 'human', at: m.createdAt };
+    }
+    if (m && m.type === 'system') {
+      return { html: escapeHtml(m.text), cls: 'sys ' + cls, at: m.createdAt };
+    }
+    const loc = s.currentLocation?.label ? ' · ' + escapeHtml(String(s.currentLocation.label).split(':').pop().trim()) : '';
+    return { html: escapeHtml(s.statusLabel || s.status || 'Label created') + loc, cls: 'sys ' + cls, at: s.lastCheckedAt || s.createdAt };
+  }
+  const COURIER_CHIP = { fedex: 'FDX', ups: 'UPS', dhl: 'DHL', usps: 'USPS', air_cargo: 'AWB', ocean_cargo: 'MBL' };
+  function dotClass(s) {
+    if (s.delayFlagged) return 'warn';
+    if (s.status === 'delivered') return 'ok';
+    if (s.status === 'exception' || s.status === 'failed_attempt') return 'danger';
+    if (s.status === 'out_for_delivery' || s.status === 'available_for_pickup') return 'vio';
+    return 'acc';
+  }
+  function inboxRow(s, seen) {
+    const isFollower = s.viewerRole === 'follower';
+    const line = lastLine(s);
+    const unread = unreadCount(s, seen);
+    const contact = state.contacts.find((c) => c.id === s.contactId);
+    const title = s.label || s.trackingNumber;
+    const sub = isFollower ? 'Following' : contact ? contact.name : '';
+    return `
+      <div class="ibx-row status-${s.status || 'pending'} ${s.status === 'delivered' && !unread ? 'done' : ''} ${unread ? 'unread' : ''}" data-id="${s.id}" role="button" tabindex="0">
+        <div class="ibx-pk">
+          <span class="ibx-chip c-${s.carrier}">${COURIER_CHIP[s.carrier] || escapeHtml(String(s.carrier).toUpperCase())}</span>
+          ${isFollower ? ICONS.chat : (CATEGORY_ICON[s.category] || CATEGORY_ICON.other)}
+          <i class="ibx-dot ${dotClass(s)}"></i>
+        </div>
+        <div class="ibx-body">
+          <div class="ibx-l1">
+            <b>${escapeHtml(title)}${sub ? ` <span class="ibx-sub">· ${escapeHtml(sub)}</span>` : ''}</b>
+            <time>${fmtShort(line.at)}</time>
+          </div>
+          <div class="ibx-l2">
+            <span class="ibx-last ${line.cls}">${line.html}</span>
+            ${unread ? `<span class="ibx-un ${s.status === 'delivered' ? 'ok' : ''}">${unread > 9 ? '9+' : unread}</span>` : s.archived ? '<span class="ibx-tag">Archived</span>' : ''}
+          </div>
+        </div>
+      </div>`;
+  }
+
   function renderShipments() {
     renderGreeting();
     const list = $('#shipments-list');
     const q = ($('#shipment-search').value || '').toLowerCase();
+    const seen = readSeen();
     const byFilter = state.shipments.filter((s) => {
       if (shipmentFilter === 'following') return s.viewerRole === 'follower';
-      if (s.viewerRole === 'follower') return false; // followed shipments only show under "Following"
       if (shipmentFilter === 'archived') return s.archived;
-      if (s.archived) return false; // archived shipments only show under the "Archived" tab
-      if (shipmentFilter === 'active') return s.status !== 'delivered';
+      if (s.archived) return false; // archived threads only show under "Archived"
       if (shipmentFilter === 'delayed') return s.delayFlagged;
-      return true; // 'all'
+      if (shipmentFilter === 'all') return true;
+      return true; // 'active' = the inbox: everything not archived, grouped below
     });
     const items = byFilter.filter((s) =>
       !q || s.trackingNumber.toLowerCase().includes(q) || (s.label || '').toLowerCase().includes(q)
     );
 
     if (!state.shipments.length) {
-      list.innerHTML = `<div class="empty">You haven't added any shipments yet.<br>Tap "+ New shipment" to start tracking.</div>`;
+      list.innerHTML = `<div class="empty">Your inbox is empty.<br>Paste a tracking number above, or tap "New", and the package becomes a thread here.</div>`;
       return;
     }
     if (!items.length) {
       list.innerHTML = q
-        ? `<div class="empty">No shipment matches "${escapeHtml(q)}".</div>`
+        ? `<div class="empty">No thread matches "${escapeHtml(q)}".</div>`
         : `<div class="empty">Nothing here.</div>`;
       return;
     }
-    list.innerHTML = items.map((s) => {
-      const isFollower = s.viewerRole === 'follower';
-      const contact = state.contacts.find((c) => c.id === s.contactId);
-      const costText = s.cost != null ? `${escapeHtml(s.currency || '')} ${s.cost.toFixed(2)}` : '';
-      const leadIcon = isFollower
-        ? `<div class="card-following-icon" title="Following">${ICONS.chat}</div>`
-        : `<div class="card-category-icon">${CATEGORY_ICON[s.category] || CATEGORY_ICON.other}</div>`;
-      return `
-        <div class="card status-${s.status || 'pending'} ${s.archived ? 'archived' : ''}" data-id="${s.id}">
-          <div class="card-row">
-            <div class="card-lead">
-              ${leadIcon}
-              <div class="card-body">
-                <p class="card-title">${escapeHtml(s.label || s.trackingNumber)}</p>
-                <p class="card-sub"><span class="mono">${escapeHtml(s.trackingNumber)}</span>${contact ? ' · ' + escapeHtml(contact.name) : ''}</p>
-              </div>
-            </div>
-            ${courierBadge(s.carrier)}
-          </div>
-          <div class="card-foot">
-            <span class="badge status-${s.status}">${escapeHtml(s.statusLabel || s.status)}</span>
-            ${s.delayFlagged ? '<span class="badge badge-delay">Possible delay</span>' : ''}
-            ${s.archived ? '<span class="badge">Archived</span>' : ''}
-            ${isFollower ? '<span class="badge">Following</span>' : ''}
-            ${costText ? `<span class="badge mono">${costText}</span>` : ''}
-            <span class="card-checked">${s.estimatedDelivery ? `ETA <span class="mono">${fmtDate(s.estimatedDelivery)}</span>` : `Checked <span class="mono">${fmtDate(s.lastCheckedAt)}</span>`}</span>
-          </div>
-          <div class="card-progress" aria-hidden="true"><i style="width:${statusProgress(s)}%"></i></div>
-        </div>
-      `;
-    }).join('');
 
-    $all('.card', list).forEach((card) =>
-      card.addEventListener('click', () => openShipmentDetail(card.dataset.id))
-    );
+    // Newest activity first inside each group - the last message if any,
+    // else the last courier check.
+    const activity = (s) => new Date(lastLine(s).at || s.createdAt).getTime();
+    const sorted = [...items].sort((a, b) => activity(b) - activity(a));
+
+    let html;
+    if (shipmentFilter === 'active') {
+      const today = sorted.filter((s) => s.status !== 'delivered' && (s.status === 'out_for_delivery' || s.status === 'available_for_pickup' || isToday(s.estimatedDelivery)));
+      const transit = sorted.filter((s) => s.status !== 'delivered' && !today.includes(s));
+      const delivered = sorted.filter((s) => s.status === 'delivered');
+      const group = (k, rows, note) => rows.length ? `
+        <div class="ibx-sec"><span>${k}</span>${note ? `<em>${note}</em>` : ''}</div>
+        ${rows.map((s) => inboxRow(s, seen)).join('')}` : '';
+      const ofd = today.filter((s) => s.status === 'out_for_delivery' || s.status === 'available_for_pickup').length;
+      html = group('Today', today, ofd ? `${ofd} out for delivery` : '') + group('In transit', transit) + group('Delivered', delivered);
+    } else {
+      html = sorted.map((s) => inboxRow(s, seen)).join('');
+    }
+    list.innerHTML = html;
+
+    $all('.ibx-row', list).forEach((row) => {
+      row.addEventListener('click', () => openShipmentDetail(row.dataset.id));
+      row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openShipmentDetail(row.dataset.id); } });
+    });
   }
 
   $('#shipment-search').addEventListener('input', renderShipments);
@@ -1014,6 +1079,7 @@
   // ---------------- shipment detail + map ----------------
   async function openShipmentDetail(id) {
     state.currentShipmentId = id;
+    markSeen(id);
     showView('shipment-detail');
     renderShipmentDetail();
     startChatPolling(id);
@@ -1258,6 +1324,7 @@
   function renderChatMessages(s) {
     const list = $('#chat-messages');
     const messages = s.messages || [];
+    if (state.currentShipmentId === s.id) markSeen(s.id); // reading cursor for the inbox
     if (!messages.length) {
       list.innerHTML = `<div class="empty small" style="padding:16px 10px;">No messages yet. Leave a note for whoever else is tracking this.</div>`;
     } else {
