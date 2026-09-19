@@ -342,6 +342,13 @@
     if (view) view.classList.add('active');
     const btn = $(`.nav-btn[data-view="${name}"]`);
     if (btn) btn.classList.add('active');
+    if (name === 'shipments') {
+      // Replay the rows' entrance each time the inbox comes back on screen.
+      const list = $('#shipments-list');
+      list.classList.remove('enter');
+      void list.offsetWidth;
+      list.classList.add('enter');
+    }
   }
 
   $all('.nav-btn').forEach((btn) => {
@@ -555,7 +562,9 @@
     if (s.status === 'out_for_delivery' || s.status === 'available_for_pickup') return 'vio';
     return 'acc';
   }
-  function inboxRow(s, seen) {
+  // `index` drives the entrance stagger (--i, capped so a long inbox
+  // doesn't keep the last rows waiting - see .inbox.enter in style.css).
+  function inboxRow(s, seen, index = 0) {
     const isFollower = s.viewerRole === 'follower';
     const line = lastLine(s);
     const unread = unreadCount(s, seen);
@@ -563,7 +572,7 @@
     const title = s.label || s.trackingNumber;
     const sub = isFollower ? 'Following' : contact ? contact.name : '';
     return `
-      <div class="ibx-row status-${s.status || 'pending'} ${s.status === 'delivered' && !unread ? 'done' : ''} ${unread ? 'unread' : ''}" data-id="${s.id}" role="button" tabindex="0">
+      <div class="ibx-row status-${s.status || 'pending'} ${s.status === 'delivered' && !unread ? 'done' : ''} ${unread ? 'unread' : ''}" data-id="${s.id}" role="button" tabindex="0" style="--i:${Math.min(index, 7)}">
         <div class="ibx-pk">
           <span class="ibx-chip c-${s.carrier}">${COURIER_CHIP[s.carrier] || escapeHtml(String(s.carrier).toUpperCase())}</span>
           ${isFollower ? ICONS.chat : (CATEGORY_ICON[s.category] || CATEGORY_ICON.other)}
@@ -616,19 +625,25 @@
     const sorted = [...items].sort((a, b) => activity(b) - activity(a));
 
     let html;
+    let rowIndex = 0;
     if (shipmentFilter === 'active') {
       const today = sorted.filter((s) => s.status !== 'delivered' && (s.status === 'out_for_delivery' || s.status === 'available_for_pickup' || isToday(s.estimatedDelivery)));
       const transit = sorted.filter((s) => s.status !== 'delivered' && !today.includes(s));
       const delivered = sorted.filter((s) => s.status === 'delivered');
       const group = (k, rows, note) => rows.length ? `
         <div class="ibx-sec"><span>${k}</span>${note ? `<em>${note}</em>` : ''}</div>
-        ${rows.map((s) => inboxRow(s, seen)).join('')}` : '';
+        ${rows.map((s) => inboxRow(s, seen, rowIndex++)).join('')}` : '';
       const ofd = today.filter((s) => s.status === 'out_for_delivery' || s.status === 'available_for_pickup').length;
       html = group('Today', today, ofd ? `${ofd} out for delivery` : '') + group('In transit', transit) + group('Delivered', delivered);
     } else {
-      html = sorted.map((s) => inboxRow(s, seen)).join('');
+      html = sorted.map((s) => inboxRow(s, seen, rowIndex++)).join('');
     }
     list.innerHTML = html;
+    // Rows animate in only when the inbox is arriving on screen (first
+    // load, or coming back from a thread via showView) - never while the
+    // user is typing in the search box or when the 2-minute poll re-renders.
+    list.classList.toggle('enter', inboxEntrance);
+    inboxEntrance = false;
 
     $all('.ibx-row', list).forEach((row) => {
       row.addEventListener('click', () => openShipmentDetail(row.dataset.id));
@@ -640,6 +655,7 @@
 
   // ---------------- shipment filter tabs ----------------
   let shipmentFilter = 'active';
+  let inboxEntrance = true;
   $all('#shipment-filter-tabs .tab').forEach((tab) => {
     tab.addEventListener('click', () => {
       shipmentFilter = tab.dataset.filter;
@@ -1350,6 +1366,17 @@
         .map((m) => ({ kind: m.type === 'system' ? 'sys' : 'msg', at: m.createdAt, m })),
     ].sort((a, b) => new Date(a.at) - new Date(b.at));
 
+    // The whole list re-renders on every poll, so entrance motion is keyed
+    // on what actually changed: events past the previous count are new
+    // (.is-new), and the milestone card only animates when the thread is
+    // first opened or its status changes.
+    const sameThread = list.dataset.sid === s.id;
+    const prevCount = sameThread ? Number(list.dataset.count || 0) : -1;
+    const cardFresh = !sameThread || list.dataset.card !== String(s.status);
+    list.dataset.sid = s.id;
+    list.dataset.count = String(events.length);
+    list.dataset.card = String(s.status);
+
     if (!events.length) {
       list.innerHTML = `<div class="empty small" style="padding:16px 10px;">Nothing yet. The courier's first scan will show up here, and so will anyone you share the link with.</div>`;
       return finishChatRender(s);
@@ -1360,20 +1387,21 @@
     let lastDay = '';
     const parts = [];
     events.forEach((ev, i) => {
+      const fresh = prevCount >= 0 && i >= prevCount ? ' is-new' : '';
       const day = new Date(ev.at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
       if (day !== lastDay) { parts.push(`<div class="th-day">${escapeHtml(day)}</div>`); lastDay = day; }
       if (ev.kind === 'cp') {
         const isLast = i === events.length - 1 || !events.slice(i + 1).some((e) => e.kind === 'cp');
         const cls = isLast ? dotFor(s.status) : 'ok';
-        parts.push(`<div class="th-sys"><i class="${cls}"></i>${escapeHtml(ev.label)}<time>${fmtShort(ev.at)}</time></div>`);
+        parts.push(`<div class="th-sys${fresh}"><i class="${cls}"></i>${escapeHtml(ev.label)}<time>${fmtShort(ev.at)}</time></div>`);
       } else if (ev.kind === 'sys') {
         const m = ev.m;
         const warn = /delay|hold|exception|failed|required|rejected/i.test(m.text || '');
-        parts.push(`<div class="th-sys ${warn ? 'warn' : ''}"><i class="${warn ? 'warn' : 'acc'}"></i>${linkify(escapeHtml(m.text))}<time>${fmtShort(m.createdAt)}</time></div>`);
+        parts.push(`<div class="th-sys ${warn ? 'warn' : ''}${fresh}"><i class="${warn ? 'warn' : 'acc'}"></i>${linkify(escapeHtml(m.text))}<time>${fmtShort(m.createdAt)}</time></div>`);
       } else {
         const m = ev.m;
         parts.push(`
-        <div class="chat-msg ${m.userId === state.user?.id ? 'mine' : ''} ${m.photo ? 'has-photo' : ''}">
+        <div class="chat-msg ${m.userId === state.user?.id ? 'mine' : ''} ${m.photo ? 'has-photo' : ''}${fresh}">
           ${m.photo ? `
             <div class="chat-msg-photo-wrap">
               <img class="chat-msg-photo" src="${escapeHtml(m.photo)}" alt="Shared photo" />
@@ -1390,7 +1418,7 @@
     });
 
     // The current milestone as a highlighted card with what to do next.
-    parts.push(milestoneCard(s));
+    parts.push(milestoneCard(s, cardFresh));
 
     list.innerHTML = parts.join('');
     $('.th-card-share', list)?.addEventListener('click', () => shareShipment(s.id));
@@ -1399,25 +1427,26 @@
     finishChatRender(s);
   }
 
-  function milestoneCard(s) {
+  function milestoneCard(s, fresh = false) {
     const owner = s.viewerRole !== 'follower';
     const eta = s.estimatedDelivery ? (isToday(s.estimatedDelivery) ? fmtShort(s.estimatedDelivery) + ' today' : fmtDate(s.estimatedDelivery)) : null;
     const share = owner && s.status !== 'delivered' ? '<button type="button" class="btn-secondary small th-card-share">Share link</button>' : '';
     const reply = s.status !== 'delivered' ? '<button type="button" class="btn-primary small th-card-reply">Reply</button>' : '';
+    const nw = fresh ? ' is-new' : '';
     if (s.status === 'delivered') {
-      return `<div class="th-card ok"><div class="h"><b>Delivered</b><time>${fmtShort((s.checkpoints || []).slice(-1)[0]?.timestamp || s.lastCheckedAt)}</time></div><p>This thread is now read-only. The photo and messages stay here.</p></div>`;
+      return `<div class="th-card ok${nw}"><div class="h"><b>Delivered</b><time>${fmtShort((s.checkpoints || []).slice(-1)[0]?.timestamp || s.lastCheckedAt)}</time></div><p>This thread is now read-only. The photo and messages stay here.</p></div>`;
     }
     if (s.status === 'out_for_delivery' || s.status === 'available_for_pickup') {
-      return `<div class="th-card hl"><div class="h"><b>${escapeHtml(s.statusLabel || 'Out for delivery')}</b><time>${fmtShort(s.lastCheckedAt)}</time></div>
+      return `<div class="th-card hl${nw}"><div class="h"><b>${escapeHtml(s.statusLabel || 'Out for delivery')}</b><time>${fmtShort(s.lastCheckedAt)}</time></div>
         <p>${s.currentLocation?.label ? 'Courier left ' + escapeHtml(String(s.currentLocation.label).split(':').pop().trim()) + '.' : 'The courier is on the way.'}</p>
         ${eta ? `<div class="eta"><b>${eta}</b><span>estimated</span></div>` : ''}
         <div class="act">${reply}${share}</div></div>`;
     }
     if (s.delayFlagged || s.status === 'exception' || s.status === 'failed_attempt') {
-      return `<div class="th-card warn"><div class="h"><b>${s.status === 'exception' ? 'Exception' : s.status === 'failed_attempt' ? 'Delivery attempt failed' : 'Possible delay'}</b><time>${fmtShort(s.lastCheckedAt)}</time></div>
+      return `<div class="th-card warn${nw}"><div class="h"><b>${s.status === 'exception' ? 'Exception' : s.status === 'failed_attempt' ? 'Delivery attempt failed' : 'Possible delay'}</b><time>${fmtShort(s.lastCheckedAt)}</time></div>
         <p>${s.delayFlagged ? 'No new scan from the courier for a while.' : 'The courier reported a problem with this shipment.'}</p><div class="act">${reply}${share}</div></div>`;
     }
-    return `<div class="th-card"><div class="h"><b>${escapeHtml(s.statusLabel || 'In transit')}</b><time>${fmtShort(s.lastCheckedAt)}</time></div>
+    return `<div class="th-card${nw}"><div class="h"><b>${escapeHtml(s.statusLabel || 'In transit')}</b><time>${fmtShort(s.lastCheckedAt)}</time></div>
       ${eta ? `<div class="eta"><b>${eta}</b><span>estimated</span></div>` : '<p>Checked automatically every 30 minutes.</p>'}
       <div class="act">${reply}${share}</div></div>`;
   }

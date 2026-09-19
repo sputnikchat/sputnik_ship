@@ -843,6 +843,19 @@ body.chat-input-focused .chat-form { bottom: 0; padding-bottom: max(8px, env(saf
 .rv { opacity: 0; transform: translateY(12px); transition: opacity .4s ease, transform .4s ease; }
 .rv.in { opacity: 1; transform: none; }
 
+/* Entrances (DESIGN.md §Motion): transform/opacity only, strong ease-out,
+   nothing over 260ms. Inbox rows stagger 20ms each on arrival (the .enter
+   class is set by the app only when the inbox comes on screen, not while
+   typing in search); in a thread only nodes marked .is-new animate, so
+   the 8-second poll re-render stays still. The highlighted milestone card
+   fades in once, on open or when its status changes. */
+.inbox.enter .ibx-row { animation: rowIn .2s cubic-bezier(.23, 1, .32, 1) both; animation-delay: calc(var(--i, 0) * 20ms); }
+.thread-msgs > .chat-msg.is-new, .thread-msgs > .th-sys.is-new { animation: msgIn .18s cubic-bezier(.23, 1, .32, 1) both; }
+.th-card.hl.is-new { animation: cardIn .26s cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes rowIn { from { opacity: 0; transform: translateY(8px); } }
+@keyframes msgIn { from { opacity: 0; transform: translateY(6px); } }
+@keyframes cardIn { from { opacity: 0; } }
+
 @keyframes pulseDot { 0% { box-shadow: 0 0 0 0 rgba(139,124,246,.55); } 70% { box-shadow: 0 0 0 8px rgba(139,124,246,0); } 100% { box-shadow: 0 0 0 0 rgba(139,124,246,0); } }
 @keyframes ringPulse { 0% { box-shadow: 0 0 0 4px rgba(94,106,210,.2); } 70% { box-shadow: 0 0 0 9px rgba(94,106,210,0); } 100% { box-shadow: 0 0 0 4px rgba(94,106,210,0); } }
 @keyframes ping { 0% { opacity: .8; transform: scale(.6); } 100% { opacity: 0; transform: scale(2.4); } }
