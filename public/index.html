@@ -247,17 +247,33 @@
       <div id="shipments-list" class="inbox"></div>
     </section>
 
-    <!-- View: Shipment detail + map -->
-    <section id="view-shipment-detail" class="view">
-      <div class="view-header">
-        <button class="btn-secondary small" id="back-to-shipments">← Back</button>
+    <!-- View: Thread - a shipment as a conversation -->
+    <section id="view-shipment-detail" class="view thread">
+      <div class="th-head">
+        <button class="th-back" id="back-to-shipments" type="button" aria-label="Back to inbox">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7"/></svg>
+        </button>
+        <div class="th-title" id="thread-title"></div>
+        <div class="th-pill" id="thread-pill"></div>
       </div>
-      <div id="map" class="map"></div>
-      <div id="shipment-detail-body" class="shipment-hero"></div>
 
-      <div class="chat-section">
-        <h3 class="chat-heading">Messages</h3>
-        <div id="chat-messages" class="chat-messages"></div>
+      <div class="live-card">
+        <div id="map" class="map"></div>
+        <div class="live-row" id="live-row"></div>
+      </div>
+
+      <div id="chat-messages" class="chat-messages thread-msgs"></div>
+
+      <details class="th-more" id="th-more">
+        <summary>
+          <span>Details &amp; actions</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div id="shipment-detail-body" class="shipment-hero"></div>
+        <div id="checkpoints-list" class="checkpoints"></div>
+      </details>
+
+      <div class="chat-section thread-input">
         <div id="chat-photo-preview" class="photo-preview" hidden>
           <img id="chat-photo-preview-img" alt="" />
           <button type="button" class="photo-preview-remove" id="chat-photo-remove" aria-label="Remove photo">
@@ -270,15 +286,13 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.5"/></svg>
           </button>
           <input type="file" accept="image/*" id="chat-photo-file" hidden />
-          <input type="text" id="chat-input" placeholder="Write a message for anyone sharing this shipment…" autocomplete="off" maxlength="2000" />
+          <input type="text" id="chat-input" placeholder="Message…" autocomplete="off" maxlength="2000" />
           <button type="submit" class="btn-primary small" aria-label="Send">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-8-6 16-3-7-7-1Z"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
           </button>
         </form>
         <p class="chat-closed-note" id="chat-closed-note" hidden>Delivered — this conversation is now read-only.</p>
       </div>
-
-      <div id="checkpoints-list" class="checkpoints"></div>
     </section>
 
     <!-- View: Contacts -->

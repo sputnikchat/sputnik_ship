@@ -1200,25 +1200,34 @@
     const contact = state.contacts.find((c) => c.id === s.contactId);
     const costText = s.cost != null ? `${escapeHtml(s.currency || '')} ${s.cost.toFixed(2)}` : '';
 
-    // Status + ETA chips floating over the map (mockup .chip / .eta).
-    const mapEl = $('#map');
-    if (mapEl) {
-      let ov = mapEl.querySelector('.map-overlay');
-      if (!ov) { ov = document.createElement('div'); ov.className = 'map-overlay'; mapEl.appendChild(ov); }
-      ov.innerHTML = `
-        <div class="map-chip status-${s.status}"><i></i>${escapeHtml(s.statusLabel || s.status)}</div>
-        ${s.estimatedDelivery ? `<div class="map-eta"><span>ETA</span><b>${fmtDate(s.estimatedDelivery)}</b></div>` : ''}
-      `;
-    }
+    // Thread header: title, participants line, status pill.
+    const others = [
+      ...(s.viewerRole === 'follower' ? ['owner'] : []),
+      ...new Set((s.messages || []).filter((m) => m.type !== 'system' && m.userId !== state.user?.id && m.handle).map((m) => '@' + m.handle)),
+    ];
+    const routeText = (() => {
+      const r = s.fullRoute || [];
+      if (r.length < 2) return '';
+      const short = (l) => escapeHtml(String(l || '').replace(/^(Origin|Destination):\s*/i, '').split(',')[0].trim());
+      return `${short(r[0].label)} → ${short(r[r.length - 1].label)}`;
+    })();
+    $('#thread-title').innerHTML = `
+      <b>${escapeHtml(s.label || s.trackingNumber)}</b>
+      <span>${escapeHtml(CARRIER_LABEL[s.carrier] || s.carrier)}${routeText ? ' · ' + routeText : ''}${others.length ? ' · you, ' + escapeHtml(others.join(', ')) : ''}</span>
+    `;
+    $('#thread-pill').innerHTML = `<span class="badge status-${s.status}">${escapeHtml(s.statusLabel || s.status)}</span>`;
+
+    // Live row under the map: ETA (or last checked) + tracking number.
+    const etaLabel = s.status === 'delivered' ? 'Delivered' : s.estimatedDelivery ? (isToday(s.estimatedDelivery) ? 'ETA today' : 'Estimated delivery') : 'Last checked';
+    const etaValue = s.status === 'delivered'
+      ? fmtDate((s.checkpoints || [])[(s.checkpoints || []).length - 1]?.timestamp || s.lastCheckedAt)
+      : s.estimatedDelivery ? (isToday(s.estimatedDelivery) ? fmtShort(s.estimatedDelivery) : fmtDate(s.estimatedDelivery)) : fmtDate(s.lastCheckedAt);
+    $('#live-row').innerHTML = `
+      <div><span class="k">${etaLabel}</span><b>${etaValue}</b></div>
+      <div class="tn">${escapeHtml(s.trackingNumber)}</div>
+    `;
 
     $('#shipment-detail-body').innerHTML = `
-      <div class="hero-top">
-        <div>
-          <div class="section-k">Live shipment</div>
-          <h2>${escapeHtml(s.label || s.trackingNumber)}</h2>
-        </div>
-        ${courierBadge(s.carrier)}
-      </div>
       <div class="hero-tags">
         <span class="badge status-${s.status}">${escapeHtml(s.statusLabel || s.status)}</span>
         ${s.delayFlagged ? '<span class="badge badge-delay">Possible delay</span>' : ''}
@@ -1323,18 +1332,46 @@
 
   function renderChatMessages(s) {
     const list = $('#chat-messages');
-    const messages = s.messages || [];
     if (state.currentShipmentId === s.id) markSeen(s.id); // reading cursor for the inbox
-    if (!messages.length) {
-      list.innerHTML = `<div class="empty small" style="padding:16px 10px;">No messages yet. Leave a note for whoever else is tracking this.</div>`;
-    } else {
-      const wasNearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
-      // System messages (status changes, delays, delivery) live in the same
-      // array as human ones, in the order they happened, so the thread
-      // reads as one timeline instead of two things to cross-reference.
-      list.innerHTML = messages.map((m) => m.type === 'system' ? `
-        <div class="chat-msg-system">${linkify(escapeHtml(m.text))} · ${fmtShort(m.createdAt)}</div>
-      ` : `
+    const messages = s.messages || [];
+    const checkpoints = s.checkpoints || [];
+    const cpLabels = new Set(checkpoints.map((c) => String(c.label || '').trim().toLowerCase()));
+
+    // One timeline, oldest → newest: courier checkpoints (as chips) and
+    // human messages (as bubbles) interleaved by time. When real
+    // checkpoints exist, the server's "Status: X" system messages would
+    // just repeat them, so those are dropped; other system messages
+    // (delays, customs, photo notices) stay.
+    const events = [
+      ...checkpoints.map((c) => ({ kind: 'cp', at: c.timestamp, label: c.label, status: c.status })),
+      ...messages
+        .filter((m) => !(checkpoints.length && m.type === 'system' && (/^(Initial status|Status):/i.test(m.text || '') || cpLabels.has(String(m.text || '').trim().toLowerCase()))))
+        .map((m) => ({ kind: m.type === 'system' ? 'sys' : 'msg', at: m.createdAt, m })),
+    ].sort((a, b) => new Date(a.at) - new Date(b.at));
+
+    if (!events.length) {
+      list.innerHTML = `<div class="empty small" style="padding:16px 10px;">Nothing yet. The courier's first scan will show up here, and so will anyone you share the link with.</div>`;
+      return finishChatRender(s);
+    }
+
+    const wasNearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+    const dotFor = (st) => st === 'delivered' ? 'ok' : st === 'out_for_delivery' || st === 'available_for_pickup' ? 'vio' : st === 'exception' || st === 'failed_attempt' ? 'danger' : st === 'completed' ? 'ok' : 'acc';
+    let lastDay = '';
+    const parts = [];
+    events.forEach((ev, i) => {
+      const day = new Date(ev.at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      if (day !== lastDay) { parts.push(`<div class="th-day">${escapeHtml(day)}</div>`); lastDay = day; }
+      if (ev.kind === 'cp') {
+        const isLast = i === events.length - 1 || !events.slice(i + 1).some((e) => e.kind === 'cp');
+        const cls = isLast ? dotFor(s.status) : 'ok';
+        parts.push(`<div class="th-sys"><i class="${cls}"></i>${escapeHtml(ev.label)}<time>${fmtShort(ev.at)}</time></div>`);
+      } else if (ev.kind === 'sys') {
+        const m = ev.m;
+        const warn = /delay|hold|exception|failed|required|rejected/i.test(m.text || '');
+        parts.push(`<div class="th-sys ${warn ? 'warn' : ''}"><i class="${warn ? 'warn' : 'acc'}"></i>${linkify(escapeHtml(m.text))}<time>${fmtShort(m.createdAt)}</time></div>`);
+      } else {
+        const m = ev.m;
+        parts.push(`
         <div class="chat-msg ${m.userId === state.user?.id ? 'mine' : ''} ${m.photo ? 'has-photo' : ''}">
           ${m.photo ? `
             <div class="chat-msg-photo-wrap">
@@ -1347,11 +1384,44 @@
           ` : ''}
           ${m.text ? `<div class="chat-msg-text">${escapeHtml(m.text)}</div>` : ''}
           <small class="chat-msg-meta">${m.userId === state.user?.id ? 'you' : '@' + escapeHtml(m.handle)} · ${fmtShort(m.createdAt)}</small>
-        </div>
-      `).join('');
-      if (wasNearBottom) list.scrollTop = list.scrollHeight;
-    }
+        </div>`);
+      }
+    });
 
+    // The current milestone as a highlighted card with what to do next.
+    parts.push(milestoneCard(s));
+
+    list.innerHTML = parts.join('');
+    $('.th-card-share', list)?.addEventListener('click', () => shareShipment(s.id));
+    $('.th-card-reply', list)?.addEventListener('click', () => $('#chat-input').focus());
+    if (wasNearBottom) list.scrollTop = list.scrollHeight;
+    finishChatRender(s);
+  }
+
+  function milestoneCard(s) {
+    const owner = s.viewerRole !== 'follower';
+    const eta = s.estimatedDelivery ? (isToday(s.estimatedDelivery) ? fmtShort(s.estimatedDelivery) + ' today' : fmtDate(s.estimatedDelivery)) : null;
+    const share = owner && s.status !== 'delivered' ? '<button type="button" class="btn-secondary small th-card-share">Share link</button>' : '';
+    const reply = s.status !== 'delivered' ? '<button type="button" class="btn-primary small th-card-reply">Reply</button>' : '';
+    if (s.status === 'delivered') {
+      return `<div class="th-card ok"><div class="h"><b>Delivered</b><time>${fmtShort((s.checkpoints || []).slice(-1)[0]?.timestamp || s.lastCheckedAt)}</time></div><p>This thread is now read-only. The photo and messages stay here.</p></div>`;
+    }
+    if (s.status === 'out_for_delivery' || s.status === 'available_for_pickup') {
+      return `<div class="th-card hl"><div class="h"><b>${escapeHtml(s.statusLabel || 'Out for delivery')}</b><time>${fmtShort(s.lastCheckedAt)}</time></div>
+        <p>${s.currentLocation?.label ? 'Courier left ' + escapeHtml(String(s.currentLocation.label).split(':').pop().trim()) + '.' : 'The courier is on the way.'}</p>
+        ${eta ? `<div class="eta"><b>${eta}</b><span>estimated</span></div>` : ''}
+        <div class="act">${reply}${share}</div></div>`;
+    }
+    if (s.delayFlagged || s.status === 'exception' || s.status === 'failed_attempt') {
+      return `<div class="th-card warn"><div class="h"><b>${s.status === 'exception' ? 'Exception' : s.status === 'failed_attempt' ? 'Delivery attempt failed' : 'Possible delay'}</b><time>${fmtShort(s.lastCheckedAt)}</time></div>
+        <p>${s.delayFlagged ? 'No new scan from the courier for a while.' : 'The courier reported a problem with this shipment.'}</p><div class="act">${reply}${share}</div></div>`;
+    }
+    return `<div class="th-card"><div class="h"><b>${escapeHtml(s.statusLabel || 'In transit')}</b><time>${fmtShort(s.lastCheckedAt)}</time></div>
+      ${eta ? `<div class="eta"><b>${eta}</b><span>estimated</span></div>` : '<p>Checked automatically every 30 minutes.</p>'}
+      <div class="act">${reply}${share}</div></div>`;
+  }
+
+  function finishChatRender(s) {
     const closed = s.status === 'delivered';
     $('#chat-form').hidden = closed;
     $('#chat-closed-note').hidden = !closed;
