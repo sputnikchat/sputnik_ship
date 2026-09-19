@@ -125,6 +125,17 @@ app.get('*', (req, res, next) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Without this, a disallowed-origin CORS rejection falls through to
+// Express's default error handler: HTML instead of this app's JSON error
+// convention, status 500 instead of 403, and (in dev, where NODE_ENV isn't
+// set) a full stack trace in the response body.
+app.use((err, req, res, next) => {
+  if (err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ error: 'Not allowed by CORS' });
+  }
+  next(err);
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Sputnik Ship running at http://localhost:${PORT}`);
