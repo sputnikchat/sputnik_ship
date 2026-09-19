@@ -87,7 +87,17 @@ app.use(
   })
 );
 
-app.use(cors());
+const allowedOrigins = [
+  'https://sputnik-ship.onrender.com',
+  'http://localhost:3000',
+];
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
 // Express's default json() body limit is 100kb - a compressed shipment
 // photo (see compressImage() in public/js/app.js) sits right around
 // that line, so some real photos were silently getting rejected with a
