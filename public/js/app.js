@@ -82,7 +82,7 @@
     });
   }
 
-  const CARRIER_LABEL = { fedex: 'FedEx', ups: 'UPS', dhl: 'DHL', usps: 'USPS' };
+  const CARRIER_LABEL = { fedex: 'FedEx', ups: 'UPS', dhl: 'DHL', usps: 'USPS', air_cargo: 'Air Cargo (AWB)' };
 
   // Kept in sync by hand with CATEGORIES in routes/shipments.js.
   const CATEGORIES = [
@@ -128,6 +128,15 @@
       iconColor: '#fff',
       path: 'M3.145 4.577L0 19.423h20.855L24 4.577H3.145zm-.157 3.806h9.436c.157 0 5.064 0 5.159.975H9.09l1.321 4.026c1.51-.723 5.222-2.233 7.455-2.328.944-.031 1.321.126 1.132.252-.126.063-1.038.189-1.761.377-1.258.315-1.321.315-2.642.755-1.478.503-2.705 1.069-4.53 1.919L.723 18.983l2.265-10.6zm16.483 1.698c-.535-.094-2.768.063-3.334.063-.126 0-.472.031-.472-.063 0-.063.126-.063.377-.094s1.006-.157 1.258-.283c.063-.063.22-.157.315-.252.031-.063.063-.094.157-.094h1.164c.755 0 1.195.094 1.132.723-.031.315-.472 1.132-.629 1.384-.063.094-.189.189-.157 0 .126-.503.597-1.321.189-1.384zm.88 8.902H2.076s17.363-6.794 17.552-6.92c0 0 1.541-2.076.629-2.925-.283-.283-.692-.283-2.265-.283 0 0-.063-.598-2.485-1.164-.283-.063-11.858-2.517-11.858-2.517h19.628l-2.926 13.809zm2.925-.695c0-.195-.114-.293-.358-.293h-.406v1.008h.146v-.439h.179l.276.455h.179L23 18.564c.162-.016.276-.097.276-.276zm-.455.146h-.163v-.341h.211c.114 0 .228.016.228.163 0 .162-.13.178-.276.178zm.016-.829a.868.868 0 0 0-.894.878c0 .504.406.894.894.894s.894-.39.894-.894a.878.878 0 0 0-.894-.878zm0 1.642c-.423 0-.731-.325-.731-.764 0-.423.325-.748.731-.748.406 0 .731.325.731.748 0 .439-.325.764-.731.764z',
     },
+    // Not a real airline brand mark on purpose - AWB/air cargo covers many
+    // different carriers (identified by the AWB's own 3-digit prefix), so
+    // this uses a generic plane glyph in the app's own accent color instead
+    // of pretending to be one specific airline.
+    air_cargo: {
+      color: '#5e6ad2',
+      iconColor: '#fff',
+      path: 'M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2.5 1.8V22l3.5-1 3.5 1v-1.2L13 19v-5.5l8 2.5z',
+    },
   };
 
   function courierBadge(carrier) {
@@ -147,6 +156,12 @@
     if (!t) return null;
     if (/^1Z[0-9A-Z]{16}$/.test(t)) return 'ups';
     if (/^(94|93|92|82|EC|CP)\d{18,20}$/.test(t) || /^[A-Z]{2}\d{9}US$/.test(t)) return 'usps';
+    // AWB (air cargo): 3-digit IATA airline prefix + hyphen + 8-digit
+    // serial (e.g. "020-12345675"). Checked before the plain-digit DHL/
+    // FedEx patterns since those would otherwise collide with an
+    // un-hyphenated AWB - requiring the hyphen keeps auto-detection
+    // unambiguous; without one, pick "Air Cargo (AWB)" by hand.
+    if (/^\d{3}-\d{8}$/.test(t)) return 'air_cargo';
     if (/^\d{10}$|^\d{11}$/.test(t)) return 'dhl';
     if (/^\d{12}$|^\d{15}$|^96\d{20}$/.test(t)) return 'fedex';
     return null;

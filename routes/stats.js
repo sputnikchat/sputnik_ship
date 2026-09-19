@@ -6,7 +6,7 @@ const { getSpaceUserIds } = require('../services/space');
 const router = express.Router();
 router.use(requireAuth);
 
-const CARRIER_LABEL = { fedex: 'FedEx', ups: 'UPS', dhl: 'DHL', usps: 'USPS' };
+const CARRIER_LABEL = { fedex: 'FedEx', ups: 'UPS', dhl: 'DHL', usps: 'USPS', air_cargo: 'Air Cargo (AWB)' };
 
 // Best-effort delivery timestamp: the last checkpoint's time for a
 // delivered shipment. Checkpoints are stored oldest-first (the UI

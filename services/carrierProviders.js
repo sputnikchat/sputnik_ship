@@ -9,7 +9,7 @@
 // `liveProviders` (fedex, ups, dhl, usps). Each one already has a
 // comment with the general flow and a link to the official docs.
 
-const CARRIERS = ['fedex', 'ups', 'dhl', 'usps'];
+const CARRIERS = ['fedex', 'ups', 'dhl', 'usps', 'air_cargo'];
 
 const STATUS_FLOW = [
   'label_created',
@@ -255,6 +255,10 @@ const liveProviders = {
   async ups(trackingNumber) { return ship24Provider(trackingNumber); },
   async dhl(trackingNumber) { return ship24Provider(trackingNumber); },
   async usps(trackingNumber) { return ship24Provider(trackingNumber); },
+  // Air Waybill (air cargo, not last-mile parcel courier): same Ship24
+  // aggregator endpoint, which auto-detects the airline from the AWB's
+  // own 3-digit prefix - no separate integration needed.
+  async air_cargo(trackingNumber) { return ship24Provider(trackingNumber); },
 };
 
 async function getTrackingUpdate(carrier, trackingNumber, shipment) {
