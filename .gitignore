@@ -16,3 +16,6 @@ agent/skills/
 
 # graphify knowledge graph output (regenerate with /graphify .)
 graphify-out/
+
+# Rendered promo videos (kept locally, too heavy for git)
+public/promo/final/
