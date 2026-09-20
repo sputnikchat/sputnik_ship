@@ -10,12 +10,15 @@ API + framework-free vanilla HTML/CSS/JS frontend. Deployed on Render at
 https://sputnik-ship.onrender.com (GitHub: sputnikchat/sputnik_ship, branch main).
 
 ## Run
-- `npm install` once, then `npm run dev` → http://localhost:3000
+- `npm install` once, then `npm run dev` → http://localhost:3000 is the marketing landing
+  (`public/landing.html`, built from `docs/design/sputnik-hero.html`); the app is at http://localhost:3000/app
 - `.env` is required (copy `.env.example`). TRACKING_MODE=mock needs no courier keys.
 - The owner does NOT use the Terminal. Run commands yourself, never hand them a script.
 
 ## Where things live
-- `server.js` — Express app, Helmet CSP, CORS allowlist, static `public/`, SPA fallback.
+- `server.js` — Express app, Helmet CSP, CORS allowlist, `/` → `public/landing.html`, static `public/`,
+  SPA fallback to `index.html` (`/app`, `/s/<token>`). `public/js/landing.js` is the landing's own script
+  (no inline scripts: the CSP forbids them); `landing-gate.js` bounces logged-in visitors to `/app`.
 - `routes/*.js` — auth (JWT in httpOnly cookie), shipments (+ per-shipment chat, followers,
   share tokens), contacts, notifications, push, account (spaces/co-owners), stats, public (`/api/public/shipments/:token`).
 - `services/carrierProviders.js` — tracking engine. `CARRIERS` array is the source of truth

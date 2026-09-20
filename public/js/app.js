@@ -204,9 +204,14 @@
     // straight away instead of leaving the user to find it themselves.
     const params = new URLSearchParams(location.search);
     const openId = params.get('openShipment');
+    // The landing page's "paste a tracking number" bar hands the number
+    // over as /app?track=<n>: open the new-shipment form with it filled in.
+    const track = (params.get('track') || '').trim();
+    if (openId || track) history.replaceState({}, '', '/app');
     if (openId) {
-      history.replaceState({}, '', '/');
       openShipmentDetail(openId);
+    } else if (track) {
+      openNewShipment(track.slice(0, 60));
     }
   }
 
@@ -774,7 +779,9 @@
     }
   }
 
-  $('#add-shipment-btn').addEventListener('click', () => {
+  // `prefill` (a tracking number handed over by the landing page) skips
+  // the clipboard check, which could otherwise overwrite it a beat later.
+  function openNewShipment(prefill) {
     renderShipmentContactOptions();
     $('#shipment-form').reset();
     $('#carrier-detect-hint').textContent = '';
@@ -783,8 +790,15 @@
     setActiveCategory('other');
     resetPhotoPicker();
     $('#shipment-modal').hidden = false;
+    if (prefill) {
+      const input = $('#shipment-form input[name="trackingNumber"]');
+      input.value = prefill;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      return;
+    }
     tryPasteAndGo();
-  });
+  }
+  $('#add-shipment-btn').addEventListener('click', () => openNewShipment());
   $('#shipment-cancel').addEventListener('click', () => { $('#shipment-modal').hidden = true; });
   $('#shipment-modal').addEventListener('click', (e) => { if (e.target.id === 'shipment-modal') $('#shipment-modal').hidden = true; });
 
@@ -1908,10 +1922,10 @@
   async function followAfterAuth(token) {
     try {
       const followed = await api('/shipments/follow', { method: 'POST', body: { shareToken: token } });
-      location.href = `/?openShipment=${followed.id}`;
+      location.href = `/app?openShipment=${followed.id}`;
     } catch (err) {
       toast(err.message);
-      location.href = '/';
+      location.href = '/app';
     }
   }
 
@@ -1941,14 +1955,14 @@
         <div class="inv-cta">
           <button type="button" class="btn-primary" id="shared-follow-btn">Follow this shipment</button>
           <span class="inv-hint">Logged in as @${escapeHtml(state.user.handle)} · read-only tracking + chat, unfollow any time</span>
-          <a href="/" class="link-btn" style="text-align:center;">Go to my inbox</a>
+          <a href="/app" class="link-btn" style="text-align:center;">Go to my inbox</a>
         </div>
       `;
       guardClick($('#shared-follow-btn'), async () => {
         try {
           const followed = await api('/shipments/follow', { method: 'POST', body: { shareToken: token } });
           toast('Now following this shipment');
-          location.href = `/?openShipment=${followed.id}`;
+          location.href = `/app?openShipment=${followed.id}`;
         } catch (err) {
           toast(err.message);
         }

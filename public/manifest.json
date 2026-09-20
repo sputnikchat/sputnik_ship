@@ -2,7 +2,7 @@
   "name": "Sputnik Ship",
   "short_name": "Sputnik Ship",
   "description": "Contacts and shipment tracking (FedEx, UPS, DHL, USPS)",
-  "start_url": "/",
+  "start_url": "/app",
   "display": "standalone",
   "background_color": "#050507",
   "theme_color": "#050507",

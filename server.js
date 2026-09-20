@@ -118,6 +118,14 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
 
+// "/" is the marketing landing for visitors; the app itself lives at /app
+// (and any deep link like /app?openShipment=... or /s/<token>). This route
+// has to come before express.static, which would otherwise answer "/"
+// with public/index.html (the app shell) itself.
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'landing.html'));
+});
+
 // Static frontend (PWA)
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res, next) => {

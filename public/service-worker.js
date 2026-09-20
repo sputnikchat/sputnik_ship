@@ -9,9 +9,9 @@
 // touching this file) never got picked up. v3 fixes that at the root:
 // network-first for the shell, only falling back to cache when actually
 // offline, so a deploy is visible on the next reload instead of never.
-const CACHE_NAME = 'sputnikship-shell-v3';
+const CACHE_NAME = 'sputnikship-shell-v4';
 const SHELL_FILES = [
-  '/',
+  '/app',
   '/index.html',
   '/css/style.css',
   '/js/app.js',
@@ -70,7 +70,7 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientsList) => {
       if (clientsList.length) return clientsList[0].focus();
-      return self.clients.openWindow('/');
+      return self.clients.openWindow('/app');
     })
   );
 });

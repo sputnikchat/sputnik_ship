@@ -24,7 +24,7 @@ cp .env.example .env
 npm start
 ```
 
-Open `http://localhost:3000` in your browser, create your account (Sign up), and you're ready to use the app.
+Open `http://localhost:3000/app` in your browser, create your account (Sign up), and you're ready to use the app. (`http://localhost:3000` on its own is the public landing page.)
 
 > Note: in the environment where this project was generated there was no internet access to download npm packages, so `npm install` wasn't run there — the syntax of every file and the internal logic (database, tracking simulator) were tested separately. On your own computer, with normal internet, `npm install` will work fine.
 
