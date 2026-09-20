@@ -20,7 +20,7 @@ Todo lo que sigue reemplaza el diseño actual de la app. No es un retoque: es un
 ```css
 :root{
   --bg:#050507; --bg2:#0b0c12; --surface:#0f1017; --line:#1e2029; --line2:#2a2d3a;
-  --text:#f2f3f7; --muted:#9a9fac; --dim:#5f6472;
+  --text:#f2f3f7; --muted:#9a9fac; --dim:#7a8090;
   --accent:#5e6ad2; --accent2:#8b7cf6; --accent-soft:rgba(94,106,210,.16);
   --ok:#3ecf8e; --warn:#f2b45c; --danger:#eb5757;
   --sans:"Instrument Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;

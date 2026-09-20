@@ -1986,6 +1986,14 @@
             <div class="handle-input"><span>@</span><input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourname" /></div>
           </label>
           <label>Password<input type="password" name="password" required minlength="6" autocomplete="new-password" /></label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="shared-signup-consent" required />
+            <span>I accept the <a href="/terms.html" target="_blank" rel="noopener">Terms</a> and <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a></span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="shared-signup-age" required />
+            <span>I confirm I am 16 or older</span>
+          </label>
           <button type="submit" class="btn-primary">Create &amp; follow</button>
           <p class="error" id="shared-signup-error" hidden></p>
         </form>

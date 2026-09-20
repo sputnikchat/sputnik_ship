@@ -124,6 +124,14 @@
           <label>Password
             <input type="password" name="password" required minlength="6" autocomplete="new-password" />
           </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="signup-consent" required />
+            <span>I accept the <a href="/terms.html" target="_blank" rel="noopener">Terms</a> and <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a></span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="signup-age" required />
+            <span>I confirm I am 16 or older</span>
+          </label>
           <button type="submit" class="btn-primary">Create account</button>
           <p class="error" id="signup-error" hidden></p>
         </form>
