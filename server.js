@@ -89,6 +89,8 @@ app.use(
 
 const allowedOrigins = [
   'https://sputnik-ship.onrender.com',
+  'https://sputnikship.app',
+  'https://www.sputnikship.app',
   'http://localhost:3000',
 ];
 app.use(cors({
