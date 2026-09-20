@@ -13,3 +13,6 @@ data/skills/
 agent/skills/
 # Playwright CLI output (may contain credentials)
 .playwright-cli/
+
+# graphify knowledge graph output (regenerate with /graphify .)
+graphify-out/
