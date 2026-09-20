@@ -1,0 +1,53 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/tokens.css"><link rel="stylesheet" href="../css/style.css"><link rel="stylesheet" href="promo.css">
+<style>
+.ph-head{display:flex;align-items:center;justify-content:space-between;padding:6px 0 12px}
+.ph-head b{font-size:15px;font-weight:600}
+.ph-head span{font-family:var(--font-mono);font-size:11px;color:var(--dim)}
+.shot{position:relative;border-radius:16px;overflow:hidden;background:#101219;border:1px solid var(--line2);aspect-ratio:3/4;opacity:0;transform:scale(.96);transition:opacity .6s cubic-bezier(.23,1,.32,1),transform .6s cubic-bezier(.23,1,.32,1)}
+.shot.show{opacity:1;transform:none}
+.shot img{width:100%;height:100%;object-fit:cover;display:block;transform:scale(1.06);transition:transform 5s ease-out}
+.shot.show img{transform:scale(1)}
+.exif{position:absolute;right:10px;bottom:10px;font-family:var(--font-mono);font-size:10.5px;color:var(--muted);background:rgba(7,8,12,.82);backdrop-filter:blur(6px);border:1px solid rgba(235,87,87,.45);border-radius:8px;padding:8px 10px;line-height:1.7;text-align:right;opacity:0;transform:translateY(8px);transition:opacity .4s cubic-bezier(.23,1,.32,1),transform .4s cubic-bezier(.23,1,.32,1)}
+.exif.show{opacity:1;transform:none}
+.exif.off{opacity:0 !important}
+.exif div{position:relative;transition:color .3s}
+.exif div::after{content:"";position:absolute;left:0;right:0;top:50%;height:1.5px;background:var(--danger);transform:scaleX(0);transform-origin:right;transition:transform .35s cubic-bezier(.23,1,.32,1)}
+.exif div.cut{color:var(--dim)}
+.exif div.cut::after{transform:scaleX(1)}
+.exif .k{color:var(--danger);font-size:9px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px}
+.strip{position:absolute;left:10px;top:10px;display:inline-flex;align-items:center;gap:5px;background:rgba(7,8,12,.85);backdrop-filter:blur(6px);border:1px solid rgba(62,207,142,.5);border-radius:999px;padding:5px 10px 5px 8px;font-size:11px;font-weight:600;color:var(--ok);opacity:0;transform:scale(.6);transition:opacity .35s cubic-bezier(.23,1,.32,1),transform .35s cubic-bezier(.23,1,.32,1)}
+.strip.show{opacity:1;transform:none}
+.strip svg{width:11px;height:11px}
+.shot .ring{width:120px;height:120px;left:-30px;top:-30px}
+.cap{margin:12px 2px 0;font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;color:var(--dim);opacity:0;transition:opacity .5s}
+.cap.show{opacity:1}
+.cap em{font-style:normal;color:var(--ok)}
+.send{margin-top:12px;width:100%;opacity:0;transform:translateY(8px);transition:opacity .45s cubic-bezier(.23,1,.32,1),transform .45s cubic-bezier(.23,1,.32,1)}
+.send.show{opacity:1;transform:none;animation:glowpulse 1.6s ease-in-out .3s infinite}
+@keyframes glowpulse{0%,100%{box-shadow:0 0 0 1px rgba(255,255,255,.08) inset,0 8px 24px -8px rgba(94,106,210,.6)}50%{box-shadow:0 0 0 1px rgba(255,255,255,.08) inset,0 14px 34px -6px rgba(94,106,210,.9)}}
+.ph-head,.send{transition-property:opacity,transform}
+.ph-head{opacity:0;transform:translateY(8px);transition:opacity .45s cubic-bezier(.23,1,.32,1),transform .45s cubic-bezier(.23,1,.32,1)}
+.ph-head.show{opacity:1;transform:none}
+</style></head><body><div class="bg"></div><div class="grid"></div><div class="stagewrap"><div class="phonewrap"><div class="device"><div class="screen"><div class="notch"></div><div class="sbar"><span>14:02</span><span>●●●</span></div><div class="inner"><div class="app"><div class="content">
+<div class="ph-head" id="head"><div><b>Send photo</b><br><span>to Marina Costa · SPK-839201</span></div><span class="badge">Preview</span></div>
+<div class="shot" id="shot">
+  <img src="pkg.jpg" alt="">
+  <div class="ring" id="ring"></div>
+  <div class="strip" id="strip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Metadata removed</div>
+  <div class="exif" id="exif"><div class="k">Hidden in the file</div><div>GPS 40.6892, -73.9857</div><div>iPhone 15 Pro</div><div>2026-09-16 16:38:07</div><div>Camera ID 8F3A-22C1</div></div>
+</div>
+<div class="cap" id="cap"><em>✓</em> location · device · timestamp — stripped before saving</div>
+<button class="btn-primary send" id="send">Send to Marina</button>
+</div></div></div></div></div></div></div></div><script>
+const at=(ms,fn)=>setTimeout(fn,ms);const $=s=>document.querySelector(s);const show=id=>document.getElementById(id).classList.add('show');
+at(500,()=>show('head'));
+at(650,()=>show('shot'));
+at(1400,()=>show('exif'));
+document.querySelectorAll('#exif div:not(.k)').forEach((d,i)=>at(2100+i*380,()=>d.classList.add('cut')));
+at(3900,()=>$('#exif').classList.add('off'));
+at(4100,()=>{show('strip');$('#ring').classList.add('go')});
+at(4500,()=>show('cap'));
+at(4900,()=>show('send'));
+</script></body></html>

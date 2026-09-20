@@ -1,0 +1,31 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/tokens.css"><link rel="stylesheet" href="../css/style.css"><link rel="stylesheet" href="promo.css">
+<style>
+.center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:44px}
+.logo{width:320px;height:320px;overflow:visible;position:relative}
+.logo .draw{fill:none;stroke:url(#g);stroke-width:2.2;stroke-linejoin:round;stroke-dasharray:1000;stroke-dashoffset:1000;animation:draw 1.5s cubic-bezier(.4,0,.2,1) .45s forwards}
+.logo .fill{fill:url(#g);opacity:0;animation:fillin .7s ease-out 1.75s forwards}
+.logowrap{position:relative;filter:drop-shadow(0 0 0 rgba(94,106,210,0));animation:glow 1.2s ease-out 1.9s forwards}
+.logowrap .ring{width:320px;height:320px;left:0;top:0}
+.word{font-size:96px;font-weight:600;letter-spacing:-.04em;color:var(--text);opacity:0;transform:translateY(18px);animation:up .7s cubic-bezier(.23,1,.32,1) 2.05s forwards}
+.tag{font-family:var(--font-mono);font-size:24px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent2);opacity:0;animation:up .6s cubic-bezier(.23,1,.32,1) 2.45s forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes fillin{to{opacity:1}}
+@keyframes glow{to{filter:drop-shadow(0 40px 90px rgba(94,106,210,.65))}}
+@keyframes up{to{opacity:1;transform:none}}
+</style></head><body><div class="bg"></div><div class="grid"></div>
+<div class="center">
+  <div class="logowrap">
+    <div class="ring" id="ring"></div>
+    <svg class="logo" viewBox="0 0 100 100">
+      <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b7cf6"/><stop offset="1" stop-color="#5e6ad2"/></linearGradient></defs>
+      <path class="fill" fill-rule="evenodd" d="M50 4 C52.5 4 54.5 5.5 55.8 7.8 L95 76 C96.6 78.8 94.6 82 91.4 82 L72 82 L58 97 C53.6 100.6 46.4 100.6 42 97 L28 82 L8.6 82 C5.4 82 3.4 78.8 5 76 L44.2 7.8 C45.5 5.5 47.5 4 50 4 Z M50 44 L62 62 L50 82 L38 62 Z"/>
+      <path class="draw" pathLength="1000" d="M50 4 C52.5 4 54.5 5.5 55.8 7.8 L95 76 C96.6 78.8 94.6 82 91.4 82 L72 82 L58 97 C53.6 100.6 46.4 100.6 42 97 L28 82 L8.6 82 C5.4 82 3.4 78.8 5 76 L44.2 7.8 C45.5 5.5 47.5 4 50 4 Z M50 44 L62 62 L50 82 L38 62 Z"/>
+    </svg>
+  </div>
+  <div class="word">Sputnik Ship</div>
+  <div class="tag">Every shipment is a conversation</div>
+</div>
+<script>setTimeout(()=>document.getElementById('ring').classList.add('go'),1850);</script>
+</body></html>
