@@ -27,9 +27,31 @@ const HANDLE_RE = /^[a-z0-9_]{3,20}$/i;
 // be hand-copied onto paper, not just pasted.
 const RECOVERY_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
+// 8 is the minimum NIST recommends for user-chosen passwords. Existing
+// accounts with a shorter one can still log in - this only applies when a
+// password is set. The upper bound keeps someone from posting a
+// multi-megabyte "password" at bcrypt (which only reads the first 72
+// bytes anyway).
+const MIN_PASSWORD = 8;
+const MAX_PASSWORD = 200;
+function passwordError(password) {
+  if (typeof password !== 'string') return 'Invalid password.';
+  if (password.length < MIN_PASSWORD) return `Password must be at least ${MIN_PASSWORD} characters long.`;
+  if (password.length > MAX_PASSWORD) return 'Password is too long.';
+  return null;
+}
+
+// Compared against when a login names a handle that doesn't exist, so
+// that path costs the same bcrypt time as a real wrong password -
+// otherwise the response time alone tells an attacker which handles are
+// registered.
+const DUMMY_HASH = bcrypt.hashSync(crypto.randomBytes(16).toString('hex'), 10);
+
 function sign(user) {
   return jwt.sign(
-    { id: user.id, handle: user.handle },
+    // tv = the user's tokenVersion when this token was issued; see
+    // middleware/auth.js for how it lets a password change end old sessions.
+    { id: user.id, handle: user.handle, tv: user.tokenVersion || 0 },
     process.env.JWT_SECRET,
     { expiresIn: '30d' }
   );
@@ -81,16 +103,22 @@ function normalizeRecoveryCode(code) {
 // an account unless you decide to close public signup (see README,
 // "Closing signup" section).
 router.post('/signup', authLimiter, async (req, res) => {
-  const { handle, password } = req.body || {};
-  if (!handle || !password) {
+  const { handle, password, website } = req.body || {};
+  // Honeypot: the signup forms carry a "website" field that is invisible
+  // and unreachable for people (off-screen, no tab stop, hidden from
+  // screen readers), so only a bot blindly filling every input ever sends
+  // it. No CAPTCHA, no third-party script, nothing tracking real users.
+  if (website) {
+    return res.status(400).json({ error: 'Signup failed. Please try again.' });
+  }
+  if (typeof handle !== 'string' || !handle || !password) {
     return res.status(400).json({ error: 'Missing data: username and password are required.' });
   }
   if (!HANDLE_RE.test(handle)) {
     return res.status(400).json({ error: 'Username must be 3-20 characters: letters, numbers, or "_".' });
   }
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
-  }
+  const pwError = passwordError(password);
+  if (pwError) return res.status(400).json({ error: pwError });
 
   const normalizedHandle = handle.toLowerCase();
   const db = await readDB();
@@ -122,14 +150,17 @@ router.post('/signup', authLimiter, async (req, res) => {
 
 router.post('/login', authLimiter, async (req, res) => {
   const { handle, password } = req.body || {};
-  if (!handle || !password) {
+  if (typeof handle !== 'string' || typeof password !== 'string' || !handle || !password) {
     return res.status(400).json({ error: 'Missing data: username and password.' });
   }
 
   const normalizedHandle = handle.toLowerCase();
   const db = await readDB();
   const user = db.users.find((u) => u.handle === normalizedHandle);
-  if (!user) return res.status(401).json({ error: 'Incorrect username or password.' });
+  if (!user) {
+    await bcrypt.compare(password, DUMMY_HASH);
+    return res.status(401).json({ error: 'Incorrect username or password.' });
+  }
 
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) return res.status(401).json({ error: 'Incorrect username or password.' });
@@ -144,12 +175,11 @@ router.post('/login', authLimiter, async (req, res) => {
 // treated as spent, same as a used one-time backup code anywhere else).
 router.post('/recover', authLimiter, async (req, res) => {
   const { handle, recoveryCode, newPassword } = req.body || {};
-  if (!handle || !recoveryCode || !newPassword) {
+  if (typeof handle !== 'string' || typeof recoveryCode !== 'string' || !handle || !recoveryCode || !newPassword) {
     return res.status(400).json({ error: 'Missing data: username, recovery code, and new password.' });
   }
-  if (newPassword.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
-  }
+  const pwError = passwordError(newPassword);
+  if (pwError) return res.status(400).json({ error: pwError });
 
   const normalizedHandle = handle.toLowerCase();
   const db = await readDB();
@@ -163,13 +193,18 @@ router.post('/recover', authLimiter, async (req, res) => {
   if (!ok) return res.status(401).json(genericError);
 
   const newRecoveryCode = generateRecoveryCode();
+  let updatedUser = user;
   await update((data) => {
     const u = data.users.find((x) => x.id === user.id);
     u.passwordHash = bcrypt.hashSync(newPassword, 10);
     u.recoveryCodeHash = bcrypt.hashSync(normalizeRecoveryCode(newRecoveryCode), 10);
+    // Recovering usually means someone else may know the old password:
+    // every session issued before this moment stops working.
+    u.tokenVersion = (u.tokenVersion || 0) + 1;
+    updatedUser = u;
   });
 
-  const token = sign(user);
+  const token = sign(updatedUser);
   setAuthCookie(req, res, token);
   res.json({ token, user: { id: user.id, handle: user.handle }, recoveryCode: newRecoveryCode });
 });
@@ -185,23 +220,30 @@ router.use(requireAuth);
 
 router.post('/change-password', async (req, res) => {
   const { currentPassword, newPassword } = req.body || {};
-  if (!currentPassword || !newPassword) {
+  if (typeof currentPassword !== 'string' || !currentPassword || !newPassword) {
     return res.status(400).json({ error: 'Missing data: current and new password.' });
   }
-  if (newPassword.length < 6) {
-    return res.status(400).json({ error: 'New password must be at least 6 characters long.' });
-  }
+  const pwError = passwordError(newPassword);
+  if (pwError) return res.status(400).json({ error: pwError });
 
   const db = await readDB();
   const user = db.users.find((u) => u.id === req.user.id);
   const ok = await bcrypt.compare(currentPassword, user.passwordHash);
   if (!ok) return res.status(401).json({ error: 'Current password is incorrect.' });
 
+  let updatedUser = null;
   await update((data) => {
     const u = data.users.find((x) => x.id === req.user.id);
     u.passwordHash = bcrypt.hashSync(newPassword, 10);
+    // Ends every other session (another device, or someone who had the
+    // old password) - this device gets a fresh token right below, so the
+    // person changing their password stays logged in here.
+    u.tokenVersion = (u.tokenVersion || 0) + 1;
+    updatedUser = u;
   });
-  res.status(204).end();
+  const token = sign(updatedUser);
+  setAuthCookie(req, res, token);
+  res.json({ token });
 });
 
 // Invalidates the old code (in case it leaked) and issues a fresh one.
@@ -209,7 +251,7 @@ router.post('/change-password', async (req, res) => {
 // silently mint a new recovery code for itself.
 router.post('/regenerate-recovery-code', async (req, res) => {
   const { currentPassword } = req.body || {};
-  if (!currentPassword) return res.status(400).json({ error: 'Current password is required.' });
+  if (typeof currentPassword !== 'string' || !currentPassword) return res.status(400).json({ error: 'Current password is required.' });
 
   const db = await readDB();
   const user = db.users.find((u) => u.id === req.user.id);

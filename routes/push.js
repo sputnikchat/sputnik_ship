@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const { update } = require('../services/store');
 const { requireAuth } = require('../middleware/auth');
 const { sendTestPush } = require('../services/notify');
@@ -13,10 +14,51 @@ router.get('/vapid-public-key', (req, res) => {
 
 router.use(requireAuth);
 
-router.post('/subscribe', async (req, res) => {
+// Each subscribe makes the server send a real push request, so it gets
+// its own small budget - a browser subscribes once per device.
+const subscribeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please wait a few minutes and try again.' },
+});
+
+// The server POSTs to whatever endpoint a subscription names (right away
+// for the test push below, and on every later notification). Accepting
+// any URL would let a logged-in user point the server at arbitrary
+// addresses - internal services, cloud metadata endpoints, someone
+// else's site (SSRF). Real browsers only ever hand out endpoints on
+// these push services.
+const PUSH_SERVICE_HOSTS = [
+  'fcm.googleapis.com', // Chrome, Edge, Brave, Opera, Android
+  'android.googleapis.com',
+  'push.services.mozilla.com', // Firefox (updates.push.services.mozilla.com)
+  'push.apple.com', // Safari / iOS (web.push.apple.com)
+  'notify.windows.com', // legacy Edge / Windows
+];
+
+function isAllowedPushEndpoint(endpoint) {
+  if (typeof endpoint !== 'string' || endpoint.length > 1000) return false;
+  let url;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'https:' || url.port || url.username || url.password) return false;
+  const host = url.hostname.toLowerCase();
+  return PUSH_SERVICE_HOSTS.some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
+}
+
+router.post('/subscribe', subscribeLimiter, async (req, res) => {
   const { endpoint, keys } = req.body || {};
-  if (!endpoint || !keys || !keys.p256dh || !keys.auth) {
+  if (!endpoint || !keys || typeof keys.p256dh !== 'string' || typeof keys.auth !== 'string'
+    || keys.p256dh.length > 200 || keys.auth.length > 100) {
     return res.status(400).json({ error: 'Invalid subscription.' });
+  }
+  if (!isAllowedPushEndpoint(endpoint)) {
+    return res.status(400).json({ error: 'Unsupported push service.' });
   }
 
   await update((data) => {

@@ -1250,3 +1250,12 @@ body.chat-input-focused .chat-form { bottom: 0; padding-bottom: max(8px, env(saf
 .inv-install svg { width: 13px; height: 13px; vertical-align: -2px; margin: 0 2px; }
 .inv-install em { font-style: normal; color: var(--accent-text); }
 .inv-foot { text-align: center; font-family: var(--mono); font-size: 10.5px; color: var(--dim); margin: 6px 0 0; }
+
+/* Signup honeypot (see routes/auth.js): present in the form so bots fill
+   it, but off-screen, untabbable and hidden from assistive tech, so no
+   person ever does. */
+.hp-field {
+  position: absolute !important; left: -10000px !important; top: auto !important;
+  width: 1px !important; height: 1px !important; overflow: hidden !important;
+  opacity: 0 !important; pointer-events: none !important;
+}

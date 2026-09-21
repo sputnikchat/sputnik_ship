@@ -1985,7 +1985,8 @@
           <label>Pick a handle
             <div class="handle-input"><span>@</span><input type="text" name="handle" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" placeholder="yourname" /></div>
           </label>
-          <label>Password<input type="password" name="password" required minlength="6" autocomplete="new-password" /></label>
+          <label>Password<input type="password" name="password" required minlength="8" autocomplete="new-password" /></label>
+          <input type="text" name="website" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true" />
           <label class="checkbox-label">
             <input type="checkbox" id="shared-signup-consent" required />
             <span>I accept the <a href="/terms.html" target="_blank" rel="noopener">Terms</a> and <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a></span>

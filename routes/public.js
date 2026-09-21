@@ -5,9 +5,22 @@
 // name/address) never leaves the owner's own account.
 
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const { readDB } = require('../services/store');
 
 const router = express.Router();
+
+// Share tokens are 72 random bits, so guessing one isn't realistic - this
+// limit is about cost: every lookup reads the whole database document,
+// and this is the one route anyone on the internet can hit without an
+// account.
+router.use(rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please wait a few minutes and try again.' },
+}));
 
 router.get('/shipments/:token', async (req, res) => {
   const db = await readDB();

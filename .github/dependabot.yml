@@ -1,0 +1,10 @@
+# Opens a pull request on GitHub whenever one of the app's npm
+# dependencies has a newer version - security fixes included - instead
+# of relying on someone remembering to check.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

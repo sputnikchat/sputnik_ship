@@ -6,10 +6,13 @@ const { checkDelay } = require('./delayDetector');
 const { sendDailyDigest } = require('./digest');
 
 // Refreshes tracking for all active (not-delivered) shipments and
-// generates a notification whenever the status changes.
-async function refreshAllShipments() {
+// generates a notification whenever the status changes. `filter` narrows
+// it to a subset (e.g. one user's space for the manual "refresh all"
+// button) - without it, any logged-in user pressing that button would
+// fan out a paid Ship24 lookup for EVERY user's shipments.
+async function refreshAllShipments(filter = null) {
   await update(async (data) => {
-    const active = data.shipments.filter((s) => s.status !== 'delivered' && !s.archived);
+    const active = data.shipments.filter((s) => s.status !== 'delivered' && !s.archived && (!filter || filter(s)));
     for (const shipment of active) {
       try {
         const result = await getTrackingUpdate(shipment.carrier, shipment.trackingNumber, shipment);

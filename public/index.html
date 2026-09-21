@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous" />
 <link rel="stylesheet" href="/css/tokens.css" />
 <link rel="stylesheet" href="/css/style.css" />
 </head>
@@ -107,7 +107,7 @@
             <input type="text" name="recoveryCode" required autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="next" placeholder="XXXX-XXXX-XXXX" style="text-transform:uppercase;" />
           </label>
           <label>New password
-            <input type="password" name="newPassword" required minlength="6" autocomplete="new-password" />
+            <input type="password" name="newPassword" required minlength="8" autocomplete="new-password" />
           </label>
           <button type="submit" class="btn-primary">Reset password</button>
           <p class="error" id="recovery-error" hidden></p>
@@ -122,8 +122,9 @@
             </div>
           </label>
           <label>Password
-            <input type="password" name="password" required minlength="6" autocomplete="new-password" />
+            <input type="password" name="password" required minlength="8" autocomplete="new-password" />
           </label>
+          <input type="text" name="website" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true" />
           <label class="checkbox-label">
             <input type="checkbox" id="signup-consent" required />
             <span>I accept the <a href="/terms.html" target="_blank" rel="noopener">Terms</a> and <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a></span>
@@ -515,7 +516,7 @@
     <h3>Change password</h3>
     <form id="change-password-form">
       <label>Current password<input type="password" name="currentPassword" required autocomplete="current-password" /></label>
-      <label>New password<input type="password" name="newPassword" required minlength="6" autocomplete="new-password" /></label>
+      <label>New password<input type="password" name="newPassword" required minlength="8" autocomplete="new-password" /></label>
       <p class="error" id="change-password-error" hidden></p>
       <div class="modal-actions">
         <button type="button" class="btn-secondary" id="change-password-cancel">Cancel</button>
@@ -755,7 +756,7 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
 <script src="/js/scan.js"></script>
 <script src="/js/hero.js"></script>
 <script src="/js/app.js"></script>

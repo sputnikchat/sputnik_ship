@@ -29,9 +29,18 @@
 (() => {
   'use strict';
 
+  // Pinned to exact versions. ZXing used to load "@latest", so any future
+  // release - or one pushed from a hijacked maintainer account - would
+  // have run inside the app with full access to the page. `integrity`
+  // (Subresource Integrity) additionally makes the browser refuse the
+  // file if its bytes ever differ from the published hash.
   const SCRIPTS = {
-    Tesseract: 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/7.0.0/tesseract.min.js',
-    ZXing: 'https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js',
+    Tesseract: {
+      src: 'https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js',
+      integrity: 'sha256-AAwn2c0N72Vfd7NscqOJwKsTeTqjHLTXqrVtCcCvvH4=',
+    },
+    // 0.23.0 is the release "@latest" was resolving to.
+    ZXing: { src: 'https://cdn.jsdelivr.net/npm/@zxing/library@0.23.0/umd/index.min.js' },
   };
   const loaded = {};
   function loadScript(globalName) {
@@ -39,7 +48,12 @@
     if (loaded[globalName]) return loaded[globalName];
     loaded[globalName] = new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = SCRIPTS[globalName];
+      const { src, integrity } = SCRIPTS[globalName];
+      script.src = src;
+      if (integrity) {
+        script.integrity = integrity;
+        script.crossOrigin = 'anonymous';
+      }
       script.onload = () => resolve();
       script.onerror = () => reject(new Error(`Could not load ${globalName}.`));
       document.head.appendChild(script);

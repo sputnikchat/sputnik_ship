@@ -1,6 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const rateLimit = require('express-rate-limit');
 const { readDB, update } = require('../services/store');
 const { requireAuth } = require('../middleware/auth');
 const { spaceIdOf, getSpaceUserIds } = require('../services/space');
@@ -54,9 +55,22 @@ router.post('/invite', async (req, res) => {
   res.json({ code, expiresAt });
 });
 
-router.post('/join', async (req, res) => {
+// Joining a space gives full access to everything in it (shipments,
+// contacts, photos, costs), and invite codes are short enough to type by
+// hand (6 characters, valid 24 h). Without a limit a script could keep
+// guessing codes until it lands in someone else's space; 10 tries per
+// 15 minutes leaves room for typos and makes guessing hopeless.
+const joinLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Please wait a few minutes and try again.' },
+});
+
+router.post('/join', joinLimiter, async (req, res) => {
   const { code } = req.body || {};
-  if (!code) return res.status(400).json({ error: 'Invite code is required.' });
+  if (typeof code !== 'string' || !code) return res.status(400).json({ error: 'Invite code is required.' });
 
   const db = await readDB();
   const normalized = String(code).toUpperCase().trim();

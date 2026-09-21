@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 
 const authRoutes = require('./routes/auth');
@@ -68,17 +69,22 @@ app.use(
         // 'wasm-unsafe-eval' (not the far broader 'unsafe-eval') is what
         // lets Tesseract.js's WebAssembly OCR core compile at all - it
         // does not permit eval()/new Function() the way 'unsafe-eval' would.
-        scriptSrc: ["'self'", "'wasm-unsafe-eval'", 'https://cdnjs.cloudflare.com', 'https://cdn.jsdelivr.net'],
+        // Leaflet, Tesseract.js and ZXing all load from jsDelivr, pinned to
+        // exact versions (and with Subresource Integrity where the hash
+        // could be verified - see public/index.html and public/js/scan.js).
+        scriptSrc: ["'self'", "'wasm-unsafe-eval'", 'https://cdn.jsdelivr.net'],
         // Tesseract.js runs its OCR in a Web Worker it creates from a
         // blob: URL, and fetches its wasm core from the same CDNs as the
         // wrapper script above.
         workerSrc: ["'self'", 'blob:'],
         // Inline style="" attributes are used throughout the frontend, so
         // style-src can't be locked down further without a larger rewrite.
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com'],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdn.jsdelivr.net'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-        imgSrc: ["'self'", 'data:', 'blob:', 'https://services.arcgisonline.com', 'https://api.qrserver.com'],
-        connectSrc: ["'self'", 'https://cdnjs.cloudflare.com', 'https://cdn.jsdelivr.net', 'blob:'],
+        // cdn.jsdelivr.net: Leaflet's stylesheet references its own
+        // control/marker images relative to itself.
+        imgSrc: ["'self'", 'data:', 'blob:', 'https://services.arcgisonline.com', 'https://api.qrserver.com', 'https://cdn.jsdelivr.net'],
+        connectSrc: ["'self'", 'https://cdn.jsdelivr.net', 'blob:'],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
         frameAncestors: ["'self'"],
@@ -106,6 +112,19 @@ app.use(cors({
 // 413 the client just reported as a generic "Network error".
 app.use(express.json({ limit: '5mb' }));
 app.use(cookieParser());
+
+// Baseline limit for the whole API, on top of the tighter per-route ones
+// (login, writes, refresh, invites, push). Sized for real use: an open
+// chat polls every 8 s (~115 requests per 15 min) and a household can
+// share one IP, so 1500 per 15 minutes never bothers a person but stops
+// a script from hammering endpoints that each read the whole database.
+app.use('/api/', rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 1500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please slow down and try again in a few minutes.' },
+}));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/contacts', contactsRoutes);

@@ -11,7 +11,8 @@ const { getSpaceUserIds } = require('../services/space');
 const { checkDelay } = require('../services/delayDetector');
 const { encryptField, decryptField } = require('../services/encryption');
 const { logAudit } = require('../services/audit');
-const { stripImageMetadata } = require('../services/imageMeta');
+const { stripImageMetadata, validateImageDataUri } = require('../services/imageMeta');
+const { ValidationError, optionalText } = require('../services/validate');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -49,9 +50,19 @@ const refreshLimiter = rateLimit({
 // or the attached photo. Same idea as routes/public.js's field allowlist,
 // just with messages/category/archived/delayFlagged added back in since
 // those aren't sensitive and following-along wants them.
+// followers (the other followers' user ids) and shareToken are left out
+// too: neither is needed to follow along, and a follower has no business
+// learning who else is following or re-minting the owner's link.
 function sanitizeForFollower(shipment) {
-  const { notes, cost, currency, contactId, photo, userId, ...safe } = shipment;
-  return { ...safe, viewerRole: 'follower' };
+  const { notes, cost, currency, contactId, photo, userId, followers, shareToken, ...safe } = shipment;
+  return { ...safe, messages: decryptMessages(safe.messages), viewerRole: 'follower' };
+}
+
+// Photos sent in the chat are encrypted at rest the same way as the
+// shipment's own photo (see services/encryption.js). Messages stored
+// before that change are plain and pass through decryptField untouched.
+function decryptMessages(messages) {
+  return (messages || []).map((m) => (m.photo ? { ...m, photo: decryptField(m.photo) } : m));
 }
 
 // The owner-facing counterpart: photo and cost are stored encrypted (see
@@ -62,6 +73,7 @@ function decryptForOwner(shipment) {
     ...shipment,
     photo: decryptField(shipment.photo),
     cost: shipment.cost === null || shipment.cost === undefined ? shipment.cost : Number(decryptField(shipment.cost)),
+    messages: decryptMessages(shipment.messages),
     viewerRole: 'owner',
   };
 }
@@ -84,7 +96,23 @@ router.post('/', writeLimiter, async (req, res) => {
   if (!carrier || !CARRIERS.includes(String(carrier).toLowerCase())) {
     return res.status(400).json({ error: `Courier must be one of: ${CARRIERS.join(', ')}` });
   }
-  if (!trackingNumber) return res.status(400).json({ error: 'Tracking number is required.' });
+  // Type-checked and length-capped: these end up in the one shared
+  // database document every request reads (see services/validate.js).
+  let clean;
+  try {
+    clean = {
+      trackingNumber: optionalText(trackingNumber, 64),
+      contactId: optionalText(contactId, 64) || null,
+      label: optionalText(label, 120),
+      notes: optionalText(notes, 2000),
+      currency: optionalText(currency, 8).toUpperCase(),
+    };
+  } catch (err) {
+    if (err instanceof ValidationError) return res.status(400).json({ error: err.message });
+    throw err;
+  }
+  if (!clean.trackingNumber) return res.status(400).json({ error: 'Tracking number is required.' });
+  if (!/^[A-Z]{3}$/.test(clean.currency)) clean.currency = 'USD';
 
   const parsedCost = cost !== undefined && cost !== null && cost !== '' ? Number(cost) : null;
   if (parsedCost !== null && !Number.isFinite(parsedCost)) {
@@ -93,20 +121,21 @@ router.post('/', writeLimiter, async (req, res) => {
   // photo is rendered back out as an <img src="..."> - reject anything
   // that isn't actually an image data URI up front, rather than relying
   // only on the frontend escaping it at render time.
-  if (photo && !/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/]+=*$/.test(photo)) {
-    return res.status(400).json({ error: 'Photo must be a valid image.' });
+  if (photo) {
+    const photoError = validateImageDataUri(photo);
+    if (photoError) return res.status(400).json({ error: photoError });
   }
 
   const shipment = {
     id: uuidv4(),
     userId: req.user.id,
     carrier: String(carrier).toLowerCase(),
-    trackingNumber: String(trackingNumber).trim(),
-    contactId: contactId || null,
-    label: label || '',
-    notes: notes || '',
+    trackingNumber: clean.trackingNumber,
+    contactId: clean.contactId,
+    label: clean.label,
+    notes: clean.notes,
     cost: parsedCost !== null ? encryptField(String(parsedCost)) : null,
-    currency: parsedCost !== null ? (currency || 'USD').toUpperCase() : null,
+    currency: parsedCost !== null ? clean.currency : null,
     category: CATEGORIES.includes(category) ? category : 'other',
     photo: photo ? encryptField(stripImageMetadata(photo)) : null,
     status: 'label_created',
@@ -171,9 +200,9 @@ router.post('/', writeLimiter, async (req, res) => {
 // a follower: read-only access to the tracking info plus the chat, so two
 // different accounts - not co-owners, not the same space - can talk about
 // one shipment (e.g. a seller and a buyer).
-router.post('/follow', async (req, res) => {
+router.post('/follow', writeLimiter, async (req, res) => {
   const { shareToken } = req.body || {};
-  if (!shareToken) return res.status(400).json({ error: 'Share link is required.' });
+  if (typeof shareToken !== 'string' || !shareToken) return res.status(400).json({ error: 'Share link is required.' });
 
   const db = await readDB();
   const shipment = db.shipments.find((s) => s.shareToken === shareToken);
@@ -273,7 +302,10 @@ router.post('/:id/refresh', refreshLimiter, async (req, res) => {
     });
     res.json(decryptForOwner(updated));
   } catch (err) {
-    res.status(502).json({ error: `Could not update tracking: ${err.message}` });
+    // The provider's raw error can include API details (URLs, account
+    // hints, stack fragments) - it goes to the server log, not the client.
+    console.error(`Manual refresh failed for shipment ${shipment.id}:`, err.message);
+    res.status(502).json({ error: 'Could not update tracking right now. Please try again later.' });
   }
 });
 
@@ -322,11 +354,12 @@ router.post('/:id/archive', async (req, res) => {
 // can talk about one shipment, e.g. "left it with the doorman".
 router.post('/:id/messages', writeLimiter, async (req, res) => {
   const { text, photo } = req.body || {};
-  const trimmedText = text ? String(text).trim() : '';
+  const trimmedText = typeof text === 'string' ? text.trim() : '';
   if (!trimmedText && !photo) return res.status(400).json({ error: 'Write a message or attach a photo.' });
   // Same allowlist as a shipment's own photo field (see POST / above).
-  if (photo && !/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/]+=*$/.test(photo)) {
-    return res.status(400).json({ error: 'Photo must be a valid image.' });
+  if (photo) {
+    const photoError = validateImageDataUri(photo);
+    if (photoError) return res.status(400).json({ error: photoError });
   }
 
   const db = await readDB();
@@ -349,7 +382,7 @@ router.post('/:id/messages', writeLimiter, async (req, res) => {
       userId: req.user.id,
       handle: author ? author.handle : 'unknown',
       text: trimmedText.slice(0, 2000),
-      photo: photo ? stripImageMetadata(photo) : null,
+      photo: photo ? encryptField(stripImageMetadata(photo)) : null,
       createdAt: new Date().toISOString(),
     };
     s.messages ||= [];
@@ -403,8 +436,13 @@ router.delete('/:id', async (req, res) => {
 
 // Manually triggers the refresh cycle for ALL shipments (the same thing
 // the scheduler does every 30 min). Useful for testing without waiting.
+// Only the caller's own space is refreshed: this used to run the global
+// refresh, so any account could make the server call Ship24 for every
+// user's shipments (burning the paid quota) just by pressing the button.
 router.post('/refresh-all/now', refreshLimiter, async (req, res) => {
-  await refreshAllShipments();
+  const before = await readDB();
+  const ownUserIds = getSpaceUserIds(before, req.user.id);
+  await refreshAllShipments((s) => ownUserIds.includes(s.userId));
   const db = await readDB();
   const spaceUserIds = getSpaceUserIds(db, req.user.id);
   const shipments = db.shipments.filter((s) => spaceUserIds.includes(s.userId)).map(decryptForOwner);

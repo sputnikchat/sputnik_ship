@@ -51,6 +51,42 @@ pool.on('error', (err) => {
 const ROW_ID = 1;
 let ensured = null;
 
+// Supabase automatically exposes every table in the `public` schema
+// through its REST API (PostgREST) and grants its platform roles - anon,
+// authenticated, service_role - full access to new tables there. This
+// table holds the ENTIRE app (password hashes, contacts, messages), so
+// with those defaults anyone holding the project's anon key, which
+// Supabase treats as public, could download it over HTTPS. The app itself
+// never goes through that API: it connects directly as the table's owner.
+//
+// Two independent locks, applied on every boot (both are idempotent):
+//  - Row Level Security with no policies: the REST roles see zero rows.
+//    The owner role this app connects as is exempt from RLS (it isn't
+//    FORCEd), so the app keeps working exactly as before.
+//  - The platform roles' grants are revoked outright, the same treatment
+//    scripts/setup-audit-role.js already gives audit_log.
+// Each statement is tried separately and only logged on failure: on a
+// plain Postgres without Supabase's roles the REVOKEs simply don't apply,
+// and a missing permission must never keep the app from starting.
+async function lockDownTable() {
+  const statements = [
+    'ALTER TABLE app_state ENABLE ROW LEVEL SECURITY',
+    'REVOKE ALL ON app_state FROM PUBLIC',
+    'REVOKE ALL ON app_state FROM anon',
+    'REVOKE ALL ON app_state FROM authenticated',
+    'REVOKE ALL ON app_state FROM service_role',
+  ];
+  for (const sql of statements) {
+    try {
+      await pool.query(sql);
+    } catch (err) {
+      if (!/does not exist/i.test(err.message)) {
+        console.error(`Could not apply "${sql}":`, err.message);
+      }
+    }
+  }
+}
+
 // Creates the table on first use and seeds it from the old data/db.json if
 // one exists locally (so demo/test data made before this migration isn't
 // lost), otherwise from an empty document. Safe to call every time - it's
@@ -78,6 +114,7 @@ function ensureReady() {
         }
         await pool.query('INSERT INTO app_state (id, data) VALUES ($1, $2)', [ROW_ID, seed]);
       }
+      await lockDownTable();
     })();
   }
   return ensured;
