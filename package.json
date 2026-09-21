@@ -17,7 +17,7 @@
     "express-rate-limit": "^8.7.0",
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
-    "node-cron": "^3.0.3",
+    "node-cron": "^4.6.0",
     "pg": "^8.23.0",
     "uuid": "^9.0.1",
     "web-push": "^3.6.7"
