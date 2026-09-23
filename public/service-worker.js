@@ -14,7 +14,7 @@
 //
 // API data (/api/*) is never touched here - app.js keeps its own
 // last-known copy per account so it can paint the inbox while the API wakes.
-const CACHE_NAME = 'sputnikship-shell-v5';
+const CACHE_NAME = 'sputnikship-shell-v6';
 // app.js owns this cache (last-known inbox data); never delete it on activate.
 const DATA_CACHE_PREFIX = 'sputnikship-data';
 const SHELL_FILES = [
@@ -31,12 +31,20 @@ const SHELL_FILES = [
 ];
 // Files whose change means "a new version was deployed".
 const VERSIONED = new Set(['/app', '/', '/css/style.css', '/css/tokens.css', '/js/app.js', '/js/landing.js']);
-// Third-party files worth keeping offline (pinned versions / font files).
-const CDN_HOSTS = new Set(['cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com']);
+// Third-party files worth keeping offline (pinned Leaflet). Only hosts the
+// CSP's connect-src allows: a worker's own fetch() obeys connect-src, so
+// routing Google Fonts through here got them blocked (fonts fell back to
+// the system face). Fonts stay with the browser's HTTP cache instead.
+const CDN_HOSTS = new Set(['cdn.jsdelivr.net']);
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_FILES)).catch(() => {})
+    // cache: 'reload' skips the browser's HTTP cache (the CDN in front of
+    // production sets a 4 h max-age), so a fresh install never starts out
+    // with yesterday's app.js.
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(SHELL_FILES.map((path) => new Request(path, { cache: 'reload' }))))
+      .catch(() => {})
   );
   self.skipWaiting();
 });
