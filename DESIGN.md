@@ -51,18 +51,34 @@ Active states (in_transit, out_for_delivery) get a pulsing dot; delivered a stat
 Rows are threads: 44px package tile with courier chip (top-left) and status dot (bottom-right),
 title (label or tracking number), second line = last message (system message in status colour,
 human message in --muted), time in mono, unread pill (--accent, or --ok for "delivered").
-Groups: Today (out for delivery / needs reply) → In transit → Delivered (55% opacity).
+Groups: Today (out for delivery / needs reply) → Needs attention (delay flag, exception,
+failed attempt) → In transit → Delivered (55% opacity). Swipe a row left to archive (touch
+only, arms at 35% of the width, Undo in the toast).
 
 ## Thread model (Detail)
-Pinned live card: 96px map strip (dot grid, route gradient --accent2→--accent, pulsing pin),
-ETA window in 14px 600, tracking number in mono. Below: one timeline oldest→newest —
-courier events as centred mono chips with a status dot, photos as bubbles with the
+Pinned live card: map 260px tall (340px from 768px), regional zoom (never street level),
+long route legs bow like a flight path, traveled leg gradient --accent2→--accent draws in
+on open while the pulsing pin rides its tip. ETA window in 14px 600, tracking number in mono.
+Below: one timeline oldest→newest — courier events on a left rail (event sentence in sans
+13.5px, place under it in --dim, date in mono; the latest event bold with its status dot,
+earlier ones --ok unless they were an exception), system notices as centred sans chips,
+the header pill reads "Delayed" when the delay flag is set, photos as bubbles with the
 "Metadata removed" badge, human messages as bubbles (mine = --accent, theirs = --surface),
 the current milestone as a highlighted card with actions. Input bar: camera + field + send.
 
+## Alerts and Calendar
+Alerts use the inbox row: 40px tile tinted by the linked shipment's state (delay amber),
+grouped Today / Yesterday / Earlier, only the newest daily summary shown, tap opens the
+thread. Calendar: week strip, then the selected day, "Coming up" and "No delivery date yet".
+Every tab starts with the same header: mono eyebrow + 22px 600 title.
+
 ## Motion
 150ms ease for state/colour, 200–260ms ease-out for entrances (translateY 8–12px → 0,
-opacity), pulsing dots 2s. Everything off under `prefers-reduced-motion`.
+opacity), pulsing dots 2s. Pushed screens (thread, account, passport) slide in 28px over
+280ms and back out the other way; tab switches rise 6px over 200ms; the phone's back
+gesture walks the same stack. Press feedback on pointer-down (scale .95–.985).
+The one long moment is the map's route draw (1.6s, ease-out cubic).
+Everything off under `prefers-reduced-motion`.
 
 ## Mobile
 Design at 390px first. Safe-area insets on top/bottom bars, 44px minimum tap targets,

@@ -17,12 +17,20 @@
   function $(sel, root = document) { return root.querySelector(sel); }
   function $all(sel, root = document) { return Array.from(root.querySelectorAll(sel)); }
 
-  function toast(msg) {
+  function toast(msg, action) {
     const el = $('#toast');
     el.textContent = msg;
+    if (action) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'toast-action';
+      b.textContent = action.label;
+      b.addEventListener('click', () => { el.hidden = true; action.onClick(); }, { once: true });
+      el.appendChild(b);
+    }
     el.hidden = false;
     clearTimeout(toast._t);
-    toast._t = setTimeout(() => { el.hidden = true; }, 2600);
+    toast._t = setTimeout(() => { el.hidden = true; }, action ? 5000 : 2600);
   }
 
   async function api(path, { method = 'GET', body } = {}) {
@@ -103,6 +111,7 @@
   // inside JS-rendered templates - static markup in index.html has its
   // own inline copies of the same style.
   const ICONS = {
+    archive: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M10 12h4"/></svg>',
     contact: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="12" r="2"/><path d="M14 10h4M14 14h4M6.3 16.8c.5-1.7 1.8-2.4 2.7-2.4s2.2.7 2.7 2.4"/></svg>',
     phone: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h3l1.5 4-2 1.5a11 11 0 0 0 5.5 5.5l1.5-2 4 1.5v3a2 2 0 0 1-2.2 2A17 17 0 0 1 3 5.2 2 2 0 0 1 5 4Z"/></svg>',
     email: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>',
@@ -364,14 +373,46 @@
   }
 
   // ---------------- navigation ----------------
-  function showView(name) {
+  // Tabs (inbox, contacts, calendar, alerts) are siblings; a thread,
+  // Account and Passport are "pushed" on top of them. Pushed screens get a
+  // history entry, so the phone's back button / edge swipe returns to the
+  // screen underneath instead of closing the app, and they slide in from
+  // the side while tab switches only cross-fade.
+  const PUSHED_VIEWS = new Set(['shipment-detail', 'account', 'passport']);
+  let currentView = 'shipments';
+  let lastTab = 'shipments';
+  let pushDepth = 0;
+  let skipNextPop = false;
+
+  function showView(name, { fromHistory = false } = {}) {
     if (name !== 'shipment-detail') stopChatPolling();
-    $all('.view').forEach((v) => v.classList.remove('active'));
+    const prev = currentView;
+    const pushing = PUSHED_VIEWS.has(name);
+    if (!fromHistory) {
+      if (pushing && name !== prev) {
+        history.pushState({ sputnikView: name }, '');
+        pushDepth++;
+      } else if (!pushing && pushDepth > 0) {
+        // Leaving the pushed stack from a tab or an in-app back button:
+        // unwind the entries this app added, quietly.
+        skipNextPop = true;
+        history.go(-pushDepth);
+        pushDepth = 0;
+      }
+    }
+    currentView = name;
+    if (!pushing) lastTab = name;
+
+    $all('.view').forEach((v) => v.classList.remove('active', 'v-push', 'v-pop', 'v-tab'));
     $all('.nav-btn').forEach((b) => b.classList.remove('active'));
     const view = $('#view-' + name);
-    if (view) view.classList.add('active');
-    const btn = $(`.nav-btn[data-view="${name}"]`);
+    if (view) {
+      view.classList.add('active');
+      if (name !== prev) view.classList.add(pushing ? 'v-push' : PUSHED_VIEWS.has(prev) ? 'v-pop' : 'v-tab');
+    }
+    const btn = $(`.nav-btn[data-view="${pushing ? lastTab : name}"]`);
     if (btn) btn.classList.add('active');
+    if (name !== prev) window.scrollTo(0, 0);
     if (name === 'shipments') {
       // Replay the rows' entrance each time the inbox comes back on screen.
       const list = $('#shipments-list');
@@ -381,16 +422,34 @@
     }
   }
 
+  window.addEventListener('popstate', (e) => {
+    if (skipNextPop) { skipNextPop = false; return; }
+    if ($('#app').hidden) return;
+    const target = e.state && e.state.sputnikView;
+    if (target && PUSHED_VIEWS.has(target) && (target !== 'shipment-detail' || state.currentShipmentId)) {
+      pushDepth = Math.max(0, pushDepth - 1);
+      showView(target, { fromHistory: true });
+      return;
+    }
+    pushDepth = 0;
+    if (currentView === 'shipment-detail') state.currentShipmentId = null;
+    showView(lastTab, { fromHistory: true });
+  });
+
+  // In-app back buttons behave exactly like the phone's back gesture.
+  function goBack() {
+    if (pushDepth > 0) history.back();
+    else showView(lastTab);
+  }
+
+
   $all('.nav-btn').forEach((btn) => {
     btn.addEventListener('click', () => showView(btn.dataset.view));
   });
 
   $('#notif-btn').addEventListener('click', () => showView('notifications'));
 
-  $('#back-to-shipments').addEventListener('click', () => {
-    state.currentShipmentId = null;
-    showView('shipments');
-  });
+  $('#back-to-shipments').addEventListener('click', goBack);
 
   // ---------------- data loading ----------------
   async function loadAll() {
@@ -412,6 +471,8 @@
     if (JSON.stringify(fresh) === JSON.stringify(state.shipments) && $('#shipments-list [data-id]')) return;
     state.shipments = fresh;
     renderShipments();
+    // Alerts name their shipment by its label, so they depend on this list.
+    if (state.notifications.length) renderNotifications();
   }
 
   async function loadNotifications() {
@@ -761,13 +822,16 @@
     let rowIndex = 0;
     if (shipmentFilter === 'active') {
       const today = sorted.filter((s) => s.status !== 'delivered' && (s.status === 'out_for_delivery' || s.status === 'available_for_pickup' || isToday(s.estimatedDelivery)));
-      const transit = sorted.filter((s) => s.status !== 'delivered' && !today.includes(s));
+      // Delays and courier problems get their own group so an amber dot
+      // doesn't hide among ordinary in-transit rows.
+      const attention = sorted.filter((s) => s.status !== 'delivered' && !today.includes(s) && (s.delayFlagged || s.status === 'exception' || s.status === 'failed_attempt'));
+      const transit = sorted.filter((s) => s.status !== 'delivered' && !today.includes(s) && !attention.includes(s));
       const delivered = sorted.filter((s) => s.status === 'delivered');
       const group = (k, rows, note) => rows.length ? `
         <div class="ibx-sec"><span>${k}</span>${note ? `<em>${note}</em>` : ''}</div>
         ${rows.map((s) => inboxRow(s, seen, rowIndex++)).join('')}` : '';
       const ofd = today.filter((s) => s.status === 'out_for_delivery' || s.status === 'available_for_pickup').length;
-      html = group('Today', today, ofd ? `${ofd} out for delivery` : '') + group('In transit', transit) + group('Delivered', delivered);
+      html = group('Today', today, ofd ? `${ofd} out for delivery` : '') + group('Needs attention', attention) + group('In transit', transit) + group('Delivered', delivered);
     } else {
       html = sorted.map((s) => inboxRow(s, seen, rowIndex++)).join('');
     }
@@ -779,12 +843,95 @@
     inboxEntrance = false;
 
     $all('.ibx-row', list).forEach((row) => {
-      row.addEventListener('click', () => openShipmentDetail(row.dataset.id));
+      const s = state.shipments.find((x) => x.id === row.dataset.id);
+      if (s && s.viewerRole !== 'follower') enableSwipeArchive(row, s);
+      row.addEventListener('click', () => { if (!row.dataset.swiped) openShipmentDetail(row.dataset.id); });
       row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openShipmentDetail(row.dataset.id); } });
     });
   }
 
   $('#shipment-search').addEventListener('input', renderShipments);
+
+  // ---------------- swipe a row left to archive ----------------
+  // Touch/pen only (a mouse has the Archive button in Details). The row
+  // follows the finger once the gesture is clearly horizontal; vertical
+  // scrolling stays with the browser (touch-action: pan-y in CSS). Past
+  // 35% of the width it arms; letting go there archives, with Undo.
+  function enableSwipeArchive(row, s) {
+    const label = s.archived ? 'Unarchive' : 'Archive';
+    let startX = 0, startY = 0, dx = 0, mode = null, armed = false, action = null;
+    const reset = () => {
+      row.classList.remove('swiping');
+      row.style.transform = '';
+      if (action) { action.remove(); action = null; }
+      mode = null; armed = false; dx = 0;
+    };
+    row.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' || mode) return;
+      startX = e.clientX; startY = e.clientY; mode = 'pending';
+    });
+    row.addEventListener('pointermove', (e) => {
+      if (!mode) return;
+      const mx = e.clientX - startX, my = e.clientY - startY;
+      if (mode === 'pending') {
+        if (Math.abs(my) > 10 && Math.abs(my) > Math.abs(mx)) { mode = null; return; }
+        if (mx < -10 && Math.abs(mx) > Math.abs(my) * 1.2) {
+          mode = 'swipe';
+          row.setPointerCapture(e.pointerId);
+          row.classList.add('swiping');
+          action = document.createElement('div');
+          action.className = 'ibx-swipe';
+          action.innerHTML = `${ICONS.archive}<span>${label}</span>`;
+          row.appendChild(action);
+        } else return;
+      }
+      dx = Math.min(0, mx);
+      row.style.transform = `translateX(${dx}px)`;
+      action.style.width = `${-dx}px`;
+      const nowArmed = -dx > row.offsetWidth * 0.35;
+      if (nowArmed !== armed) {
+        armed = nowArmed;
+        action.classList.toggle('armed', armed);
+        if (armed && navigator.vibrate) navigator.vibrate(8);
+      }
+    });
+    const end = async () => {
+      if (mode !== 'swipe') { mode = null; return; }
+      row.dataset.swiped = '1';
+      setTimeout(() => { delete row.dataset.swiped; }, 350);
+      if (!armed) {
+        row.classList.remove('swiping');
+        row.style.transform = '';
+        row.addEventListener('transitionend', () => { if (!row.classList.contains('swiping')) reset(); }, { once: true });
+        mode = null;
+        return;
+      }
+      mode = null;
+      row.classList.remove('swiping');
+      row.classList.add('swiped-out');
+      row.style.transform = `translateX(${-row.offsetWidth}px)`;
+      try {
+        await api(`/shipments/${s.id}/archive`, { method: 'POST' });
+        await loadShipments();
+        toast(s.archived ? 'Moved back to the inbox' : 'Archived', {
+          label: 'Undo',
+          onClick: async () => {
+            await api(`/shipments/${s.id}/archive`, { method: 'POST' }).catch(() => {});
+            loadShipments();
+          },
+        });
+      } catch (err) {
+        row.classList.remove('swiped-out');
+        reset();
+        toast(err.message);
+      }
+    };
+    row.addEventListener('pointerup', end);
+    row.addEventListener('pointercancel', () => {
+      if (mode === 'swipe') { row.classList.remove('swiping'); row.style.transform = ''; setTimeout(reset, 250); }
+      mode = null;
+    });
+  }
 
   // ---------------- shipment filter tabs ----------------
   let shipmentFilter = 'active';
@@ -1165,7 +1312,9 @@
     }
     const selected = new Date(calendarSelectedDay + 'T00:00:00');
     $('#calendar-month-label').textContent = selected.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    $('#calendar-today-label').textContent = `${calendarSelectedDay === todayKey ? 'Today' : 'Selected'} · ${selected.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })}`;
+    $('#calendar-today-label').textContent = calendarSelectedDay === todayKey
+      ? `Today, ${selected.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+      : selected.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 
     $('#calendar-grid').innerHTML = days.map((d) => {
       const key = dateKey(d);
@@ -1195,29 +1344,47 @@
 
   const CARRIER_CODE = { fedex: 'FDX', ups: 'UPS', dhl: 'DHL', usps: 'USPS' };
 
+  function calItem(s, when) {
+    const contact = state.contacts.find((c) => c.id === s.contactId);
+    const pill = s.delayFlagged && s.status !== 'delivered'
+      ? '<span class="badge badge-delay">Delayed</span>'
+      : `<span class="badge status-${s.status}">${s.status === 'out_for_delivery' ? 'Out today' : escapeHtml(s.statusLabel || s.status)}</span>`;
+    const sub = [when, contact ? escapeHtml(contact.name) : ''].filter(Boolean).join(' · ') || escapeHtml(s.trackingNumber);
+    return `
+      <div class="cal-item" data-id="${s.id}" role="button" tabindex="0">
+        <div class="c">${CARRIER_CODE[s.carrier] || escapeHtml(String(s.carrier || '').toUpperCase().slice(0, 4))}</div>
+        <div class="t"><b>${escapeHtml(s.label || s.trackingNumber)}</b><span>${sub}</span></div>
+        ${pill}
+      </div>`;
+  }
+
+  // The selected day first, then what's coming after it and what has no
+  // date yet - so the screen is never just "nothing today" while packages
+  // are in fact on their way.
   function renderCalendarDayList(byDay) {
     const list = $('#calendar-day-list');
     const info = byDay[calendarSelectedDay];
-    if (!info || !info.items.length) {
-      list.innerHTML = '<div class="empty">No shipments expected this day.</div>';
-      return;
-    }
-    list.innerHTML = info.items.map((s) => {
-      const contact = state.contacts.find((c) => c.id === s.contactId);
-      const pill = s.delayFlagged
-        ? '<span class="badge badge-delay">Delayed</span>'
-        : `<span class="badge status-${s.status}">${s.status === 'out_for_delivery' ? 'Out today' : escapeHtml(s.statusLabel || s.status)}</span>`;
-      const when = s.estimatedDelivery ? `by ${fmtShort(s.estimatedDelivery)}` : '';
-      const sub = [when, contact ? escapeHtml(contact.name) : ''].filter(Boolean).join(' · ') || escapeHtml(s.trackingNumber);
-      return `
-        <div class="cal-item" data-id="${s.id}">
-          <div class="c">${CARRIER_CODE[s.carrier] || escapeHtml(String(s.carrier || '').toUpperCase().slice(0, 4))}</div>
-          <div class="t"><b>${escapeHtml(s.label || s.trackingNumber)}</b><span>${sub}</span></div>
-          ${pill}
-        </div>
-      `;
-    }).join('');
-    $all('.cal-item', list).forEach((card) => card.addEventListener('click', () => openShipmentDetail(card.dataset.id)));
+    const dayLabel = new Date(calendarSelectedDay + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const onDay = info && info.items.length ? info.items : [];
+    const dayEnd = new Date(calendarSelectedDay + 'T23:59:59').getTime();
+    const active = state.shipments.filter((s) => !s.archived && s.status !== 'delivered');
+    const upcoming = active
+      .filter((s) => s.estimatedDelivery && new Date(s.estimatedDelivery).getTime() > dayEnd)
+      .sort((a, b) => new Date(a.estimatedDelivery) - new Date(b.estimatedDelivery))
+      .slice(0, 6);
+    const undated = active.filter((s) => !s.estimatedDelivery && s.status !== 'out_for_delivery');
+    const whenFor = (s) => s.estimatedDelivery ? new Date(s.estimatedDelivery).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+
+    let html = onDay.length
+      ? onDay.map((s) => calItem(s, s.estimatedDelivery ? `by ${fmtShort(s.estimatedDelivery)}` : '')).join('')
+      : `<div class="cal-none">Nothing expected on ${escapeHtml(dayLabel)}.${upcoming[0] ? ` Next: <b>${escapeHtml(whenFor(upcoming[0]))}</b>` : ''}</div>`;
+    if (upcoming.length) html += `<div class="ibx-sec"><span>Coming up</span></div>` + upcoming.map((s) => calItem(s, whenFor(s))).join('');
+    if (undated.length) html += `<div class="ibx-sec"><span>No delivery date yet</span></div>` + undated.map((s) => calItem(s, '')).join('');
+    list.innerHTML = html;
+    $all('.cal-item', list).forEach((card) => {
+      card.addEventListener('click', () => openShipmentDetail(card.dataset.id));
+      card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openShipmentDetail(card.dataset.id); } });
+    });
   }
 
   $('#calendar-prev').addEventListener('click', () => {
@@ -1374,7 +1541,11 @@
       <b>${escapeHtml(s.label || s.trackingNumber)}</b>
       <span>${escapeHtml(CARRIER_LABEL[s.carrier] || s.carrier)}${routeText ? ' · ' + routeText : ''}${others.length ? ' · you, ' + escapeHtml(others.join(', ')) : ''}</span>
     `;
-    $('#thread-pill').innerHTML = `<span class="badge status-${s.status}">${escapeHtml(s.statusLabel || s.status)}</span>`;
+    // A delay flag outranks the courier's last status word: the pill must
+    // agree with the amber milestone card below it.
+    $('#thread-pill').innerHTML = s.delayFlagged && s.status !== 'delivered'
+      ? '<span class="badge badge-delay">Delayed</span>'
+      : `<span class="badge status-${s.status}">${escapeHtml(s.statusLabel || s.status)}</span>`;
 
     // Live row under the map: ETA (or last checked) + tracking number.
     const etaLabel = s.status === 'delivered' ? 'Delivered' : s.estimatedDelivery ? (isToday(s.estimatedDelivery) ? 'ETA today' : 'Estimated delivery') : 'Last checked';
@@ -1531,11 +1702,20 @@
     events.forEach((ev, i) => {
       const fresh = prevCount >= 0 && i >= prevCount ? ' is-new' : '';
       const day = new Date(ev.at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-      if (day !== lastDay) { parts.push(`<div class="th-day">${escapeHtml(day)}</div>`); lastDay = day; }
+      // Courier events carry their own date on the rail, so a day divider
+      // would only break the line; dividers mark where people talk.
+      if (day !== lastDay && ev.kind !== 'cp') parts.push(`<div class="th-day">${escapeHtml(day)}</div>`);
+      lastDay = day;
       if (ev.kind === 'cp') {
         const isLast = i === events.length - 1 || !events.slice(i + 1).some((e) => e.kind === 'cp');
-        const cls = isLast ? dotFor(s.status) : 'ok';
-        parts.push(`<div class="th-sys${fresh}"><i class="${cls}"></i>${escapeHtml(ev.label)}<time>${fmtShort(ev.at)}</time></div>`);
+        const cls = isLast ? dotFor(s.status) : ev.status === 'exception' || ev.status === 'failed_attempt' ? 'danger' : 'ok';
+        // Courier labels arrive as "What happened · Where" - split them so
+        // the event reads first and the place sits quietly underneath.
+        const raw = String(ev.label || '');
+        const cut = raw.lastIndexOf(' · ');
+        const what = cut > 0 ? raw.slice(0, cut) : raw;
+        const where = cut > 0 ? raw.slice(cut + 3) : '';
+        parts.push(`<div class="th-ev${isLast ? ' now' : ''}${fresh}"><i class="${cls}"></i><div class="th-ev-b"><p>${escapeHtml(what)}</p>${where ? `<span>${escapeHtml(where)}</span>` : ''}</div><time>${fmtShort(ev.at)}</time></div>`);
       } else if (ev.kind === 'sys') {
         const m = ev.m;
         const warn = /delay|hold|exception|failed|required|rejected/i.test(m.text || '');
@@ -1682,12 +1862,13 @@
     // Remaining leg: faint dashed line that drifts (mockup .route-line);
     // traveled leg: 3px round-capped accent2->accent gradient, applied to
     // the SVG path after fitBounds below.
-    L.polyline(latlngs, { color: 'rgba(255,255,255,.18)', weight: 2, className: 'map-route-pending' }).addTo(map);
+    L.polyline(arcPath(latlngs), { color: 'rgba(255,255,255,.18)', weight: 2, className: 'map-route-pending' }).addTo(map);
     let donePolyline = null;
-    if (doneIndex >= 0) {
-      donePolyline = L.polyline(latlngs.slice(0, doneIndex + 1), { color: accent, weight: 3, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+    if (doneIndex >= 1) {
+      donePolyline = L.polyline(arcPath(latlngs.slice(0, doneIndex + 1)), { color: accent, weight: 3, lineCap: 'round', lineJoin: 'round' }).addTo(map);
     }
 
+    let currentMarker = null;
     route.forEach((p, i) => {
       const isDone = i <= doneIndex;
       const isCurrent = i === doneIndex;
@@ -1701,8 +1882,9 @@
           iconSize: [22, 22],
           iconAnchor: [11, 11],
         });
-        const marker = L.marker([p.lat, p.lng], { icon }).addTo(map);
+        const marker = L.marker([p.lat, p.lng], { icon, zIndexOffset: 1000 }).addTo(map);
         marker.bindPopup(`<b>${escapeHtml(p.label)}</b>`);
+        currentMarker = marker;
         return;
       }
       // Origin reads as the green "start" dot, later done stops in accent,
@@ -1717,8 +1899,13 @@
       marker.bindPopup(`<b>${escapeHtml(p.label)}</b>`);
     });
 
+    // A route that's one stop (or a few stops in one town) would fitBounds
+    // to street level - a wall of street names with a dot. Pull back to a
+    // regional view so the pin reads as "where in the world it is".
     const bounds = L.latLngBounds(latlngs);
-    map.fitBounds(bounds, { padding: [30, 30] });
+    const spanKm = bounds.getNorthWest().distanceTo(bounds.getSouthEast()) / 1000;
+    if (spanKm < 60) map.setView(bounds.getCenter(), 6);
+    else map.fitBounds(bounds, { padding: [34, 34], maxZoom: 7 });
 
     // Draw the "traveled so far" line in, rather than having it just
     // appear - a plain CSS stroke-dashoffset animation on the SVG path
@@ -1732,22 +1919,76 @@
     // getElement()/getTotalLength() aren't available (falls back to a
     // fully-drawn static line, same as before this was added).
     if (donePolyline) {
+      // The traveled line draws itself from the origin while the live pin
+      // rides along its tip, both driven by the same frame loop so they
+      // can't drift apart. A zoom mid-flight just snaps to the end state.
       const animateDrawIn = () => {
         const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         const pathEl = donePolyline.getElement && donePolyline.getElement();
-        if (!pathEl) return;
+        if (!pathEl || state[mapKey] !== map) return;
         applyRouteGradient(pathEl, accent2, accent);
         if (prefersReducedMotion || typeof pathEl.getTotalLength !== 'function') return;
         const length = pathEl.getTotalLength();
-        pathEl.style.transition = 'none';
+        if (length < 4) return;
+        const end = currentMarker ? currentMarker.getLatLng() : null;
+        const DURATION = 1600;
+        const ease = (t) => 1 - Math.pow(1 - t, 3);
+        let start = null;
+        let raf = 0;
+        const finish = () => {
+          cancelAnimationFrame(raf);
+          pathEl.style.strokeDasharray = '';
+          pathEl.style.strokeDashoffset = '';
+          if (currentMarker && end) currentMarker.setLatLng(end);
+          map.off('zoomstart', finish);
+        };
+        map.on('zoomstart', finish);
         pathEl.style.strokeDasharray = `${length} ${length}`;
         pathEl.style.strokeDashoffset = String(length);
-        pathEl.getBoundingClientRect(); // force layout so the transition below doesn't get coalesced with the initial style
-        pathEl.style.transition = 'stroke-dashoffset 1.4s ease-out';
-        requestAnimationFrame(() => { pathEl.style.strokeDashoffset = '0'; });
+        const step = (now) => {
+          if (state[mapKey] !== map) return;
+          if (start === null) start = now;
+          const t = Math.min(1, (now - start) / DURATION);
+          const drawn = length * ease(t);
+          pathEl.style.strokeDashoffset = String(length - drawn);
+          if (currentMarker) {
+            const pt = pathEl.getPointAtLength(drawn);
+            currentMarker.setLatLng(map.layerPointToLatLng(L.point(pt.x, pt.y)));
+          }
+          if (t < 1) raf = requestAnimationFrame(step);
+          else finish();
+        };
+        raf = requestAnimationFrame(step);
       };
-      setTimeout(animateDrawIn, 60);
+      setTimeout(animateDrawIn, 120);
     }
+  }
+
+  // Long legs bow gently (like a flight path) instead of running as
+  // ruler-straight lines; short hops between nearby scans stay straight.
+  // Every original stop stays on the path, so markers still sit on it.
+  function arcPath(latlngs) {
+    if (latlngs.length < 2) return latlngs;
+    const out = [latlngs[0]];
+    for (let i = 1; i < latlngs.length; i++) {
+      const [lat1, lng1] = latlngs[i - 1];
+      const [lat2, lng2] = latlngs[i];
+      const dLat = lat2 - lat1;
+      const dLng = lng2 - lng1;
+      const span = Math.hypot(dLat, dLng);
+      if (span > 3) {
+        // Bow to the left of travel (north-ish on west→east legs), 18% of span.
+        const cLat = (lat1 + lat2) / 2 + dLng * 0.18;
+        const cLng = (lng1 + lng2) / 2 - dLat * 0.18;
+        for (let k = 1; k < 24; k++) {
+          const t = k / 24;
+          const u = 1 - t;
+          out.push([u * u * lat1 + 2 * u * t * cLat + t * t * lat2, u * u * lng1 + 2 * u * t * cLng + t * t * lng2]);
+        }
+      }
+      out.push(latlngs[i]);
+    }
+    return out;
   }
 
   // Paints the traveled route with an SVG gradient (accent2 -> accent).
@@ -1821,33 +2062,81 @@
   }
 
   // ---------------- notifications ----------------
+  // Alerts read like the inbox: one row per update, grouped by day, the
+  // tile tinted by the linked shipment's state, and a tap opens the thread.
+  const ALERT_ICON = {
+    delay: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
+    digest: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h12M8 12h12M8 18h8"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>',
+    status: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-5 9 5-9 5-9-5Z"/><path d="M3 8v8l9 5 9-5V8M12 13v8"/></svg>',
+    bell: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 10a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6Z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>',
+  };
+  const isDigest = (n) => n.type === 'digest' || /^daily shipment summary/i.test(n.title || '');
+
+  function alertRow(n) {
+    const s = n.shipmentId ? state.shipments.find((x) => x.id === n.shipmentId) : null;
+    const kind = isDigest(n) ? 'digest' : n.type === 'chat' ? 'chat' : n.type === 'delay' || /delay/i.test(n.title || '') ? 'delay' : s || n.type === 'status' ? 'status' : 'bell';
+    const tone = kind === 'digest' ? 'acc' : kind === 'delay' || n.level === 'warning' ? 'warn' : s ? dotClass(s) : n.level === 'success' ? 'ok' : 'acc';
+    // "Possible delay: 1234567890 (DHL)" → "Possible delay" + the thread's own name.
+    const cut = String(n.title || '').indexOf(':');
+    const head = s && cut > 0 ? n.title.slice(0, cut) : n.title;
+    const about = s && cut > 0 ? (s.label || s.trackingNumber) : '';
+    const icon = kind === 'chat' ? ICONS.chat : ALERT_ICON[kind];
+    return `
+      <div class="al-row ${n.read ? '' : 'unread'}" data-id="${n.id}" data-sid="${s ? s.id : ''}" role="button" tabindex="0">
+        <div class="al-ic tone-${tone}">${icon}</div>
+        <div class="al-body">
+          <div class="al-l1"><b>${escapeHtml(head || 'Update')}</b><time>${fmtShort(n.createdAt)}</time></div>
+          ${about ? `<span class="al-about">${escapeHtml(about)}</span>` : ''}
+          <p>${escapeHtml(n.message || '')}</p>
+        </div>
+      </div>`;
+  }
+
   function renderNotifications() {
     const list = $('#notifications-list');
     const unread = state.notifications.filter((n) => !n.read).length;
     $('#notif-dot').hidden = unread === 0;
+    $('#alerts-sub').textContent = unread ? `${unread} unread` : 'You’re all caught up.';
+    $('#mark-all-read-btn').hidden = unread === 0;
 
     if (!state.notifications.length) {
-      list.innerHTML = `<div class="empty">No notifications yet. We'll let you know here when a shipment's status changes.</div>`;
+      list.innerHTML = `<div class="empty">No updates yet. When a courier scans one of your packages, it shows up here.</div>`;
       return;
     }
 
-    list.innerHTML = state.notifications.map((n) => `
-      <div class="card notif-card ${n.read ? '' : 'unread'}" data-id="${n.id}">
-        <div class="notif-dotmark ${n.read ? 'read' : ''}"></div>
-        <div>
-          <p class="card-title">${escapeHtml(n.title)}</p>
-          <p class="card-sub">${escapeHtml(n.message)}</p>
-          <p class="notif-time">${fmtDate(n.createdAt)}</p>
-        </div>
-      </div>
-    `).join('');
+    // The daily summary repeats every morning; only the newest one is news.
+    let digestShown = false;
+    const items = state.notifications.filter((n) => {
+      if (!isDigest(n)) return true;
+      if (digestShown) return false;
+      digestShown = true;
+      return true;
+    });
 
-    $all('.notif-card', list).forEach((card) =>
-      card.addEventListener('click', async () => {
-        await api(`/notifications/${card.dataset.id}/read`, { method: 'POST' });
-        loadNotifications();
-      })
-    );
+    const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const today = startOfDay(new Date());
+    const groups = [['Today', []], ['Yesterday', []], ['Earlier', []]];
+    items.forEach((n) => {
+      const day = startOfDay(new Date(n.createdAt));
+      groups[day >= today ? 0 : day >= today - 864e5 ? 1 : 2][1].push(n);
+    });
+    list.innerHTML = groups.filter(([, rows]) => rows.length)
+      .map(([k, rows]) => `<div class="ibx-sec"><span>${k}</span></div>${rows.map(alertRow).join('')}`)
+      .join('');
+
+    $all('.al-row', list).forEach((row) => {
+      const open = () => {
+        const n = state.notifications.find((x) => x.id === row.dataset.id);
+        if (n && !n.read) {
+          n.read = true; // optimistic: the dot clears on tap, not a round-trip later
+          renderNotifications();
+          api(`/notifications/${row.dataset.id}/read`, { method: 'POST' }).catch(() => {});
+        }
+        if (row.dataset.sid) openShipmentDetail(row.dataset.sid);
+      };
+      row.addEventListener('click', open);
+      row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    });
   }
 
   guardClick($('#mark-all-read-btn'), async () => {
@@ -1923,6 +2212,7 @@
       return;
     }
     btn.hidden = false;
+    $('#push-banner').hidden = false;
 
     try {
       const reg = await navigator.serviceWorker.ready;
@@ -1935,7 +2225,9 @@
 
   function updatePushButton(subscribed) {
     const btn = $('#push-toggle-btn');
-    btn.textContent = subscribed ? 'Notifications enabled ✓' : 'Enable notifications';
+    btn.textContent = subscribed ? 'On' : 'Turn on';
+    // Once this phone is subscribed the banner has done its job.
+    $('#push-banner').hidden = subscribed;
   }
 
   guardClick($('#push-toggle-btn'), async () => {
@@ -2195,7 +2487,7 @@
   // ---------------- account ----------------
   $('#topbar-avatar').addEventListener('click', openAccountView);
   $('#greeting-avatar').addEventListener('click', openAccountView);
-  $('#back-from-account').addEventListener('click', () => showView('shipments'));
+  $('#back-from-account').addEventListener('click', goBack);
   $('#account-logout-btn').addEventListener('click', logout);
 
   function openAccountView() {
@@ -2377,7 +2669,7 @@
     showView('passport');
     loadPassport();
   });
-  $('#back-from-passport').addEventListener('click', () => showView('account'));
+  $('#back-from-passport').addEventListener('click', goBack);
 
   async function loadPassport() {
     try {
@@ -2453,7 +2745,9 @@
   (function initReveal() {
     if (!('IntersectionObserver' in window) || !('MutationObserver' in window)) return;
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const REVEAL = '.card, .cal-item, .shipment-hero, .cal-alert, .account-block, .pp-stat';
+    // Only the Passport's stat tiles: app content must never sit invisible
+    // until scrolled (Account blocks did), and lists re-render on polls.
+    const REVEAL = '.pp-stat';
     const io = new IntersectionObserver((entries) => {
       entries.forEach((e) => {
         if (!e.isIntersecting) return;
@@ -2486,6 +2780,7 @@
   } else {
     showAuth();
   }
+  document.documentElement.classList.remove('boot-app');
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

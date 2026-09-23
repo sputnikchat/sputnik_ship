@@ -18,8 +18,11 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous" />
 <link rel="stylesheet" href="/css/tokens.css" />
 <link rel="stylesheet" href="/css/style.css" />
+<script src="/js/boot.js"></script>
 </head>
 <body>
+
+<div class="boot-splash" aria-hidden="true"><div class="brand-badge"><img class="logo-mark" src="/icons/logo-mark.svg" alt="" /></div></div>
 
 <div id="toast" class="toast" hidden></div>
 
@@ -208,7 +211,7 @@
       <button id="logout-btn" class="icon-btn" title="Log out">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4"/><path d="M15 8l4 4-4 4"/><path d="M19 12H9"/></svg>
       </button>
-      <div class="avatar avatar-sm" id="topbar-avatar">?</div>
+      <button type="button" class="avatar avatar-sm" id="topbar-avatar" aria-label="Account">?</button>
     </div>
   </header>
   <div id="conn-status" class="conn-status" role="status" aria-live="polite" hidden></div>
@@ -242,13 +245,13 @@
           <h1 id="greeting-title">Hi</h1>
           <p id="greeting-sub" class="ibx-sub">Updates automatically every 30 minutes.</p>
         </div>
-        <div class="avatar avatar-lg" id="greeting-avatar" hidden>?</div>
+        <button type="button" class="avatar avatar-lg" id="greeting-avatar" aria-label="Account" hidden>?</button>
         <span class="stat-pill" hidden><span class="stat-pill-num" id="active-shipments-count">0</span></span>
       </div>
       <div class="cmd">
         <div class="cmd-in">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-          <input id="shipment-search" class="search" type="search" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="search" placeholder="Paste a tracking number or search…" aria-label="Search shipments" />
+          <input id="shipment-search" class="search" type="search" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="search" placeholder="Tracking number or search" aria-label="Search shipments" />
           <button id="refresh-now-btn" class="cmd-refresh" type="button" title="Refresh now" aria-label="Refresh now">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
           </button>
@@ -318,8 +321,11 @@
 
     <!-- View: Contacts -->
     <section id="view-contacts" class="view">
-      <div class="view-header">
-        <h2>Contacts</h2>
+      <div class="ibx-head">
+        <div class="ibx-title">
+          <span class="section-k">Contacts</span>
+          <h1>People you ship to</h1>
+        </div>
         <button id="add-contact-btn" class="btn-primary small">+ New contact</button>
       </div>
       <div class="search-wrap">
@@ -332,9 +338,9 @@
     <!-- View: Calendar -->
     <section id="view-calendar" class="view">
       <div class="cal-head">
-        <div>
-          <div class="cal-month" id="calendar-month-label"></div>
-          <div class="cal-today" id="calendar-today-label"></div>
+        <div class="ibx-title">
+          <span class="section-k" id="calendar-month-label"></span>
+          <h1 id="calendar-today-label"></h1>
         </div>
         <div class="calendar-nav">
           <button type="button" class="icon-btn" id="calendar-prev" aria-label="Previous week">
@@ -352,21 +358,28 @@
 
     <!-- View: Notifications -->
     <section id="view-notifications" class="view">
-      <div class="view-header">
-        <h2>Notifications</h2>
-        <div style="display:flex; gap:6px;">
-          <button id="push-toggle-btn" class="btn-secondary small" hidden>Enable notifications</button>
-          <button id="mark-all-read-btn" class="btn-secondary small">Mark all read</button>
+      <div class="ibx-head">
+        <div class="ibx-title">
+          <span class="section-k">Alerts</span>
+          <h1>Updates</h1>
+          <p class="ibx-sub" id="alerts-sub"></p>
         </div>
+        <button id="mark-all-read-btn" class="head-link" type="button">Mark all read</button>
       </div>
-      <p id="push-unavailable-hint" class="hint" hidden></p>
-      <div id="notifications-list" class="cards"></div>
+      <div class="push-banner" id="push-banner" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 10a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6Z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+        <p>Get courier updates on this phone, even with the app closed.</p>
+        <button id="push-toggle-btn" class="btn-primary small" type="button">Turn on</button>
+      </div>
+      <p id="push-unavailable-hint" class="push-banner hint-banner" hidden></p>
+      <div id="notifications-list" class="alerts"></div>
     </section>
 
     <!-- View: Account -->
     <section id="view-account" class="view">
-      <div class="view-header">
-        <button class="btn-secondary small" id="back-from-account">← Back</button>
+      <div class="th-head">
+        <button class="th-back" id="back-from-account" type="button" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7"/></svg></button>
+        <div class="th-title"><b>Account</b></div>
       </div>
       <div class="greeting-with-avatar" style="margin-bottom:18px;">
         <div class="avatar avatar-lg" id="account-avatar">?</div>
@@ -425,7 +438,7 @@
         </label>
       </div>
 
-      <div class="pp-section-title">App</div>
+      <div class="pp-section-title" id="install-app-title">App</div>
       <div class="account-block" id="install-app-block" hidden>
         <p class="small muted" id="install-app-hint" style="margin:0 0 10px;">Install Sputnik Ship on this device for a faster, full-screen experience.</p>
         <button type="button" class="btn-secondary" id="install-app-btn" style="width:100%;">Install app</button>
@@ -449,10 +462,10 @@
 
     <!-- View: Passport (shipping stats) -->
     <section id="view-passport" class="view">
-      <div class="view-header">
-        <button class="btn-secondary small" id="back-from-passport">← Back</button>
+      <div class="th-head">
+        <button class="th-back" id="back-from-passport" type="button" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7"/></svg></button>
+        <div class="th-title"><b>Your Passport</b></div>
       </div>
-      <h1 style="font-size:20px; font-weight:500; margin:0 0 14px;">Your Passport</h1>
       <div class="tabs" id="passport-period"></div>
       <div class="pp-hero">
         <div>

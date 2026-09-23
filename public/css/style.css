@@ -886,7 +886,7 @@ body.chat-input-focused .chat-form { bottom: 0; padding-bottom: max(8px, env(saf
    the 8-second poll re-render stays still. The highlighted milestone card
    fades in once, on open or when its status changes. */
 .inbox.enter .ibx-row { animation: rowIn .2s cubic-bezier(.23, 1, .32, 1) both; animation-delay: calc(var(--i, 0) * 20ms); }
-.thread-msgs > .chat-msg.is-new, .thread-msgs > .th-sys.is-new { animation: msgIn .18s cubic-bezier(.23, 1, .32, 1) both; }
+.thread-msgs > .chat-msg.is-new, .thread-msgs > .th-sys.is-new, .thread-msgs > .th-ev.is-new { animation: msgIn .18s cubic-bezier(.23, 1, .32, 1) both; }
 .th-card.hl.is-new { animation: cardIn .26s cubic-bezier(.23, 1, .32, 1) both; }
 @keyframes rowIn { from { opacity: 0; transform: translateY(8px); } }
 @keyframes msgIn { from { opacity: 0; transform: translateY(6px); } }
@@ -1211,7 +1211,7 @@ body.chat-input-focused .chat-form { bottom: 0; padding-bottom: max(8px, env(saf
 @media (prefers-reduced-motion: reduce) { .ibx-dot { animation: none !important; } }
 
 /* ---------- Thread (shipment detail as a conversation) ---------- */
-.thread .th-head { display: flex; align-items: center; gap: 10px; padding: 2px 0 12px; }
+.th-head { display: flex; align-items: center; gap: 10px; padding: 2px 0 12px; }
 .th-back { width: 36px; height: 36px; flex: none; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); display: grid; place-items: center; cursor: pointer; }
 .th-back svg { width: 16px; height: 16px; }
 .th-title { flex: 1; min-width: 0; }
@@ -1220,7 +1220,8 @@ body.chat-input-focused .chat-form { bottom: 0; padding-bottom: max(8px, env(saf
 .th-pill { flex: none; }
 
 .live-card { border: 1px solid var(--line2); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface); box-shadow: var(--glow); margin-bottom: 8px; }
-.live-card .map { height: 180px; border: 0; border-radius: 0; margin: 0; box-shadow: none; }
+.live-card .map { height: 260px; border: 0; border-radius: 0; margin: 0; box-shadow: none; }
+@media (min-width: 768px) { .live-card .map { height: 340px; } }
 /* The live card's map is a glance strip: on touch, pinch and drag already
    work, so the desktop +/- control only covers the route. */
 @media (pointer: coarse) { .live-card .leaflet-control-zoom { display: none; } }
@@ -1231,7 +1232,24 @@ body.chat-input-focused .chat-form { bottom: 0; padding-bottom: max(8px, env(saf
 
 .chat-messages.thread-msgs { max-height: none; overflow: visible; gap: 10px; padding: 8px 0 12px; }
 .th-day { align-self: center; font-family: var(--mono); font-size: 10.5px; color: var(--dim); letter-spacing: .06em; text-transform: uppercase; margin-top: 6px; }
-.th-sys { align-self: center; display: inline-flex; align-items: center; gap: 7px; max-width: 100%; font-family: var(--mono); font-size: 11px; line-height: 1.4; color: var(--muted); background: var(--bg2); border: 1px solid var(--line); border-radius: 14px; padding: 5px 11px; }
+.th-sys { align-self: center; display: inline-flex; align-items: center; gap: 8px; max-width: 100%; font-size: 12.5px; line-height: 1.4; color: var(--muted); background: var(--bg2); border: 1px solid var(--line); border-radius: 14px; padding: 6px 12px; }
+.th-sys time { font-family: var(--mono); font-size: 10.5px; }
+
+/* Courier events: one vertical rail, oldest → newest. The event reads in
+   sans (it's a sentence), the place sits under it, the time stays mono.
+   The rail segment runs from each dot down to the next event's dot. */
+.th-ev { position: relative; display: grid; grid-template-columns: 12px 1fr auto; gap: 12px; align-items: start; padding: 2px 4px 2px 6px; }
+.th-ev > i { position: relative; z-index: 1; width: 9px; height: 9px; margin: 5px 0 0 1.5px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px var(--bg); }
+.th-ev:has(+ .th-ev)::after { content: ""; position: absolute; left: 11.5px; top: 16px; bottom: -12px; width: 1.5px; border-radius: 1px; background: linear-gradient(var(--line2), var(--line)); }
+.th-ev > i.acc { background: var(--accent); } .th-ev > i.vio { background: var(--accent2); } .th-ev > i.warn { background: var(--warn); } .th-ev > i.danger { background: var(--danger); }
+.th-ev.now > i { width: 11px; height: 11px; margin: 4px 0 0 0.5px; }
+.th-ev.now > i.acc, .th-ev.now > i.vio { animation: pulseDot 2s infinite; }
+.th-ev-b { min-width: 0; }
+.th-ev-b p { margin: 0; font-size: 13.5px; line-height: 1.4; color: var(--muted); }
+.th-ev.now .th-ev-b p { color: var(--text); font-weight: 500; }
+.th-ev-b span { display: block; margin-top: 2px; font-size: 12px; color: var(--dim); }
+.th-ev > time { font-family: var(--mono); font-size: 11px; color: var(--dim); padding-top: 2px; white-space: nowrap; }
+.th-ev.now > time { color: var(--accent-text); }
 .th-sys i { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); flex: none; }
 .th-sys time { flex: none; white-space: nowrap; }
 .th-sys i.acc { background: var(--accent); } .th-sys i.vio { background: var(--accent2); } .th-sys i.warn { background: var(--warn); } .th-sys i.danger { background: var(--danger); }
@@ -1295,3 +1313,161 @@ body.chat-input-focused .chat-form { bottom: 0; padding-bottom: max(8px, env(saf
   width: 1px !important; height: 1px !important; overflow: hidden !important;
   opacity: 0 !important; pointer-events: none !important;
 }
+
+/* =====================================================================
+   App polish pass (impeccable critique → polish, mobile-native).
+   Kept together so the intent reads in one place.
+   ===================================================================== */
+
+/* iOS zooms into any field under 16px and never zooms back out. */
+input, select, textarea, .cmd-in .search, .search { font-size: 16px; }
+
+/* 44px minimum tap targets (DESIGN.md › Mobile). */
+.icon-btn, .th-back { width: 44px; height: 44px; }
+.topbar .avatar-sm { width: 40px; height: 40px; }
+.topbar-actions { gap: 6px; }
+.cmd-refresh { width: 44px; height: 44px; }
+.cmd-go { height: 44px; }
+.tabs.chips .tab { position: relative; min-height: 36px; }
+.tabs.chips .tab::after { content: ""; position: absolute; inset: -4px 0; }
+.btn-primary.small, .btn-secondary.small, .btn-danger.small { min-height: 40px; }
+.th-card .act .btn-primary, .th-card .act .btn-secondary { min-height: 44px; }
+.th-more summary { min-height: 44px; }
+button.avatar { border: 0; padding: 0; cursor: pointer; font: inherit; font-weight: 600; }
+button.avatar:active { transform: scale(.94); }
+
+/* Own-bubble timestamp: was 3.2:1 on the accent. */
+.chat-msg.mine .chat-msg-meta { color: rgba(255,255,255,.84); }
+
+/* Press feedback lands on pointer-down, scaled a hair so it reads on a
+   phone; hover styles stay gated behind (hover: hover) elsewhere. */
+.ibx-row { transition: background .15s ease, opacity .15s ease, transform .12s ease-out; }
+.ibx-row:active { transform: scale(.985); }
+.tabs .tab:active, .nav-btn:active, .day:active b, .conn-action:active { transform: scale(.95); }
+.tab, .nav-btn, .day b { transition: background .15s, color .15s, border-color .15s, transform .12s ease-out; }
+.cal-item:active, .al-row:active { transform: scale(.985); }
+
+/* Screen transitions. Pushed screens (thread, account, passport) slide in
+   from the side like a navigation stack; going back slides the other way;
+   tabs only rise a few px. `backwards` fill so no transform lingers after
+   the animation (a transform would re-anchor fixed/sticky children). */
+.view.v-push { animation: viewPush .28s cubic-bezier(.22, 1, .36, 1) backwards; }
+.view.v-pop { animation: viewPop .24s cubic-bezier(.22, 1, .36, 1) backwards; }
+.view.v-tab { animation: viewTab .2s ease-out backwards; }
+@keyframes viewPush { from { opacity: 0; transform: translateX(28px); } }
+@keyframes viewPop { from { opacity: .4; transform: translateX(-18px); } }
+@keyframes viewTab { from { opacity: 0; transform: translateY(6px); } }
+
+/* Only the two active states pulse (DESIGN.md › Semantic status colours). */
+.ibx-row:not(.done) .ibx-dot.acc { animation: none; }
+.ibx-row.status-in_transit:not(.done) .ibx-dot.acc,
+.ibx-row:not(.done) .ibx-dot.vio { animation: pulseDot 2s infinite; }
+
+/* Desktop: the tab bar floats as a dock the width of the content column
+   instead of stretching 1280px of empty buttons. */
+@media (min-width: 900px) {
+  .bottom-nav {
+    left: 50%; right: auto; bottom: 16px; width: min(560px, calc(100vw - 48px)); transform: translateX(-50%);
+    border: 1px solid var(--line2); border-radius: 18px; padding: 6px;
+    box-shadow: 0 24px 60px -24px rgba(0,0,0,.9);
+  }
+  .app { padding-bottom: 104px; }
+}
+
+/* Swipe to archive (app.js enableSwipeArchive). The action rides the row's
+   right edge, so it fills exactly the space the row has uncovered. */
+.ibx-row { position: relative; touch-action: pan-y; }
+.ibx-row.swiping { transition: none; }
+.ibx-row.swiped-out { transition: transform .22s cubic-bezier(.22, 1, .36, 1), opacity .22s ease-out; opacity: 0; }
+.ibx-swipe {
+  position: absolute; top: 0; bottom: 0; left: 100%; display: flex; align-items: center; justify-content: flex-end;
+  gap: 6px; padding-right: 16px; overflow: hidden; white-space: nowrap; border-radius: 10px;
+  background: var(--surface-2); color: var(--muted); font-size: 12.5px; font-weight: 500;
+  transition: background .15s, color .15s;
+}
+.ibx-swipe .icon { width: 17px; height: 17px; flex: none; transition: transform .15s ease-out; }
+.ibx-swipe.armed { background: var(--accent); color: #fff; }
+.ibx-swipe.armed .icon { transform: scale(1.12); }
+
+.toast { display: flex; align-items: center; gap: 12px; }
+.toast-action { flex: none; min-height: 32px; padding: 0 12px; border: 0; border-radius: 999px; background: var(--accent-soft); color: var(--accent-text); font: 600 12px var(--sans); cursor: pointer; }
+
+/* Boot splash (js/boot.js marks a signed-in visit before first paint):
+   the logo on the page ground while scripts load, instead of the login
+   hero flashing past. app.js removes .boot-app as soon as it decides. */
+.boot-splash { display: none; }
+.boot-app #auth-screen, .boot-app #shared-view { display: none !important; }
+.boot-app .boot-splash {
+  position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: var(--bg);
+  background-image: radial-gradient(60% 40% at 80% 0%, rgba(94,106,210,.14), transparent 70%);
+}
+.boot-splash .brand-badge { width: 64px; height: 64px; border-radius: 18px; animation: splashBreathe 1.8s ease-in-out infinite; }
+.boot-splash .brand-badge img.logo-mark { height: 34px; }
+@keyframes splashBreathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139,124,246,0); }
+  50% { box-shadow: 0 0 0 10px rgba(139,124,246,.12); }
+}
+
+/* ---------- Shared screen header (inbox pattern on every tab) ---------- */
+.ibx-head .btn-primary.small { flex: none; align-self: center; }
+.head-link {
+  flex: none; align-self: center; min-height: 44px; padding: 0 4px; border: 0; background: none; cursor: pointer;
+  color: var(--accent-text); font: 500 13px var(--sans);
+}
+@media (hover: hover) and (pointer: fine) { .head-link:hover { color: var(--text); } }
+
+/* ---------- Alerts (app.js renderNotifications) ---------- */
+.alerts { display: block; }
+.al-row {
+  position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 11px 6px; cursor: pointer;
+  border-bottom: 1px solid var(--line); border-radius: 10px; transition: background .15s ease, transform .12s ease-out;
+}
+.al-row:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent-soft); }
+@media (hover: hover) and (pointer: fine) { .al-row:hover { background: rgba(255,255,255,.02); } }
+.al-ic {
+  flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent-text); border: 1px solid rgba(94,106,210,.3);
+}
+.al-ic .icon, .al-ic svg { width: 18px; height: 18px; }
+.al-ic.tone-vio { background: rgba(139,124,246,.18); color: #ddd6ff; border-color: rgba(139,124,246,.4); }
+.al-ic.tone-ok { background: rgba(62,207,142,.14); color: var(--ok); border-color: rgba(62,207,142,.35); }
+.al-ic.tone-warn { background: rgba(242,180,92,.14); color: var(--warn); border-color: rgba(242,180,92,.35); }
+.al-ic.tone-danger { background: rgba(235,87,87,.14); color: var(--danger); border-color: rgba(235,87,87,.35); }
+.al-body { flex: 1; min-width: 0; }
+.al-l1 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.al-l1 b { font-size: 14.5px; font-weight: 500; letter-spacing: -.01em; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.al-l1 time { flex: none; font-family: var(--mono); font-size: 11px; color: var(--dim); }
+.al-about { display: block; font-size: 12.5px; color: var(--text); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.al-body p { margin: 2px 0 0; font-size: 13px; line-height: 1.4; color: var(--dim); }
+.al-row.unread .al-l1 b { color: var(--text); font-weight: 600; }
+.al-row.unread .al-body p { color: var(--muted); }
+.al-row.unread .al-l1 time { color: var(--accent-text); }
+.al-row.unread::after { content: ""; position: absolute; left: -6px; top: 26px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent2); }
+
+.push-banner {
+  display: flex; align-items: center; gap: 12px; margin: 0 0 12px; padding: 10px 10px 10px 14px;
+  background: var(--surface); border: 1px solid var(--line2); border-radius: var(--radius-md);
+}
+.push-banner > svg { flex: none; width: 18px; height: 18px; color: var(--accent2); }
+.push-banner p { flex: 1; margin: 0; font-size: 13px; line-height: 1.4; color: var(--muted); }
+.push-banner .btn-primary { flex: none; }
+.hint-banner { display: block; padding: 12px 14px; font-size: 13px; line-height: 1.45; color: var(--muted); }
+
+/* ---------- Calendar ---------- */
+.cal-head { align-items: flex-end; margin: 4px 0 2px; }
+.cal-head .ibx-title h1 { margin: 2px 0 0; font-size: 22px; font-weight: 600; letter-spacing: -.03em; line-height: 1.1; }
+.day { font-size: 11px; }
+.day b { width: 38px; height: 38px; font-size: 14px; }
+.day.today b::after { background: transparent; }
+.day.today.has b::after { background: #fff; }
+.cal-list { gap: 8px; }
+.cal-list .ibx-sec { padding: 12px 4px 0; }
+.cal-none { padding: 14px 4px 4px; font-size: 13.5px; color: var(--muted); }
+.cal-none b { color: var(--text); font-weight: 600; }
+.cal-item .t span { font-family: var(--sans); font-size: 12px; color: var(--muted); }
+.cal-item .t b { font-size: 14px; }
+/* Typed numbers stay mono; the hint reads as a sentence and fits at 390. */
+.cmd-in .search::placeholder { font-family: var(--sans); letter-spacing: 0; }
+/* The "App" heading only exists for the install block under it. */
+#install-app-title:has(+ #install-app-block[hidden]) { display: none; }
+#join-space-form input::placeholder { text-transform: none; }

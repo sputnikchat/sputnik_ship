@@ -22,6 +22,7 @@ const SHELL_FILES = [
   '/css/tokens.css',
   '/css/style.css',
   '/js/app.js',
+  '/js/boot.js',
   '/js/scan.js',
   '/js/hero.js',
   '/manifest.json',
