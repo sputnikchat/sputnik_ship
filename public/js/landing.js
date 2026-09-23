@@ -2,10 +2,19 @@
   document.documentElement.classList.add('js');
   var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // scroll reveal
+  if (!reduce) document.documentElement.classList.add('motion');
+
+  // scroll reveal - items inside a group (cards, features, story rows)
+  // arrive one after another instead of all at once
+  ['.cards', '.fgrid', '.story .srow', '.cta .wrap', '.signal .wrap'].forEach(function(sel){
+    document.querySelectorAll(sel).forEach(function(group){
+      var items = group.querySelectorAll(':scope > .rv');
+      items.forEach(function(el, i){ el.style.transitionDelay = Math.min(i, 6) * 80 + 'ms'; });
+    });
+  });
   var els = document.querySelectorAll('.rv');
   if ('IntersectionObserver' in window && !reduce) {
-    var io = new IntersectionObserver(function(en){ en.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} }); },{threshold:.12});
+    var io = new IntersectionObserver(function(en){ en.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} }); },{threshold:.12, rootMargin:'0px 0px -6% 0px'});
     els.forEach(function(el){ io.observe(el); });
     var tr = document.getElementById('track');
     var io2 = new IntersectionObserver(function(en){ en.forEach(function(e){ if(e.isIntersecting){ tr.classList.add('inview'); io2.disconnect(); } }); },{threshold:.3});
@@ -74,6 +83,202 @@
     var v = input.value.trim();
     location.href = v && v !== demo ? '/app?track=' + encodeURIComponent(v) : '/app';
   });
+
+  // ---------- motion helpers ----------
+  function easeInOut(t){ return t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; }
+  // Runs fn(progress) over ms on animation frames; resolves when done.
+  function tween(ms, fn){
+    return new Promise(function(done){
+      var start = null;
+      function step(now){
+        if (start === null) start = now;
+        var t = Math.min(1, (now - start) / ms);
+        fn(t);
+        if (t < 1) requestAnimationFrame(step); else done();
+      }
+      requestAnimationFrame(step);
+    });
+  }
+  function wait(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+  // Only animate what's on screen and in a visible tab.
+  function watchVisible(el, cb){
+    if (!('IntersectionObserver' in window)) { cb(true); return; }
+    new IntersectionObserver(function(en){ en.forEach(function(e){ cb(e.isIntersecting); }); }, { threshold: .15 }).observe(el);
+  }
+  var tabVisible = !document.hidden;
+  document.addEventListener('visibilitychange', function(){ tabVisible = !document.hidden; });
+
+  // ---------- 2 · hero: the live route ----------
+  (function heroRoute(){
+    var svg = document.querySelector('.phone .map svg');
+    if (!svg || reduce) return;
+    var fill = svg.querySelector('.route-fill');
+    var circles = svg.querySelectorAll('circle');
+    var ring = svg.querySelector('.pin');           // pulsing halo
+    var dot = ring && ring.nextElementSibling;      // white pin
+    if (!fill || !ring || !dot || typeof fill.getTotalLength !== 'function') return;
+    var total = fill.getTotalLength();
+    // The traveled leg ends where the pin sits ("In flight · N. Atlantic").
+    var px = +dot.getAttribute('cx'), py = +dot.getAttribute('cy'), best = 0, bestD = 1e9;
+    for (var l = 0; l <= total; l += 2) { var q = fill.getPointAtLength(l); var d = (q.x-px)*(q.x-px)+(q.y-py)*(q.y-py); if (d < bestD) { bestD = d; best = l; } }
+    var traveled = best;
+    svg.parentNode.classList.add('js-route');
+    fill.style.strokeDasharray = total + ' ' + total;
+    fill.style.strokeDashoffset = total;
+    function pinAt(len){ var q = fill.getPointAtLength(len); ring.setAttribute('cx', q.x); ring.setAttribute('cy', q.y); dot.setAttribute('cx', q.x); dot.setAttribute('cy', q.y); }
+    pinAt(0);
+
+    var tl = document.querySelectorAll('.phone .tl > div'), msg = document.querySelector('.phone .msg');
+    var floats = document.querySelectorAll('.hero .float');
+    var cur = document.querySelector('.phone .tl .cur');
+    function on(el){ if (el) el.classList.add('on'); }
+    // Every beat of the story lands in step with the pin.
+    wait(500).then(function(){ on(floats[0]); on(tl[0]); return wait(500); })
+      .then(function(){
+        return tween(2600, function(t){
+          var len = traveled * easeInOut(t);
+          fill.style.strokeDashoffset = total - len;
+          pinAt(len);
+          if (t > .38) { on(tl[1]); on(floats[1]); }
+        });
+      })
+      .then(function(){ on(cur); on(tl[3]); on(floats[2]); return wait(700); })
+      .then(function(){ on(msg); packets(); });
+
+    // Afterwards a small packet of light keeps travelling the flown leg
+    // - the "live" in live tracking - only while the hero is on screen.
+    function packets(){
+      var ns = 'http://www.w3.org/2000/svg';
+      var pk = document.createElementNS(ns, 'circle');
+      pk.setAttribute('r', '2.6'); pk.setAttribute('class', 'pkt'); pk.style.opacity = 0;
+      svg.insertBefore(pk, ring);
+      var visible = true;
+      watchVisible(svg, function(v){ visible = v; });
+      (function loop(){
+        if (!visible || !tabVisible) { setTimeout(loop, 600); return; }
+        tween(1500, function(t){
+          var q = fill.getPointAtLength(traveled * t);
+          pk.setAttribute('cx', q.x); pk.setAttribute('cy', q.y);
+          pk.style.opacity = t < .1 ? t * 10 : t > .85 ? (1 - t) / .15 : 1;
+        }).then(function(){ setTimeout(loop, 2600); });
+      })();
+    }
+  })();
+
+  // Background routes behind the hero: the solid one draws in, then a
+  // faint package drifts along each of them, on a slow loop.
+  (function heroBackground(){
+    var svg = document.querySelector('.hero-bg .route');
+    if (!svg || reduce) return;
+    var ns = 'http://www.w3.org/2000/svg';
+    var paths = svg.querySelectorAll('path');
+    var visible = true;
+    watchVisible(document.querySelector('.hero'), function(v){ visible = v; });
+    paths.forEach(function(path, i){
+      if (typeof path.getTotalLength !== 'function') return;
+      var L = path.getTotalLength();
+      if (!path.classList.contains('route-line')) {
+        path.style.strokeDasharray = L + ' ' + L;
+        path.style.strokeDashoffset = L;
+        tween(2400, function(t){ path.style.strokeDashoffset = L * (1 - easeInOut(t)); });
+      }
+      var pk = document.createElementNS(ns, 'circle');
+      pk.setAttribute('r', i ? '2' : '2.6'); pk.setAttribute('class', 'bg-pkt');
+      svg.appendChild(pk);
+      var dur = i ? 16000 : 11000, offset = i ? .45 : 0, start = null;
+      (function frame(now){
+        if (visible && tabVisible) {
+          if (start === null) start = now - offset * dur;
+          var t = ((now - start) % dur) / dur;
+          var q = path.getPointAtLength(L * t);
+          pk.setAttribute('cx', q.x); pk.setAttribute('cy', q.y);
+          pk.style.opacity = (Math.sin(Math.PI * t) * .8).toFixed(3);
+        } else start = null;
+        requestAnimationFrame(frame);
+      })(performance.now());
+    });
+  })();
+
+  // ---------- 3 · automatic demo: courier updates arrive one by one ----------
+  (function trackDemo(){
+    var box = document.querySelector('.card .status');
+    if (!box || reduce) return;
+    var rows = Array.prototype.slice.call(box.children);
+    var typing = document.createElement('div');
+    typing.className = 'typing'; typing.setAttribute('aria-hidden', 'true');
+    typing.innerHTML = '<b></b><b></b><b></b>';
+    box.classList.add('demo');
+    box.appendChild(typing);
+    var visible = false, running = false;
+    watchVisible(box, function(v){ visible = v; if (v && !running) run(); });
+    function run(){
+      running = true;
+      rows.forEach(function(r){ r.classList.remove('on-seen', 'on'); box.appendChild(r); });
+      box.appendChild(typing);
+      var i = 0;
+      (function next(){
+        if (i >= rows.length) {
+          return wait(3600).then(function(){
+            rows.forEach(function(r){ r.classList.remove('on-seen'); });
+            return wait(500);
+          }).then(function(){ running = false; if (visible) run(); });
+        }
+        box.insertBefore(typing, rows[i]);
+        typing.classList.add('show');
+        wait(i ? 650 : 350).then(function(){
+          typing.classList.remove('show');
+          rows.forEach(function(r){ r.classList.remove('on'); });
+          rows[i].classList.add('on-seen');
+          rows[i].classList.add('on'); // the newest update is the live one
+          i++;
+          box.appendChild(typing);
+          return wait(700);
+        }).then(next);
+      })();
+    }
+  })();
+
+  // The photo thread plays its conversation once, the first time it
+  // scrolls into view.
+  (function chatDemo(){
+    var chat = document.querySelector('#photo .chat');
+    if (!chat || reduce) return;
+    var items = Array.prototype.slice.call(chat.children);
+    chat.classList.add('demo');
+    var typing = document.createElement('div');
+    typing.className = 'typing'; typing.setAttribute('aria-hidden', 'true');
+    typing.innerHTML = '<b></b><b></b><b></b>';
+    var done = false;
+    watchVisible(chat, function(v){
+      if (!v || done) return;
+      done = true;
+      var i = 0;
+      (function next(){
+        if (i >= items.length) { typing.remove(); return; }
+        var el = items[i];
+        var theirs = el.classList.contains('them');
+        var p = theirs ? (chat.insertBefore(typing, el), typing.classList.add('show'), wait(900)) : wait(i ? 500 : 200);
+        p.then(function(){
+          typing.classList.remove('show');
+          if (typing.parentNode) typing.remove();
+          el.classList.add('shown');
+          i++;
+          return wait(650);
+        }).then(next);
+      })();
+    });
+  })();
+
+  // ---------- 4 · pointer spotlight on cards (real pointers only) ----------
+  if (!reduce && matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    document.querySelectorAll('.card, .feat').forEach(function(el){
+      var raf = 0, x = 0, y = 0;
+      el.addEventListener('pointermove', function(e){
+        var r = el.getBoundingClientRect(); x = e.clientX - r.left; y = e.clientY - r.top;
+        if (!raf) raf = requestAnimationFrame(function(){ raf = 0; el.style.setProperty('--mx', x + 'px'); el.style.setProperty('--my', y + 'px'); });
+      }, { passive: true });
+    });
+  }
 
   // Same service worker as the app, registered once the page is idle: the
   // next visit (and the jump to /app) opens from cache, even while the

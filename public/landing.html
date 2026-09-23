@@ -305,6 +305,79 @@ html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 .btn,a{touch-action:manipulation}
 @media (hover:none){.btn-p:hover{transform:none;background:var(--accent)}.btn-g:hover{background:transparent;border-color:var(--line2)}}
 .btn-p:active{transform:scale(.97)}
+
+/* ================= MOTION LAYER (js/landing.js) =================
+   Everything that starts hidden is gated behind html.motion, which
+   landing.js only adds when prefers-reduced-motion is off, so without JS
+   or with reduced motion the page is simply static and complete. */
+:root{--ease-out:cubic-bezier(.23,1,.32,1);--ease-io:cubic-bezier(.77,0,.175,1)}
+
+/* 1 · Scroll reveal: rise + un-blur, staggered inside groups. */
+.rv{transition:opacity .8s var(--ease-out),transform .8s var(--ease-out),filter .8s var(--ease-out)}
+.motion .rv{opacity:0;transform:translateY(22px)}
+.motion h2.rv,.motion p.rv,.motion .sec-h.rv,.motion .stxt.rv{filter:blur(6px)}
+.motion .rv.in{opacity:1;transform:none;filter:none}
+.motion .track .stop{opacity:0;transform:translateY(10px);transition:opacity .6s var(--ease-out),transform .6s var(--ease-out)}
+.motion .track.inview .stop{opacity:1;transform:none}
+.track.inview .stop:nth-child(1){transition-delay:.25s}.track.inview .stop:nth-child(2){transition-delay:.75s}.track.inview .stop:nth-child(3){transition-delay:1.25s}.track.inview .stop:nth-child(4){transition-delay:1.75s}.track.inview .stop:nth-child(5){transition-delay:2.35s}
+
+/* 2 · Hero: the phone's route draws itself while the live pin rides its
+   tip, the notifications land in step, then packets keep travelling. */
+.pin{transform-box:fill-box}
+.js-route .route-fill{animation:none}
+.motion .hero .float{opacity:0;translate:0 10px;transition:opacity .6s var(--ease-out),translate .6s var(--ease-out)}
+.motion .hero .float.on{opacity:1;translate:0 0}
+.motion .tl > div,.motion .phone .msg{opacity:0;transform:translateY(6px);transition:opacity .45s var(--ease-out),transform .45s var(--ease-out)}
+.motion .tl > div.on,.motion .phone .msg.on{opacity:1;transform:none}
+.tl div.cur i{transition:box-shadow .3s}
+.pkt{fill:#c7ccff;filter:drop-shadow(0 0 4px rgba(139,124,246,.9))}
+.bg-pkt{fill:#8b7cf6;opacity:0}
+
+/* Hero result panel keeps its height from the start (it used to grow
+   and push the page down: layout shift). A hint fills it until the demo
+   number resolves. */
+.cmd-out{max-height:none;opacity:1;padding-block:14px 16px;position:relative;transition:none}
+.cmd-out .found{opacity:0;transition:opacity .35s}
+.cmd.open .cmd-out .found{opacity:1}
+.cmd-hint{position:absolute;inset:0;display:grid;place-items:center;padding:0 16px;text-align:center;font-family:var(--sans);font-size:13px;color:var(--dim);transition:opacity .3s}
+.cmd.open .cmd-hint{opacity:0}
+
+/* 3 · Automatic demo: courier updates arrive one by one in the "Track"
+   card; the photo thread plays its messages in order when it scrolls in. */
+.motion .status.demo > div:not(.typing){opacity:0;transform:translateY(6px);transition:opacity .4s var(--ease-out),transform .4s var(--ease-out),color .3s}
+.motion .status.demo > div.on-seen{opacity:1;transform:none}
+.status .typing,.chat .typing{display:none}
+.motion .status.demo .typing,.motion .chat.demo .typing{display:flex}
+.typing{align-items:center;gap:4px;height:14px;padding-left:16px;opacity:0;transition:opacity .2s}
+.typing.show{opacity:1}
+.typing b{width:5px;height:5px;border-radius:50%;background:var(--dim);animation:typing 1s infinite ease-in-out}
+.typing b:nth-child(2){animation-delay:.15s}.typing b:nth-child(3){animation-delay:.3s}
+@keyframes typing{0%,100%{opacity:.3;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+.chat .typing{align-self:flex-start;height:28px;padding:0 12px;background:var(--surface);border:1px solid var(--line);border-radius:14px;border-bottom-left-radius:4px}
+.motion .chat.demo > .bub,.motion .chat.demo > .pbub,.motion .chat.demo > .sys{opacity:0;transform:translateY(8px) scale(.98);transform-origin:bottom left;transition:opacity .4s var(--ease-out),transform .4s var(--ease-out)}
+.motion .chat.demo > .me,.motion .chat.demo > .pbub{transform-origin:bottom right}
+.motion .chat.demo > .shown{opacity:1;transform:none}
+
+/* 4 · Micro-interactions. Hover only where there is a real pointer;
+   touch gets press feedback instead. */
+.card::before,.feat::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .3s;background:radial-gradient(380px circle at var(--mx,50%) var(--my,0%),rgba(139,124,246,.13),transparent 60%)}
+.feat{overflow:hidden}
+.feat svg{transition:transform .25s var(--ease-out),color .25s}
+.navlinks a{position:relative}
+.navlinks a::after{content:"";position:absolute;left:0;right:0;bottom:-4px;height:1px;background:currentColor;transform:scaleX(0);transform-origin:left;transition:transform .25s var(--ease-out)}
+.btn-p{position:relative;overflow:hidden}
+.btn-p::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.22) 50%,transparent 65%);transform:translateX(-120%);pointer-events:none}
+@media (hover:hover) and (pointer:fine){
+  .card:hover::before,.feat:hover::before{opacity:1}
+  .feat:hover svg{transform:translateY(-2px) scale(1.06);color:#b9bff0}
+  .navlinks a:hover::after{transform:scaleX(1)}
+  .btn-p:hover::after{transform:translateX(120%);transition:transform .7s var(--ease-out)}
+  .btn-g:hover{border-color:rgba(139,124,246,.55)}
+  .cmd:hover{border-color:#3a3e4e}
+}
+.card:active,.feat:active{transform:scale(.99)}
+.cmd:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),0 30px 80px -30px rgba(0,0,0,.8)}
+@media (prefers-reduced-motion:reduce){.cmd-hint{display:none}}
 </style>
 </head>
 <body>
@@ -343,6 +416,7 @@ html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
           <button type="submit" aria-label="Track"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
         </form>
         <div class="cmd-out" id="cmd-out">
+          <div class="cmd-hint" aria-hidden="true">Paste any tracking number — it opens as a live thread.</div>
           <div class="found">✓ Shipment found · SPK-839201</div>
           <div class="step"><i class="done"></i><span>New York · Brooklyn</span><em>picked up</em></div>
           <div class="step"><i class="done"></i><span>JFK · export hub</span><em>departed 22:10</em></div>
