@@ -701,6 +701,42 @@ body.chat-input-focused .chat-form { bottom: 0; padding-bottom: max(8px, env(saf
   box-shadow: 0 20px 40px -16px rgba(0,0,0,.9);
 }
 
+/* ---------- Connection / version status (app.js setConnStatus) ----------
+   Hangs just under the sticky top bar. Accent family only: this is app
+   state, not shipment state, so it never borrows the status colours. */
+.conn-status {
+  position: fixed; z-index: 9; left: 50%; top: calc(66px + env(safe-area-inset-top, 0px));
+  display: flex; align-items: center; gap: 8px; max-width: calc(100vw - 32px);
+  padding: 7px 8px 7px 12px; border-radius: 999px; font-size: 12px; color: var(--muted);
+  background: rgba(15,16,23,.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--line2); box-shadow: 0 16px 32px -18px rgba(0,0,0,.9);
+  opacity: 0; transform: translate(-50%, -8px);
+  transition: opacity .2s ease-out, transform .24s cubic-bezier(.23, 1, .32, 1);
+}
+.conn-status.show { opacity: 1; transform: translate(-50%, 0); }
+.conn-status span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conn-status:not(:has(.conn-action)) { padding-right: 14px; }
+.conn-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--accent2); }
+.conn-status.tone-busy .conn-dot { animation: pulseDot 2s infinite; }
+.conn-status.tone-done .conn-dot { background: var(--accent); }
+.conn-status.tone-warn .conn-dot { background: var(--dim); }
+.conn-action {
+  flex: none; min-height: 28px; padding: 0 12px; border-radius: 999px; border: none; cursor: pointer;
+  background: var(--accent); color: #fff; font: 500 12px var(--sans);
+}
+.conn-action:active { transform: scale(.97); }
+
+/* Skeleton rows: first open with nothing saved yet, while the API wakes. */
+.sk { background: linear-gradient(90deg, #12131b 0%, #1a1c27 50%, #12131b 100%); background-size: 200% 100%; animation: skShimmer 1.6s ease-in-out infinite; }
+.ibx-pk.sk { border-color: var(--line); }
+.sk-row { cursor: default; }
+.sk-line { display: block; height: 11px; width: 62%; border-radius: 6px; }
+.sk-line.short { width: 38%; margin-top: 8px; height: 9px; }
+.sk-row:nth-child(2) .sk-line { width: 48%; }
+.sk-row:nth-child(3) .sk-line { width: 70%; }
+.sk-row:nth-child(4) { opacity: .6; }
+@keyframes skShimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
 /* ---------- Contact card ---------- */
 .contact-card-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .contact-methods { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }

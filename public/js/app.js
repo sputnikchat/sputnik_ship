@@ -58,9 +58,13 @@
       if (btn && btn.disabled) return; // a request from the previous tap is still running
       const originalText = btn ? btn.textContent : null;
       if (btn) { btn.disabled = true; btn.textContent = 'Please wait…'; }
+      // A sleeping server (see showApp) can hold this request for up to a
+      // minute - say so instead of leaving "Please wait…" there silently.
+      const slow = setTimeout(() => { if (btn) btn.textContent = 'Waking up the server…'; }, 5000);
       try {
         await handler(e);
       } finally {
+        clearTimeout(slow);
         if (btn) { btn.disabled = false; btn.textContent = originalText; }
       }
     });
@@ -197,7 +201,26 @@
   async function showApp() {
     $('#auth-screen').hidden = true;
     $('#app').hidden = false;
-    await loadAll();
+    // Paint the last-known inbox right away (or skeleton rows on a first
+    // open), then swap in live data. On Render's free plan the API can take
+    // 30-60 s to wake up; that wait now happens behind real content.
+    const hydrated = await hydrateFromCache();
+    if (!hydrated) {
+      renderGreeting();
+      $('#greeting-sub').textContent = 'Loading your shipments…';
+      renderInboxSkeleton();
+    }
+    const slow = setTimeout(() => setConnStatus(hydrated ? 'stale' : 'waking'), 1200);
+    try {
+      await loadAll();
+      clearTimeout(slow);
+      setConnStatus(connStatusShown ? 'fresh' : null);
+    } catch (err) {
+      clearTimeout(slow);
+      if (!state.token) return; // 401: logout() already took over
+      setConnStatus('offline');
+      return;
+    }
     initPush();
     // A "follow this shipment" redirect from the public /s/:token page
     // (see renderSharedCta) lands here with ?openShipment=<id> - open it
@@ -231,6 +254,8 @@
     state.user = null;
     localStorage.removeItem('sputnikship_token');
     localStorage.removeItem('sputnikship_user');
+    clearCachedData();
+    setConnStatus(null);
     try {
       await fetch(API + '/auth/logout', { method: 'POST' });
     } catch (err) {
@@ -374,18 +399,121 @@
 
   async function loadContacts() {
     state.contacts = await api('/contacts');
+    saveCachedData('contacts', state.contacts);
     renderContacts();
     renderShipmentContactOptions();
   }
 
   async function loadShipments() {
-    state.shipments = await api('/shipments');
+    const fresh = await api('/shipments');
+    saveCachedData('shipments', fresh);
+    // Live data identical to what's already painted (the cached copy, most
+    // mornings): skip the re-render so the rows don't flash.
+    if (JSON.stringify(fresh) === JSON.stringify(state.shipments) && $('#shipments-list [data-id]')) return;
+    state.shipments = fresh;
     renderShipments();
   }
 
   async function loadNotifications() {
     state.notifications = await api('/notifications');
+    saveCachedData('notifications', state.notifications);
     renderNotifications();
+  }
+
+  // ---------------- last-known data (instant open) ----------------
+  // A copy of the three GET lists lives in Cache Storage, per account, so
+  // the inbox can paint before the API answers. Cleared on logout; the
+  // service worker leaves this cache alone (see service-worker.js).
+  const DATA_CACHE = 'sputnikship-data-v1';
+  const hasCaches = 'caches' in window;
+  function dataKey(name) { return `/__data/${encodeURIComponent(state.user?.id || 'anon')}/${name}`; }
+
+  function saveCachedData(name, data) {
+    if (!hasCaches || !state.user?.id) return;
+    caches.open(DATA_CACHE)
+      .then((c) => c.put(dataKey(name), new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } })))
+      .catch(() => {});
+  }
+
+  async function readCachedData(name) {
+    try {
+      const res = await caches.match(dataKey(name), { cacheName: DATA_CACHE });
+      return res ? await res.json() : null;
+    } catch { return null; }
+  }
+
+  function clearCachedData() {
+    if (hasCaches) caches.delete(DATA_CACHE).catch(() => {});
+  }
+
+  async function hydrateFromCache() {
+    if (!hasCaches || !state.user?.id) return false;
+    const [shipments, contacts, notifications] = await Promise.all(
+      ['shipments', 'contacts', 'notifications'].map(readCachedData)
+    );
+    if (!Array.isArray(shipments)) return false;
+    state.shipments = shipments;
+    renderShipments();
+    if (Array.isArray(contacts)) { state.contacts = contacts; renderContacts(); renderShipmentContactOptions(); }
+    if (Array.isArray(notifications)) { state.notifications = notifications; renderNotifications(); }
+    return true;
+  }
+
+  function renderInboxSkeleton() {
+    const row = `
+      <div class="ibx-row sk-row" aria-hidden="true">
+        <div class="ibx-pk sk"></div>
+        <div class="ibx-body"><span class="sk sk-line"></span><span class="sk sk-line short"></span></div>
+      </div>`;
+    $('#shipments-list').innerHTML = `<div class="sk-list" aria-busy="true" aria-label="Loading your shipments">${row.repeat(4)}</div>`;
+  }
+
+  // One quiet status pill under the top bar: the server is waking up, the
+  // data on screen is the last saved copy, the connection failed, or a new
+  // version of the app is ready.
+  let connStatusShown = false;
+  function setConnStatus(kind) {
+    const el = $('#conn-status');
+    // "New version ready" outranks everything else until the reload.
+    if (el.dataset.kind === 'update' && !el.hidden && kind !== 'update') return;
+    clearTimeout(setConnStatus._t);
+    const copy = {
+      waking: { text: 'Waking up the server — this can take up to a minute', tone: 'busy' },
+      stale: { text: 'Showing your last update · refreshing', tone: 'busy' },
+      fresh: { text: 'Up to date', tone: 'done' },
+      offline: { text: 'Can’t reach the server — showing your last update', tone: 'warn', action: 'Retry' },
+      update: { text: 'A new version of Sputnik Ship is ready', tone: 'done', action: 'Reload' },
+    }[kind];
+    if (!copy) {
+      connStatusShown = false;
+      el.classList.remove('show');
+      setConnStatus._t = setTimeout(() => { el.hidden = true; }, 200);
+      return;
+    }
+    connStatusShown = true;
+    el.dataset.kind = kind;
+    el.className = `conn-status tone-${copy.tone}`;
+    el.innerHTML = `<i class="conn-dot" aria-hidden="true"></i><span>${escapeHtml(copy.text)}</span>` +
+      (copy.action ? `<button type="button" class="conn-action">${escapeHtml(copy.action)}</button>` : '');
+    el.hidden = false;
+    void el.offsetWidth;
+    el.classList.add('show');
+    if (kind === 'fresh') setConnStatus._t = setTimeout(() => setConnStatus(null), 1600);
+  }
+
+  $('#conn-status').addEventListener('click', (e) => {
+    if (!e.target.closest('.conn-action')) return;
+    const kind = $('#conn-status').dataset.kind;
+    if (kind === 'update') { location.reload(); return; }
+    if (kind === 'offline') showApp();
+  });
+
+  // The service worker serves the app from its cache and re-downloads it in
+  // the background; when that copy turns out to be a new deploy it says so.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'shell-updated' && !$('#app').hidden) setConnStatus('update');
+    });
   }
 
   // ---------------- render: contacts ----------------
@@ -1875,12 +2003,17 @@
     $('#shared-view').hidden = false;
     $('#shared-from').innerHTML = '';
     $('#shared-body').innerHTML = '<p class="empty small" style="padding:14px;">Loading shipment…</p>';
+    const slowShared = setTimeout(() => {
+      const p = $('#shared-body .empty');
+      if (p) p.textContent = 'Waking up the server — this can take up to a minute…';
+    }, 4000);
     $('#shared-checkpoints').innerHTML = '';
     $('#shared-map').hidden = true;
     let shipment = null;
 
     try {
-      const res = await fetch(`${API}/public/shipments/${token}`);
+      let res;
+      try { res = await fetch(`${API}/public/shipments/${token}`); } finally { clearTimeout(slowShared); }
       const s = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(s.error || 'This share link is no longer valid.');
       shipment = s;

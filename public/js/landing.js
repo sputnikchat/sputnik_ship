@@ -74,4 +74,13 @@
     var v = input.value.trim();
     location.href = v && v !== demo ? '/app?track=' + encodeURIComponent(v) : '/app';
   });
+
+  // Same service worker as the app, registered once the page is idle: the
+  // next visit (and the jump to /app) opens from cache, even while the
+  // server is still waking up.
+  if ('serviceWorker' in navigator) {
+    addEventListener('load', function(){
+      setTimeout(function(){ navigator.serviceWorker.register('/service-worker.js').catch(function(){}); }, 2000);
+    });
+  }
 })();
