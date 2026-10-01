@@ -168,8 +168,15 @@ function pushNotificationToUsers(data, { userIds, shipmentId, title, message, le
     maybeSendWebPush(data, notification);
     if (!first) first = notification;
   }
-  // Keep at most 200 notifications total so this doesn't grow without limit.
-  data.notifications = data.notifications.slice(0, 200);
+  // Keep at most 200 notifications per user so this doesn't grow without
+  // limit. (It used to be 200 in total, so one busy account could push
+  // everyone else's unread notifications out of the store.)
+  const perUser = new Map();
+  data.notifications = data.notifications.filter((n) => {
+    const count = (perUser.get(n.userId) || 0) + 1;
+    perUser.set(n.userId, count);
+    return count <= 200;
+  });
 
   // Email (if enabled) is a single fixed address in .env, not per-user -
   // send it once regardless of how many people were notified.

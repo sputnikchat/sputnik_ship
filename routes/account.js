@@ -84,6 +84,12 @@ router.post('/join', joinLimiter, async (req, res) => {
   if (invite.fromUserId === req.user.id) {
     return res.status(400).json({ error: "You can't join your own invite." });
   }
+  // The code is only as good as its creator's membership: someone who has
+  // since left that space can't use an old code to get back in.
+  const inviter = db.users.find((u) => u.id === invite.fromUserId);
+  if (!inviter || spaceIdOf(inviter) !== invite.spaceId) {
+    return res.status(404).json({ error: 'That invite code is invalid or already used.' });
+  }
 
   let coOwners = [];
   await update((data) => {
@@ -99,12 +105,26 @@ router.post('/join', joinLimiter, async (req, res) => {
   res.json({ ok: true, coOwners });
 });
 
-// Goes back to a solo space. Doesn't affect the other members - they
-// keep sharing whatever's left of that space between them.
+// Goes back to a solo space; the other members keep sharing whatever's
+// left of that space between them. A space's id is its founder's user id,
+// so when the founder leaves, simply resetting their own spaceId changed
+// nothing - everyone else still pointed at it and kept full access to the
+// founder's shipments and contacts. Instead the remaining members move to
+// a space of their own (named after the longest-standing of them).
+// Invites the leaver created are deleted so they can't be used to return.
 router.post('/leave-space', async (req, res) => {
   await update((data) => {
     const me = data.users.find((u) => u.id === req.user.id);
+    const oldSpaceId = spaceIdOf(me);
+    const others = data.users.filter((u) => u.id !== me.id && spaceIdOf(u) === oldSpaceId);
+    if (oldSpaceId === me.id && others.length) {
+      const heir = [...others].sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))[0];
+      for (const u of others) u.spaceId = heir.id;
+      data.spaceInvites = (data.spaceInvites || []).filter((i) => i.spaceId !== oldSpaceId || i.fromUserId !== me.id);
+      for (const i of data.spaceInvites || []) if (i.spaceId === oldSpaceId) i.spaceId = heir.id;
+    }
     me.spaceId = me.id;
+    data.spaceInvites = (data.spaceInvites || []).filter((i) => i.fromUserId !== me.id);
   });
   res.status(204).end();
 });

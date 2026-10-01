@@ -52,10 +52,15 @@ const refreshLimiter = rateLimit({
 // those aren't sensitive and following-along wants them.
 // followers (the other followers' user ids) and shareToken are left out
 // too: neither is needed to follow along, and a follower has no business
-// learning who else is following or re-minting the owner's link.
-function sanitizeForFollower(shipment) {
+// learning who else is following or re-minting the owner's link. For the
+// same reason messages keep only the viewer's own userId (the client uses
+// it to tell "mine" from "theirs"); everyone else's internal id is removed.
+function sanitizeForFollower(shipment, viewerId) {
   const { notes, cost, currency, contactId, photo, userId, followers, shareToken, ...safe } = shipment;
-  return { ...safe, messages: decryptMessages(safe.messages), viewerRole: 'follower' };
+  const messages = decryptMessages(safe.messages).map(({ userId: author, ...m }) =>
+    author === viewerId ? { ...m, userId: author } : m
+  );
+  return { ...safe, messages, viewerRole: 'follower' };
 }
 
 // Photos sent in the chat are encrypted at rest the same way as the
@@ -86,7 +91,7 @@ router.get('/', async (req, res) => {
     .map(decryptForOwner);
   const followed = db.shipments
     .filter((s) => !spaceUserIds.includes(s.userId) && (s.followers || []).includes(req.user.id))
-    .map(sanitizeForFollower);
+    .map((s) => sanitizeForFollower(s, req.user.id));
   const shipments = [...owned, ...followed].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   res.json(shipments);
 });
@@ -221,7 +226,7 @@ router.post('/follow', writeLimiter, async (req, res) => {
     updated = s;
   });
   await logAudit({ userId: req.user.id, action: 'accept_invite', shipmentId: shipment.id, req });
-  res.json(sanitizeForFollower(updated));
+  res.json(sanitizeForFollower(updated, req.user.id));
 });
 
 router.post('/:id/unfollow', async (req, res) => {
@@ -247,7 +252,7 @@ router.get('/:id', async (req, res) => {
     await logAudit({ userId: req.user.id, action: 'view_shipment', shipmentId: shipment.id, req });
     return res.json(decryptForOwner(shipment));
   }
-  if ((shipment.followers || []).includes(req.user.id)) return res.json(sanitizeForFollower(shipment));
+  if ((shipment.followers || []).includes(req.user.id)) return res.json(sanitizeForFollower(shipment, req.user.id));
   return res.status(404).json({ error: 'Shipment not found.' });
 });
 
@@ -417,7 +422,7 @@ router.post('/:id/messages', writeLimiter, async (req, res) => {
     }
     updated = s;
   });
-  res.json(isOwnerSide ? decryptForOwner(updated) : sanitizeForFollower(updated));
+  res.json(isOwnerSide ? decryptForOwner(updated) : sanitizeForFollower(updated, req.user.id));
 });
 
 router.delete('/:id', async (req, res) => {
