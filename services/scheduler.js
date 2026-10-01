@@ -4,6 +4,26 @@ const { getTrackingUpdate } = require('./carrierProviders');
 const { pushNotification, pushSystemMessage, applyCustomsAlert } = require('./notify');
 const { checkDelay } = require('./delayDetector');
 const { sendDailyDigest } = require('./digest');
+const { geocodeLocation } = require('./geocode');
+
+// Delivered shipments are never re-tracked, so one whose places couldn't be
+// geocoded at the time (e.g. the geocoder was refusing Render's IP) kept an
+// empty map forever. This rebuilds the route from the stored checkpoint
+// labels ("<status> · <place>") - geocoding only, no paid Ship24 lookup.
+async function repairMissingRoute(shipment) {
+  const points = [];
+  for (const cp of shipment.checkpoints) {
+    const sep = cp.label.lastIndexOf(' · ');
+    const point = sep === -1 ? null : await geocodeLocation(cp.label.slice(sep + 3));
+    if (point) points.push({ label: cp.label, lat: point.lat, lng: point.lng, timestamp: cp.timestamp });
+  }
+  if (!points.length) return;
+  Object.assign(shipment, {
+    fullRoute: points,
+    checkpointIndex: points.length - 1,
+    currentLocation: points[points.length - 1],
+  });
+}
 
 // Refreshes tracking for all active (not-delivered) shipments and
 // generates a notification whenever the status changes. `filter` narrows
@@ -57,6 +77,17 @@ async function refreshAllShipments(filter = null) {
         applyCustomsAlert(data, shipment, result);
       } catch (err) {
         console.error(`Error updating shipment ${shipment.id}:`, err.message);
+      }
+    }
+
+    const missingRoute = data.shipments.filter(
+      (s) => !active.includes(s) && s.checkpoints?.length && !s.fullRoute?.length && (!filter || filter(s))
+    );
+    for (const shipment of missingRoute) {
+      try {
+        await repairMissingRoute(shipment);
+      } catch (err) {
+        console.error(`Error repairing route of shipment ${shipment.id}:`, err.message);
       }
     }
   });

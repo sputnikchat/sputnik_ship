@@ -16,33 +16,51 @@ async function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Nominatim refuses or rate-limits a lot of shared cloud IPs (Render's
+// included), so a failed lookup falls back to Photon (komoot's free
+// geocoder over the same OpenStreetMap data). Only definite answers are
+// cached: caching a network error as "no coordinates" used to leave a
+// shipment's map empty forever.
+const USER_AGENT = 'SputnikShip/1.0 (personal shipment tracker; hello.chefjoice@gmail.com)';
+
+async function nominatim(key) {
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(key)}`;
+  const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+  if (!res.ok) throw new Error(`Nominatim responded ${res.status}`);
+  const results = await res.json();
+  return results && results[0] ? { lat: Number(results[0].lat), lng: Number(results[0].lon) } : null;
+}
+
+async function photon(key) {
+  const url = `https://photon.komoot.io/api/?limit=1&q=${encodeURIComponent(key)}`;
+  const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+  if (!res.ok) throw new Error(`Photon responded ${res.status}`);
+  const coords = (await res.json())?.features?.[0]?.geometry?.coordinates;
+  return coords ? { lat: Number(coords[1]), lng: Number(coords[0]) } : null;
+}
+
 async function geocodeLocation(text) {
   const key = String(text || '').trim().toLowerCase();
   if (!key) return null;
   if (cache.has(key)) return cache.get(key);
 
-  // Space out new calls to Nominatim (not the ones that hit cache).
+  // Space out new calls (not the ones that hit cache).
   const elapsed = Date.now() - lastCallAt;
   if (elapsed < 1100) await wait(1100 - elapsed);
   lastCallAt = Date.now();
 
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(key)}`;
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'SputnikShip/1.0 (personal shipment tracker; hello.chefjoice@gmail.com)' },
-    });
-    if (!res.ok) throw new Error(`Nominatim responded ${res.status}`);
-    const results = await res.json();
-    const point = results && results[0]
-      ? { lat: Number(results[0].lat), lng: Number(results[0].lon) }
-      : null;
-    cache.set(key, point);
-    return point;
-  } catch (err) {
-    console.error(`Could not geocode "${text}":`, err.message);
-    cache.set(key, null);
-    return null;
+  for (const provider of [nominatim, photon]) {
+    try {
+      const point = await provider(key);
+      if (point) {
+        cache.set(key, point);
+        return point;
+      }
+    } catch (err) {
+      console.error(`Could not geocode "${text}" with ${provider.name}:`, err.message);
+    }
   }
+  return null;
 }
 
 module.exports = { geocodeLocation };
