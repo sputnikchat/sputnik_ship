@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const { readDB, update } = require('../services/store');
 const { requireAuth } = require('../middleware/auth');
+const { passwordCheckLimiter } = require('../middleware/limits');
 const { spaceIdOf, getSpaceUserIds } = require('../services/space');
 
 const { clearSessionCookies } = require('../services/sessions');
@@ -159,7 +160,7 @@ router.put('/notify-prefs', async (req, res) => {
 // own shipments/contacts untouched - only this user's data is removed.
 // Requires the current password so a stolen/left-open session can't
 // silently wipe the account.
-router.delete('/', async (req, res) => {
+router.delete('/', passwordCheckLimiter, async (req, res) => {
   const { currentPassword } = req.body || {};
   if (!currentPassword) return res.status(400).json({ error: 'Current password is required.' });
 

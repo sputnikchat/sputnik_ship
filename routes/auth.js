@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
 const { readDB, update } = require('../services/store');
 const { requireAuth } = require('../middleware/auth');
+const { passwordCheckLimiter } = require('../middleware/limits');
 const {
   REFRESH_COOKIE,
   createSession,
@@ -278,7 +279,7 @@ router.post('/logout', async (req, res) => {
 
 router.use(requireAuth);
 
-router.post('/change-password', async (req, res) => {
+router.post('/change-password', passwordCheckLimiter, async (req, res) => {
   const { currentPassword, newPassword } = req.body || {};
   if (typeof currentPassword !== 'string' || !currentPassword || !newPassword) {
     return res.status(400).json({ error: 'Missing data: current and new password.' });
@@ -307,7 +308,7 @@ router.post('/change-password', async (req, res) => {
 // Invalidates the old code (in case it leaked) and issues a fresh one.
 // Requires the current password so a stolen/left-open session can't
 // silently mint a new recovery code for itself.
-router.post('/regenerate-recovery-code', async (req, res) => {
+router.post('/regenerate-recovery-code', passwordCheckLimiter, async (req, res) => {
   const { currentPassword } = req.body || {};
   if (typeof currentPassword !== 'string' || !currentPassword) return res.status(400).json({ error: 'Current password is required.' });
 

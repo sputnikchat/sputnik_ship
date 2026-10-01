@@ -43,6 +43,14 @@ if (!process.env.JWT_SECRET) {
     'JWT_SECRET is not set. Copy .env.example to .env and set one (a long random string) before starting the server.'
   );
 }
+// The example value is public on GitHub: anyone could sign valid session
+// tokens with it. Refuse to run with it; warn on anything short.
+if (/^(cambia|change)/i.test(process.env.JWT_SECRET)) {
+  throw new Error('JWT_SECRET is still the example value from .env.example. Set a long random string.');
+}
+if (process.env.JWT_SECRET.length < 32) {
+  console.warn('WARNING: JWT_SECRET is shorter than 32 characters. Use a long random string (e.g. 64 hex chars).');
+}
 
 const app = express();
 
