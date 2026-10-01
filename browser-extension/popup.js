@@ -17,7 +17,10 @@
     toast._t = setTimeout(() => { el.hidden = true; }, 2200);
   }
 
-  async function api(path, { method = 'GET', body, token } = {}) {
+  // Access tokens last 15 minutes; on a 401 the stored refresh token is
+  // swapped for a new pair once and the request retried (the server rotates
+  // the refresh token on every use - see services/sessions.js).
+  async function api(path, { method = 'GET', body, token } = {}, retried = false) {
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(API_BASE + path, {
@@ -25,21 +28,38 @@
       headers,
       body: body ? JSON.stringify(body) : undefined,
     });
+    if (res.status === 401 && token && !retried) {
+      const fresh = await refreshSession();
+      if (fresh) return api(path, { method, body, token: fresh }, true);
+    }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Network error');
     return data;
   }
 
+  async function refreshSession() {
+    const { refreshToken } = await getSession();
+    if (!refreshToken) return null;
+    try {
+      const data = await api('/auth/refresh', { method: 'POST', body: { refreshToken } }, true);
+      await new Promise((resolve) => chrome.storage.local.set({ token: data.token, refreshToken: data.refreshToken }, resolve));
+      return data.token;
+    } catch (err) {
+      await clearSession();
+      return null;
+    }
+  }
+
   function getSession() {
     return new Promise((resolve) => {
-      chrome.storage.local.get(['token', 'handle'], (r) => resolve(r));
+      chrome.storage.local.get(['token', 'refreshToken', 'handle'], (r) => resolve(r));
     });
   }
-  function setSession(token, handle) {
-    return new Promise((resolve) => chrome.storage.local.set({ token, handle }, resolve));
+  function setSession(token, refreshToken, handle) {
+    return new Promise((resolve) => chrome.storage.local.set({ token, refreshToken, handle }, resolve));
   }
   function clearSession() {
-    return new Promise((resolve) => chrome.storage.local.remove(['token', 'handle'], resolve));
+    return new Promise((resolve) => chrome.storage.local.remove(['token', 'refreshToken', 'handle'], resolve));
   }
 
   // Same carrier patterns as public/js/app.js's detectCarrier() - kept in
@@ -151,7 +171,7 @@
     errEl.hidden = true;
     try {
       const data = await api('/auth/login', { method: 'POST', body: fd });
-      await setSession(data.token, data.user.handle);
+      await setSession(data.token, data.refreshToken, data.user.handle);
       showScanView(data.token, data.user.handle);
     } catch (err) {
       errEl.textContent = err.message;
@@ -160,6 +180,9 @@
   });
 
   $('#logout-btn').addEventListener('click', async () => {
+    const { refreshToken } = await getSession();
+    // Ends the session on the server too, not just in this browser.
+    if (refreshToken) await api('/auth/logout', { method: 'POST', body: { refreshToken } }).catch(() => {});
     await clearSession();
     $('#scan-view').hidden = true;
     $('#login-view').hidden = false;

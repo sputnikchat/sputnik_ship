@@ -6,6 +6,8 @@ const { readDB, update } = require('../services/store');
 const { requireAuth } = require('../middleware/auth');
 const { spaceIdOf, getSpaceUserIds } = require('../services/space');
 
+const { clearSessionCookies } = require('../services/sessions');
+
 const router = express.Router();
 router.use(requireAuth);
 
@@ -159,7 +161,7 @@ router.delete('/', async (req, res) => {
     data.users = data.users.filter((u) => u.id !== uid);
   });
 
-  res.clearCookie('sputnikship_token', { httpOnly: true, secure: req.secure, sameSite: 'lax', path: '/' });
+  clearSessionCookies(req, res);
   res.status(204).end();
 });
 

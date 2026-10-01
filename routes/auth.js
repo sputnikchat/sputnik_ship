@@ -1,11 +1,18 @@
 const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
 const { readDB, update } = require('../services/store');
 const { requireAuth } = require('../middleware/auth');
+const {
+  REFRESH_COOKIE,
+  createSession,
+  rotate,
+  revokeByRefresh,
+  setSessionCookies,
+  clearSessionCookies,
+} = require('../services/sessions');
 
 const router = express.Router();
 
@@ -47,33 +54,64 @@ function passwordError(password) {
 // registered.
 const DUMMY_HASH = bcrypt.hashSync(crypto.randomBytes(16).toString('hex'), 10);
 
-function sign(user) {
-  return jwt.sign(
-    // tv = the user's tokenVersion when this token was issued; see
-    // middleware/auth.js for how it lets a password change end old sessions.
-    { id: user.id, handle: user.handle, tv: user.tokenVersion || 0 },
-    process.env.JWT_SECRET,
-    { expiresIn: '30d' }
-  );
+// Per-account lockout, on top of the per-IP limiter above: an attacker
+// rotating IPs (a botnet) still gets 5 guesses per account, then a wait
+// that doubles with every further lockout (15 min, 30 min, 1 h ... 24 h).
+// Keyed by the typed handle whether or not it exists, so a lockout doesn't
+// reveal which handles are real. Kept in memory: a restart only clears the
+// counters, never unlocks a stolen session.
+const MAX_FAILS = 5;
+const BASE_LOCK_MS = 15 * 60 * 1000;
+const MAX_LOCK_MS = 24 * 60 * 60 * 1000;
+const loginFailures = new Map(); // handle -> { fails, locks, lockedUntil, lastAt }
+
+function lockedFor(handle) {
+  const entry = loginFailures.get(handle);
+  return entry && entry.lockedUntil > Date.now() ? entry.lockedUntil - Date.now() : 0;
 }
 
-// The main web app's own session lives in this httpOnly cookie instead of
-// a token the page's own JavaScript can read (e.g. from localStorage) -
-// so a future XSS bug in this app or a compromised third-party script it
-// loads can't walk off with a logged-in session. httpOnly means client
-// JS genuinely cannot read or set this cookie; only the server can.
-// The browser extension and any other non-browser client still get the
-// token in the response body and send it as a Bearer header instead,
-// since a cross-origin client was never going to receive this cookie.
-const AUTH_COOKIE = 'sputnikship_token';
-function setAuthCookie(req, res, token) {
-  res.cookie(AUTH_COOKIE, token, {
-    httpOnly: true,
-    secure: req.secure,
-    sameSite: 'lax',
-    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days, matches the JWT's own expiry
-    path: '/',
+function recordFailure(handle) {
+  const now = Date.now();
+  const entry = loginFailures.get(handle) || { fails: 0, locks: 0, lockedUntil: 0, lastAt: now };
+  entry.fails += 1;
+  entry.lastAt = now;
+  if (entry.fails >= MAX_FAILS) {
+    entry.lockedUntil = now + Math.min(BASE_LOCK_MS * 2 ** entry.locks, MAX_LOCK_MS);
+    entry.locks += 1;
+    entry.fails = 0;
+    console.warn(`Login locked for handle "${handle}" after repeated failures.`);
+  }
+  loginFailures.set(handle, entry);
+  // Bounded memory: forget handles nobody has tried for a day.
+  if (loginFailures.size > 10000) {
+    for (const [h, e] of loginFailures) if (now - e.lastAt > MAX_LOCK_MS) loginFailures.delete(h);
+  }
+}
+
+function lockedResponse(res, ms) {
+  const minutes = Math.ceil(ms / 60000);
+  res.set('Retry-After', String(Math.ceil(ms / 1000)));
+  return res.status(429).json({ error: `Too many failed attempts for this account. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.` });
+}
+
+// Kicking sessions out isn't enough on its own: a device someone
+// subscribed to push while they had the session would keep receiving this
+// account's notifications. The owner re-enables push on their devices.
+function dropPushSubscriptions(data, userId) {
+  data.pushSubscriptions = (data.pushSubscriptions || []).filter((p) => p.userId !== userId);
+}
+
+// Starts a session for `userId` (inside one store update) and hands the
+// tokens out: as httpOnly cookies for the web app, and in the body for the
+// browser extension, which keeps them itself and calls /refresh.
+async function startSession(req, res, userId, mutate) {
+  const result = await update((data) => {
+    const u = data.users.find((x) => x.id === userId);
+    if (mutate) mutate(u, data);
+    return createSession(u, req.headers['user-agent']);
   });
+  setSessionCookies(req, res, result);
+  return { token: result.accessToken, refreshToken: result.refreshToken };
 }
 
 // Wallet-style account, no email on file - so there's no "reset link" a
@@ -142,10 +180,9 @@ router.post('/signup', authLimiter, async (req, res) => {
     data.users.push(user);
   });
 
-  const token = sign(user);
-  setAuthCookie(req, res, token);
+  const tokens = await startSession(req, res, user.id);
   // recoveryCode is returned exactly once - the server keeps only its hash.
-  res.status(201).json({ token, user: { id: user.id, handle: user.handle }, recoveryCode });
+  res.status(201).json({ ...tokens, user: { id: user.id, handle: user.handle }, recoveryCode });
 });
 
 router.post('/login', authLimiter, async (req, res) => {
@@ -155,19 +192,24 @@ router.post('/login', authLimiter, async (req, res) => {
   }
 
   const normalizedHandle = handle.toLowerCase();
+  const wait = lockedFor(normalizedHandle);
+  if (wait) return lockedResponse(res, wait);
+
   const db = await readDB();
   const user = db.users.find((u) => u.handle === normalizedHandle);
-  if (!user) {
-    await bcrypt.compare(password, DUMMY_HASH);
+  const ok = user
+    ? await bcrypt.compare(password, user.passwordHash)
+    : await bcrypt.compare(password, DUMMY_HASH).then(() => false);
+  if (!ok) {
+    recordFailure(normalizedHandle);
+    const nowLocked = lockedFor(normalizedHandle);
+    if (nowLocked) return lockedResponse(res, nowLocked);
     return res.status(401).json({ error: 'Incorrect username or password.' });
   }
 
-  const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return res.status(401).json({ error: 'Incorrect username or password.' });
-
-  const token = sign(user);
-  setAuthCookie(req, res, token);
-  res.json({ token, user: { id: user.id, handle: user.handle } });
+  loginFailures.delete(normalizedHandle);
+  const tokens = await startSession(req, res, user.id);
+  res.json({ ...tokens, user: { id: user.id, handle: user.handle } });
 });
 
 // Recovers a locked-out account with the one-time code shown at signup.
@@ -182,37 +224,55 @@ router.post('/recover', authLimiter, async (req, res) => {
   if (pwError) return res.status(400).json({ error: pwError });
 
   const normalizedHandle = handle.toLowerCase();
+  const wait = lockedFor(normalizedHandle);
+  if (wait) return lockedResponse(res, wait);
+
   const db = await readDB();
   const user = db.users.find((u) => u.handle === normalizedHandle);
   // Same generic error whether the handle doesn't exist or the code is
   // wrong - don't reveal which one to an attacker guessing handles.
   const genericError = { error: 'Incorrect username or recovery code.' };
-  if (!user || !user.recoveryCodeHash) return res.status(401).json(genericError);
-
-  const ok = await bcrypt.compare(normalizeRecoveryCode(recoveryCode), user.recoveryCodeHash);
-  if (!ok) return res.status(401).json(genericError);
+  const ok = user && user.recoveryCodeHash
+    ? await bcrypt.compare(normalizeRecoveryCode(recoveryCode), user.recoveryCodeHash)
+    : false;
+  if (!ok) {
+    recordFailure(normalizedHandle);
+    return res.status(401).json(genericError);
+  }
+  loginFailures.delete(normalizedHandle);
 
   const newRecoveryCode = generateRecoveryCode();
-  let updatedUser = user;
-  await update((data) => {
-    const u = data.users.find((x) => x.id === user.id);
-    u.passwordHash = bcrypt.hashSync(newPassword, 10);
-    u.recoveryCodeHash = bcrypt.hashSync(normalizeRecoveryCode(newRecoveryCode), 10);
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  const recoveryCodeHash = await bcrypt.hash(normalizeRecoveryCode(newRecoveryCode), 10);
+  const tokens = await startSession(req, res, user.id, (u, data) => {
+    u.passwordHash = passwordHash;
+    u.recoveryCodeHash = recoveryCodeHash;
     // Recovering usually means someone else may know the old password:
-    // every session issued before this moment stops working.
+    // every existing session (and token) stops working.
     u.tokenVersion = (u.tokenVersion || 0) + 1;
-    updatedUser = u;
+    u.sessions = [];
+    dropPushSubscriptions(data, u.id);
   });
-
-  const token = sign(updatedUser);
-  setAuthCookie(req, res, token);
-  res.json({ token, user: { id: user.id, handle: user.handle }, recoveryCode: newRecoveryCode });
+  res.json({ ...tokens, user: { id: user.id, handle: user.handle }, recoveryCode: newRecoveryCode });
 });
 
-// Clears the session cookie. Doesn't require a valid session itself - a
-// stale or already-expired cookie should still be clearable.
-router.post('/logout', (req, res) => {
-  res.clearCookie(AUTH_COOKIE, { httpOnly: true, secure: req.secure, sameSite: 'lax', path: '/' });
+// Rotates the browser extension's refresh token (the web app does this
+// transparently in middleware/auth.js via its cookie).
+router.post('/refresh', authLimiter, async (req, res) => {
+  const { refreshToken } = req.body || {};
+  if (typeof refreshToken !== 'string') return res.status(400).json({ error: 'Missing refresh token.' });
+  const r = await update((data) => rotate(data, refreshToken));
+  if (!r || !r.refreshToken) return res.status(401).json({ error: 'Session expired. Please log in again.' });
+  res.json({ token: r.accessToken, refreshToken: r.refreshToken });
+});
+
+// Ends this session server-side and clears the cookies. Doesn't require a
+// valid access token - a stale or already-expired session should still be
+// closable.
+router.post('/logout', async (req, res) => {
+  const refreshToken = req.cookies?.[REFRESH_COOKIE] || (req.body || {}).refreshToken;
+  if (typeof refreshToken === 'string') await update((data) => revokeByRefresh(data, refreshToken));
+  clearSessionCookies(req, res);
   res.status(204).end();
 });
 
@@ -231,19 +291,17 @@ router.post('/change-password', async (req, res) => {
   const ok = await bcrypt.compare(currentPassword, user.passwordHash);
   if (!ok) return res.status(401).json({ error: 'Current password is incorrect.' });
 
-  let updatedUser = null;
-  await update((data) => {
-    const u = data.users.find((x) => x.id === req.user.id);
-    u.passwordHash = bcrypt.hashSync(newPassword, 10);
-    // Ends every other session (another device, or someone who had the
-    // old password) - this device gets a fresh token right below, so the
-    // person changing their password stays logged in here.
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  // Ends every other session (another device, or someone who had the old
+  // password) - this device gets a fresh session, so the person changing
+  // their password stays logged in here.
+  const tokens = await startSession(req, res, req.user.id, (u, data) => {
+    u.passwordHash = passwordHash;
     u.tokenVersion = (u.tokenVersion || 0) + 1;
-    updatedUser = u;
+    u.sessions = [];
+    dropPushSubscriptions(data, u.id);
   });
-  const token = sign(updatedUser);
-  setAuthCookie(req, res, token);
-  res.json({ token });
+  res.json(tokens);
 });
 
 // Invalidates the old code (in case it leaked) and issues a fresh one.
