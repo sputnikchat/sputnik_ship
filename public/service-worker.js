@@ -14,7 +14,7 @@
 //
 // API data (/api/*) is never touched here - app.js keeps its own
 // last-known copy per account so it can paint the inbox while the API wakes.
-const CACHE_NAME = 'sputnikship-shell-v6';
+const CACHE_NAME = 'sputnikship-shell-v7';
 // app.js owns this cache (last-known inbox data); never delete it on activate.
 const DATA_CACHE_PREFIX = 'sputnikship-data';
 const SHELL_FILES = [
@@ -136,25 +136,35 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('push', (event) => {
   let data = { title: 'Sputnik Ship', body: 'You have a shipment update.' };
   try {
-    if (event.data) data = event.data.json();
+    if (event.data) data = { ...data, ...event.data.json() };
   } catch (err) {
     // if the payload isn't valid JSON, fall back to the default text above
   }
+  // Safari/iOS revoke push permission if a push arrives and no
+  // notification is shown - so always show one, even on odd payloads.
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
+    self.registration.showNotification(data.title || 'Sputnik Ship', {
+      body: data.body || '',
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
+      tag: data.tag || undefined,
+      renotify: Boolean(data.tag),
+      data: { url: data.url || '/app' },
     })
   );
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const target = new URL((event.notification.data && event.notification.data.url) || '/app', self.location.origin).href;
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientsList) => {
-      if (clientsList.length) return clientsList[0].focus();
-      return self.clients.openWindow('/app');
+      const client = clientsList.find((c) => c.url.startsWith(self.location.origin));
+      if (client) {
+        if ('navigate' in client) client.navigate(target).catch(() => {});
+        return client.focus();
+      }
+      return self.clients.openWindow(target);
     })
   );
 });

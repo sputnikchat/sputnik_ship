@@ -36,13 +36,85 @@ function applyCustomsAlert(data, shipment, result) {
   shipment.customsAlertedAt = marker;
 }
 
-const VAPID_READY = Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
-if (VAPID_READY) {
-  webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || 'mailto:example@example.com',
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-  );
+// Env values pasted into a hosting dashboard often carry stray spaces or
+// newlines, and Apple's push service (iPhone + Safari) rejects the whole
+// request (403 BadJwtToken) when the VAPID subject isn't a clean
+// "mailto:" or "https:" URL - Chrome is more forgiving, which is how a
+// setup can look fine on one browser and silently fail on another.
+function cleanEnv(v) {
+  return String(v || '').trim().replace(/^['"]|['"]$/g, '');
+}
+function normalizeSubject(raw) {
+  const v = cleanEnv(raw).replace(/\s+/g, '');
+  if (/^mailto:[^@\s]+@[^@\s]+\.[^@\s]+$/i.test(v) && !/@(example|localhost)/i.test(v)) return v;
+  if (/^https:\/\/[^\s]+$/i.test(v) && !/localhost/i.test(v)) return v;
+  if (/^[^@\s:]+@[^@\s]+\.[^@\s]+$/.test(v)) return `mailto:${v}`;
+  return 'https://sputnikship.app';
+}
+const VAPID_PUBLIC = cleanEnv(process.env.VAPID_PUBLIC_KEY);
+const VAPID_PRIVATE = cleanEnv(process.env.VAPID_PRIVATE_KEY);
+const VAPID_SUBJECT = normalizeSubject(process.env.VAPID_SUBJECT);
+let VAPID_READY = false;
+if (VAPID_PUBLIC && VAPID_PRIVATE) {
+  try {
+    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
+    VAPID_READY = true;
+    console.log(`Web push ready (subject: ${VAPID_SUBJECT}).`);
+  } catch (err) {
+    console.error('Web push NOT configured - invalid VAPID settings:', err.message);
+  }
+} else {
+  console.warn('Web push disabled: VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY missing.');
+}
+
+// TTL: keep trying for a day if the phone is offline (default 4 weeks is
+// pointless for tracking updates). urgency high: iOS/Android otherwise
+// may batch or delay delivery while the phone is idle.
+const PUSH_OPTIONS = { TTL: 24 * 60 * 60, urgency: 'high' };
+
+function describePushError(err) {
+  const body = typeof err.body === 'string' ? err.body.trim().slice(0, 200) : '';
+  return [err.statusCode, body || err.message].filter(Boolean).join(' ');
+}
+
+// Remembers the outcome of the last delivery attempt on the subscription
+// itself, so a failing device is visible in the database and in
+// GET /api/push/status instead of only in server logs.
+function recordPushResult(subId, ok, reason) {
+  if (!subId) return;
+  storeUpdate((d) => {
+    const sub = (d.pushSubscriptions || []).find((s) => s.id === subId);
+    if (!sub) return;
+    if (ok) { sub.lastOkAt = new Date().toISOString(); sub.lastError = null; }
+    else { sub.lastError = reason; sub.lastErrorAt = new Date().toISOString(); }
+  }).catch(() => {});
+}
+
+function removeSubscription(subId) {
+  storeUpdate((d) => {
+    d.pushSubscriptions = (d.pushSubscriptions || []).filter((s) => s.id !== subId);
+  }).catch(() => {});
+}
+
+// One real delivery attempt to one subscription. Returns {ok, reason, gone}.
+async function deliver(sub, payloadObj) {
+  if (!VAPID_READY) return { ok: false, reason: 'Push notifications are not configured on the server.' };
+  try {
+    await webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, JSON.stringify(payloadObj), PUSH_OPTIONS);
+    recordPushResult(sub.id, true);
+    return { ok: true };
+  } catch (err) {
+    const reason = describePushError(err);
+    const gone = err.statusCode === 404 || err.statusCode === 410;
+    if (gone) removeSubscription(sub.id);
+    else recordPushResult(sub.id, false, reason);
+    console.error(`Push to ${hostOf(sub.endpoint)} failed: ${reason}`);
+    return { ok: false, reason, gone };
+  }
+}
+
+function hostOf(endpoint) {
+  try { return new URL(endpoint).hostname; } catch { return 'unknown'; }
 }
 
 // Fired right after a device subscribes (routes/push.js), so "Enable
@@ -50,16 +122,24 @@ if (VAPID_READY) {
 // a subscription can be created client-side and still never actually
 // deliver (a stale VAPID key mismatch, a malformed endpoint, etc.).
 async function sendTestPush(sub) {
-  if (!VAPID_READY) return { ok: false, reason: 'Push notifications are not configured on the server.' };
-  try {
-    await webpush.sendNotification(
-      { endpoint: sub.endpoint, keys: sub.keys },
-      JSON.stringify({ title: 'Sputnik Ship', body: 'Notifications are working - you\'ll get alerts here from now on.' })
-    );
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, reason: err.message };
+  return deliver(sub, {
+    title: 'Sputnik Ship',
+    body: 'Notifications are working - you\'ll get alerts here from now on.',
+    url: '/app',
+    tag: 'sputnik-test',
+  });
+}
+
+// Sends a test push to every device this user has subscribed and reports
+// each result - backs the "Send test" button so a broken device is obvious.
+async function sendTestToUser(data, userId) {
+  const subs = (data.pushSubscriptions || []).filter((s) => s.userId === userId);
+  const results = [];
+  for (const sub of subs) {
+    const r = await sendTestPush(sub);
+    results.push({ device: hostOf(sub.endpoint), ...r });
   }
+  return results;
 }
 
 // Creates one notification per recipient (saved inside the same `data`
@@ -130,33 +210,22 @@ async function maybeSendEmail(notification) {
   }
 }
 
-// Browser push notifications (optional). Disabled by default: only
-// runs when VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY are set in .env (see
+// Browser push notifications. Only runs when VAPID keys are set (see
 // README). Fire-and-forget: doesn't block notification creation and
-// doesn't require callers of pushNotification() to await it.
+// doesn't require callers of pushNotification() to await it. Results are
+// recorded with their own store.update() calls (see deliver()), since this
+// runs after the transaction that called pushNotification() has finished.
 function maybeSendWebPush(data, notification) {
   if (!VAPID_READY) return;
   data.pushSubscriptions ||= [];
   const subs = data.pushSubscriptions.filter((s) => s.userId === notification.userId);
-  const payload = JSON.stringify({ title: notification.title, body: notification.message });
-
-  subs.forEach((sub) => {
-    webpush
-      .sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, payload)
-      .catch((err) => {
-        if (err.statusCode === 404 || err.statusCode === 410) {
-          // The subscription expired or the user revoked permission: remove it.
-          // This uses its own store.update() (rather than touching the `data`
-          // above) because this callback runs after the transaction that
-          // called pushNotification() has already finished and persisted.
-          storeUpdate((d) => {
-            d.pushSubscriptions = (d.pushSubscriptions || []).filter((s) => s.id !== sub.id);
-          }).catch(() => {});
-        } else {
-          console.error('Could not send push notification:', err.message);
-        }
-      });
-  });
+  const payload = {
+    title: notification.title,
+    body: notification.message,
+    url: notification.shipmentId ? `/app#shipment=${notification.shipmentId}` : '/app',
+    tag: notification.shipmentId || notification.id,
+  };
+  subs.forEach((sub) => { deliver(sub, payload).catch(() => {}); });
 }
 
-module.exports = { pushNotification, pushNotificationToUsers, pushSystemMessage, applyCustomsAlert, sendTestPush };
+module.exports = { pushNotification, pushNotificationToUsers, pushSystemMessage, applyCustomsAlert, sendTestPush, sendTestToUser, VAPID_PUBLIC };

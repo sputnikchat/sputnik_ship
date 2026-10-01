@@ -2207,20 +2207,64 @@
       // hint the button just never appears and nothing explains why.
       if (isIos() && !isStandalone()) {
         hint.textContent = 'To get notifications on iPhone, first install this app: tap the Share icon in Safari, then "Add to Home Screen" - then open it from there and come back here.';
-        hint.hidden = false;
+      } else {
+        hint.textContent = 'This browser does not support push notifications. Try Chrome, Edge, Firefox or Safari.';
       }
+      hint.hidden = false;
       return;
     }
     btn.hidden = false;
     $('#push-banner').hidden = false;
 
+    if (Notification.permission === 'denied') {
+      hint.textContent = isIos()
+        ? 'Notifications are blocked. On iPhone open Settings > Notifications > Sputnik Ship and turn on Allow Notifications.'
+        : 'Notifications are blocked for this site. Click the lock icon next to the address bar and allow Notifications, then reload.';
+      hint.hidden = false;
+    }
+
     try {
       const reg = await navigator.serviceWorker.ready;
-      const existing = await reg.pushManager.getSubscription();
+      let existing = await reg.pushManager.getSubscription();
+      if (existing && Notification.permission === 'granted') {
+        existing = await resyncSubscription(reg, existing);
+      }
       updatePushButton(Boolean(existing));
     } catch (err) {
       // If the service worker isn't ready yet, leave the button in its default state.
     }
+  }
+
+  function sameKey(sub, publicKey) {
+    try {
+      const current = sub.options && sub.options.applicationServerKey;
+      if (!current) return true; // browser doesn't expose it - assume fine
+      const a = new Uint8Array(current);
+      const b = urlBase64ToUint8Array(publicKey);
+      return a.length === b.length && a.every((v, i) => v === b[i]);
+    } catch {
+      return true;
+    }
+  }
+
+  // Runs on every launch. Before this, "already subscribed in this
+  // browser" was treated as done forever - but the server's copy could be
+  // gone (expired and removed, or this device now logged in to another
+  // account), so nothing was ever delivered and the button still said
+  // "enabled". Now the server is re-told about this device each time, and
+  // a subscription made with an old VAPID key is replaced.
+  async function resyncSubscription(reg, existing) {
+    const { publicKey } = await api('/push/vapid-public-key');
+    if (!publicKey) return existing;
+    if (!sameKey(existing, publicKey)) {
+      await existing.unsubscribe().catch(() => {});
+      existing = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+    }
+    await api('/push/subscribe?sync=1', { method: 'POST', body: existing.toJSON() }).catch(() => {});
+    return existing;
   }
 
   function updatePushButton(subscribed) {
@@ -2230,19 +2274,59 @@
     $('#push-banner').hidden = subscribed;
   }
 
+  async function sendTestPushToMe() {
+    const res = await api('/push/test', { method: 'POST' });
+    if (!res.devices) {
+      toast('No devices registered yet - tap "Turn on" again.');
+      return;
+    }
+    const failed = res.results.filter((r) => !r.ok);
+    if (!failed.length) {
+      toast(`Test sent to ${res.devices} device${res.devices > 1 ? 's' : ''} - it should arrive in a few seconds.`);
+    } else {
+      toast(`Test failed on ${failed.length} of ${res.devices} device(s): ${failed[0].reason || 'unknown error'}`);
+    }
+  }
+
+  // Profile > "Send a test notification": re-registers this device (or
+  // subscribes it if needed) and fires a real push, reporting the result.
+  guardClick($('#push-test-btn'), async () => {
+    if (!pushSupported()) {
+      toast(isIos() && !isStandalone()
+        ? 'On iPhone, first add the app to your Home Screen and open it from there.'
+        : 'This browser does not support push notifications.');
+      return;
+    }
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const existing = await reg.pushManager.getSubscription();
+      if (!existing || Notification.permission !== 'granted') {
+        toast('Notifications are not on for this device yet - open Alerts and tap "Turn on" first.');
+        return;
+      }
+      await resyncSubscription(reg, existing);
+      await sendTestPushToMe();
+    } catch (err) {
+      toast('Could not send the test: ' + err.message);
+    }
+  });
+
   guardClick($('#push-toggle-btn'), async () => {
     if (!pushSupported()) return;
     try {
       const reg = await navigator.serviceWorker.ready;
-      const existing = await reg.pushManager.getSubscription();
-      if (existing) {
-        toast('Notifications are already enabled in this browser.');
+      let existing = await reg.pushManager.getSubscription();
+      if (existing && Notification.permission === 'granted') {
+        await resyncSubscription(reg, existing);
+        await sendTestPushToMe();
         return;
       }
 
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
-        toast('Notification permission was not granted.');
+        toast(permission === 'denied'
+          ? 'Notifications are blocked - allow them in your browser/phone settings, then try again.'
+          : 'Notification permission was not granted.');
         return;
       }
 
@@ -2252,12 +2336,14 @@
         return;
       }
 
+      if (existing) await existing.unsubscribe().catch(() => {});
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey),
       });
       const result = await api('/push/subscribe', { method: 'POST', body: sub.toJSON() });
       updatePushButton(true);
+      $('#push-unavailable-hint').hidden = true;
       if (result.testPush?.ok) {
         toast('Notifications enabled - check for the test alert');
       } else {
