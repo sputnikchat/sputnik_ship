@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -157,7 +157,8 @@ app.get('/', (req, res) => {
 
 // Static frontend (PWA)
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('*', (req, res, next) => {
+// Express 5 path syntax: a named wildcard ('*' alone is no longer valid).
+app.get('/{*splat}', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

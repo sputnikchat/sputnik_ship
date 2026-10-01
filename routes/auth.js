@@ -2,7 +2,6 @@ const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
-const { v4: uuidv4 } = require('uuid');
 const { readDB, update } = require('../services/store');
 const { requireAuth } = require('../middleware/auth');
 const { passwordCheckLimiter } = require('../middleware/limits');
@@ -170,7 +169,7 @@ router.post('/signup', authLimiter, async (req, res) => {
   const recoveryCode = generateRecoveryCode();
   const recoveryCodeHash = await bcrypt.hash(normalizeRecoveryCode(recoveryCode), 10);
   const user = {
-    id: uuidv4(),
+    id: crypto.randomUUID(),
     handle: normalizedHandle,
     passwordHash,
     recoveryCodeHash,

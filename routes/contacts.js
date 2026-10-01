@@ -1,6 +1,6 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const { readDB, update } = require('../services/store');
 const { requireAuth } = require('../middleware/auth');
 const { getSpaceUserIds } = require('../services/space');
@@ -71,7 +71,7 @@ router.post('/', writeLimiter, async (req, res) => {
   }
 
   const contact = {
-    id: uuidv4(),
+    id: crypto.randomUUID(),
     userId: req.user.id,
     createdAt: new Date().toISOString(),
   };

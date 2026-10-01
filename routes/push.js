@@ -1,4 +1,4 @@
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { update, readDB } = require('../services/store');
@@ -71,7 +71,7 @@ router.post('/subscribe', subscribeLimiter, async (req, res) => {
     // different account - the push must follow whoever is logged in).
     data.pushSubscriptions = data.pushSubscriptions.filter((s) => s.endpoint !== endpoint);
     saved = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       userId: req.user.id,
       endpoint,
       keys: { p256dh: keys.p256dh, auth: keys.auth },

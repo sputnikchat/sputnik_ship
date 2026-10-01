@@ -15,7 +15,7 @@
 // since that role can always re-grant itself privileges. True immunity
 // to that would mean the running app never holding an admin-level
 // credential at all - a bigger change than this table asked for.
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const { Pool } = require('pg');
 
 if (!process.env.AUDIT_DATABASE_URL) {
@@ -43,7 +43,7 @@ async function logAudit({ userId, action, shipmentId = null, req = null }) {
   try {
     await pool.query(
       'INSERT INTO audit_log (id, user_id, action, shipment_id, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6)',
-      [uuidv4(), userId, action, shipmentId, req?.ip || null, req?.headers?.['user-agent'] || null]
+      [crypto.randomUUID(), userId, action, shipmentId, req?.ip || null, req?.headers?.['user-agent'] || null]
     );
   } catch (err) {
     console.error('Could not write audit log entry:', err.message);

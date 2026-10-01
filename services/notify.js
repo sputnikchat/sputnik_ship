@@ -1,4 +1,4 @@
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const webpush = require('web-push');
 const { update: storeUpdate } = require('./store');
 const { getSpaceUserIds } = require('./space');
@@ -9,7 +9,7 @@ const { getSpaceUserIds } = require('./space');
 // shipment's whole timeline, not two things to cross-reference.
 function pushSystemMessage(shipment, text) {
   shipment.messages ||= [];
-  shipment.messages.push({ id: uuidv4(), type: 'system', text, createdAt: new Date().toISOString() });
+  shipment.messages.push({ id: crypto.randomUUID(), type: 'system', text, createdAt: new Date().toISOString() });
 }
 
 // A customs hold (Fase 4): same system-message mechanism as a status
@@ -154,7 +154,7 @@ function pushNotificationToUsers(data, { userIds, shipmentId, title, message, le
     const recipient = data.users.find((u) => u.id === recipientId);
     if (type && recipient?.notifyPrefs && recipient.notifyPrefs[type] === false) continue;
     const notification = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       userId: recipientId,
       shipmentId,
       title,

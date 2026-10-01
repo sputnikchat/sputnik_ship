@@ -1,7 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
-const { v4: uuidv4 } = require('uuid');
 const { readDB, update } = require('../services/store');
 const { requireAuth } = require('../middleware/auth');
 const { getTrackingUpdate, CARRIERS } = require('../services/carrierProviders');
@@ -132,7 +131,7 @@ router.post('/', writeLimiter, async (req, res) => {
   }
 
   const shipment = {
-    id: uuidv4(),
+    id: crypto.randomUUID(),
     userId: req.user.id,
     carrier: String(carrier).toLowerCase(),
     trackingNumber: clean.trackingNumber,
@@ -383,7 +382,7 @@ router.post('/:id/messages', writeLimiter, async (req, res) => {
     const s = data.shipments.find((x) => x.id === shipment.id);
     const author = data.users.find((u) => u.id === req.user.id);
     const msg = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       userId: req.user.id,
       handle: author ? author.handle : 'unknown',
       text: trimmedText.slice(0, 2000),
