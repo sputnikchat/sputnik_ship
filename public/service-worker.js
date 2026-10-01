@@ -14,7 +14,7 @@
 //
 // API data (/api/*) is never touched here - app.js keeps its own
 // last-known copy per account so it can paint the inbox while the API wakes.
-const CACHE_NAME = 'sputnikship-shell-v7';
+const CACHE_NAME = 'sputnikship-shell-v8';
 // app.js owns this cache (last-known inbox data); never delete it on activate.
 const DATA_CACHE_PREFIX = 'sputnikship-data';
 const SHELL_FILES = [

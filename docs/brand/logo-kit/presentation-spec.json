@@ -1,0 +1,31 @@
+{
+  "brand": "Sputnik Ship",
+  "tagline": "Every shipment is a conversation",
+  "brief": "Una PWA que convierte cada envío en una conversación entre quien envía, quien recibe y el mensajero. Debe sentirse tranquila, precisa y oscura (linaje Linear/Raycast) y verse nítida como icono de app.",
+  "adjectives": ["tranquila", "precisa", "en movimiento", "de confianza"],
+  "criteria": "Éxito: un solo dibujo en toda la marca, legible a 16 px, sólido en la pantalla de inicio de iPhone y Android, y que conserve el índigo → violeta.",
+  "industry": "consumer-app",
+  "nav": ["Product", "How it works", "Log in"],
+  "brand_color": "#5e6ad2",
+  "tile_color": "#6c6fe0",
+  "greyscale": false,
+  "designer": "Sputnik Ship",
+  "round": 2,
+  "concepts": [
+    {
+      "name": "Proa",
+      "symbol": "proa-symbol-color.svg",
+      "symbol_on_tile": "proa-symbol-white.svg",
+      "lockup": "sputnik-ship-horizontal.svg",
+      "lockup_on_dark": "sputnik-ship-horizontal-on-dark.svg",
+      "idea": "La proa de una nave que avanza, con un ojo de buey en forma de rombo: el envío en camino.",
+      "rationale": [
+        "Evolución del logo actual: se conserva lo reconocible y el color",
+        "Ángulos y esquinas construidos con geometría exacta, un solo dibujo en todas partes",
+        "Icono a sangre con degradado: destaca en pantallas claras y oscuras"
+      ]
+    }
+  ],
+  "recommendation": "Proa — la evolución elegida: mismo espíritu, dibujo limpio y un icono de app que por fin se ve.",
+  "next_steps": ["Publicar el nuevo icono (git push)", "Reinstalar la app en el móvil para ver el icono nuevo", "Actualizar las escenas del vídeo promo"]
+}
