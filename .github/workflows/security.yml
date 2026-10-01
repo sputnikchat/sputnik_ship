@@ -1,0 +1,78 @@
+# Continuous security checks. A failed run emails the repo owner (GitHub's
+# default notification for failed workflows), with the details in the run.
+#
+# 1. Dependencies: npm audit fails on any high/critical vulnerability.
+# 2. Code: CodeQL scans the JavaScript for injection, XSS, path traversal,
+#    insecure crypto and similar; findings appear under Security > Code
+#    scanning, with the exact line.
+# 3. Production: checks the live site still enforces its protections - the
+#    API refuses requests without (or with a forged) session and the
+#    security headers are set.
+name: Security checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '17 6 * * 1'   # every Monday 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: npm audit (fails on high or critical)
+        run: npm audit --omit=dev --audit-level=high
+
+  codeql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v3
+
+  production:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SITE: https://sputnik-ship.onrender.com
+    steps:
+      - name: Wake the service
+        run: curl --silent --max-time 90 --retry 2 -o /dev/null "$SITE/api/health"
+      - name: API refuses requests without a session
+        run: |
+          for endpoint in /api/shipments /api/contacts /api/notifications /api/account/co-owners /api/stats/passport; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$SITE$endpoint")
+            echo "$endpoint -> $code"
+            [ "$code" = "401" ] || { echo "::error::$endpoint answered $code without a session (expected 401)"; exit 1; }
+          done
+      - name: A forged session token is rejected
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer eyJhbGciOiJub25lIn0.eyJpZCI6ImF0dGFja2VyIn0." "$SITE/api/shipments")
+          echo "forged token -> $code"
+          [ "$code" = "401" ] || { echo "::error::forged token answered $code (expected 401)"; exit 1; }
+      - name: Security headers are present
+        run: |
+          headers=$(curl -sI "$SITE/app")
+          for h in content-security-policy strict-transport-security x-content-type-options x-frame-options; do
+            echo "$headers" | grep -qi "^$h:" || { echo "::error::missing header $h"; exit 1; }
+            echo "ok: $h"
+          done

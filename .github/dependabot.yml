@@ -1,6 +1,6 @@
-# Opens a pull request on GitHub whenever one of the app's npm
-# dependencies has a newer version - security fixes included - instead
-# of relying on someone remembering to check.
+# Dependabot: opens a pull request whenever a dependency (npm package or
+# GitHub Action) has a security fix or a new version, so vulnerable
+# libraries don't sit unnoticed. Security alerts arrive by email too.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -8,3 +8,10 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
