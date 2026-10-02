@@ -1268,7 +1268,7 @@ body.chat-input-focused .chat-form { bottom: 0; padding-bottom: max(8px, env(saf
 .th-card .eta { display: flex; align-items: baseline; gap: 8px; }
 .th-card .eta b { font-size: 19px; letter-spacing: -.02em; font-weight: 600; }
 .th-card .eta span { font-family: var(--mono); font-size: 11px; color: var(--dim); }
-.th-card .act { display: flex; gap: 8px; margin-top: 4px; }
+.th-card .act { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 
 .th-more { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--bg2); margin: 4px 0 14px; }
 .th-more summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
@@ -1331,7 +1331,7 @@ input, select, textarea, .cmd-in .search, .search { font-size: 16px; }
 .tabs.chips .tab { position: relative; min-height: 36px; }
 .tabs.chips .tab::after { content: ""; position: absolute; inset: -4px 0; }
 .btn-primary.small, .btn-secondary.small, .btn-danger.small { min-height: 40px; }
-.th-card .act .btn-primary, .th-card .act .btn-secondary { min-height: 44px; }
+.th-card .act .btn-primary, .th-card .act .btn-secondary { min-height: 44px; white-space: nowrap; }
 .th-more summary { min-height: 44px; }
 button.avatar { border: 0; padding: 0; cursor: pointer; font: inherit; font-weight: 600; }
 button.avatar:active { transform: scale(.94); }

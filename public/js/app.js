@@ -96,6 +96,17 @@
 
   const CARRIER_LABEL = { fedex: 'FedEx', ups: 'UPS', dhl: 'DHL', usps: 'USPS', air_cargo: 'Air Cargo (AWB)', ocean_cargo: 'Ocean Cargo (MBL)' };
 
+  // Ship24 covers almost no airlines and only Maersk among shipping lines, so
+  // air/ocean cargo gets a hand-off to track-trace.com, which routes any AWB
+  // or container number to the carrier's own site. It doesn't take the
+  // number in the URL, so the button copies it first.
+  // ponytail: link-out only; a real feed (DCSA for ocean, a paid AWB API)
+  // would bring cargo onto the map.
+  const CARGO_SITE = {
+    air_cargo: 'https://www.track-trace.com/aircargo',
+    ocean_cargo: 'https://www.track-trace.com/container',
+  };
+
   // Kept in sync by hand with CATEGORIES in routes/shipments.js.
   const CATEGORIES = [
     { value: 'electronics', label: 'Electronics', icon: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>' },
@@ -1745,12 +1756,21 @@
     list.innerHTML = parts.join('');
     $('.th-card-share', list)?.addEventListener('click', () => shareShipment(s.id));
     $('.th-card-reply', list)?.addEventListener('click', () => $('#chat-input').focus());
+    $('.th-card-site', list)?.addEventListener('click', async () => {
+      // Copy before opening the tab: once it opens, this page loses focus
+      // and the clipboard write is refused.
+      const copied = await navigator.clipboard.writeText(s.trackingNumber).then(() => true, () => false);
+      window.open(CARGO_SITE[s.carrier], '_blank', 'noopener');
+      toast(copied ? 'Tracking number copied. Paste it on the page.' : `Paste this number on the page: ${s.trackingNumber}`);
+    });
     if (wasNearBottom) list.scrollTop = list.scrollHeight;
     finishChatRender(s);
   }
 
+
   function milestoneCard(s, fresh = false) {
     const owner = s.viewerRole !== 'follower';
+    const site = CARGO_SITE[s.carrier] ? '<button type="button" class="btn-secondary small th-card-site">Carrier site ↗</button>' : '';
     const eta = s.estimatedDelivery ? (isToday(s.estimatedDelivery) ? fmtShort(s.estimatedDelivery) + ' today' : fmtDate(s.estimatedDelivery)) : null;
     const share = owner && s.status !== 'delivered' ? '<button type="button" class="btn-secondary small th-card-share">Share link</button>' : '';
     const reply = s.status !== 'delivered' ? '<button type="button" class="btn-primary small th-card-reply">Reply</button>' : '';
@@ -1762,15 +1782,15 @@
       return `<div class="th-card hl${nw}"><div class="h"><b>${escapeHtml(s.statusLabel || 'Out for delivery')}</b><time>${fmtShort(s.lastCheckedAt)}</time></div>
         <p>${s.currentLocation?.label ? 'Courier left ' + escapeHtml(String(s.currentLocation.label).split(':').pop().trim()) + '.' : 'The courier is on the way.'}</p>
         ${eta ? `<div class="eta"><b>${eta}</b><span>estimated</span></div>` : ''}
-        <div class="act">${reply}${share}</div></div>`;
+        <div class="act">${reply}${share}${site}</div></div>`;
     }
     if (s.delayFlagged || s.status === 'exception' || s.status === 'failed_attempt') {
       return `<div class="th-card warn${nw}"><div class="h"><b>${s.status === 'exception' ? 'Exception' : s.status === 'failed_attempt' ? 'Delivery attempt failed' : 'Possible delay'}</b><time>${fmtShort(s.lastCheckedAt)}</time></div>
-        <p>${s.delayFlagged ? 'No new scan from the courier for a while.' : 'The courier reported a problem with this shipment.'}</p><div class="act">${reply}${share}</div></div>`;
+        <p>${s.delayFlagged ? 'No new scan from the courier for a while.' : 'The courier reported a problem with this shipment.'}</p><div class="act">${reply}${share}${site}</div></div>`;
     }
     return `<div class="th-card${nw}"><div class="h"><b>${escapeHtml(s.statusLabel || 'In transit')}</b><time>${fmtShort(s.lastCheckedAt)}</time></div>
       ${eta ? `<div class="eta"><b>${eta}</b><span>estimated</span></div>` : '<p>Checked automatically every 30 minutes.</p>'}
-      <div class="act">${reply}${share}</div></div>`;
+      <div class="act">${reply}${share}${site}</div></div>`;
   }
 
   function finishChatRender(s) {
@@ -1833,7 +1853,9 @@
     }
 
     if (!route) {
-      container.innerHTML = '<div class="empty" style="padding:20px;">The map will appear as soon as the courier reports the first checkpoint.</div>';
+      container.innerHTML = CARGO_SITE[shipment.carrier]
+        ? '<div class="empty" style="padding:20px;">Live map isn\'t available for this carrier yet. Use “Carrier site” below.</div>'
+        : '<div class="empty" style="padding:20px;">The map will appear as soon as the courier reports the first checkpoint.</div>';
       return;
     }
     if (typeof L === 'undefined') {
