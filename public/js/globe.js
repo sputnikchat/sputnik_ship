@@ -1,11 +1,14 @@
 // Hero globe: a dotted Earth behind the phone with shipment routes arcing
-// between real hubs and a packet of light riding each one. Desktop only,
-// loaded after the page is idle (three.js is ~170 KB over the wire), and
-// never for prefers-reduced-motion or without WebGL - the static SVG
-// routes stay in place for everyone else.
+// between real hubs and a packet of light riding each one. Tablets and up
+// (>640px), loaded after the page is idle (three.js is ~170 KB over the
+// wire), and never for prefers-reduced-motion or without WebGL - phones and
+// everyone else keep the static SVG routes.
 const hero = document.querySelector('.hero');
 const bg = hero && hero.querySelector('.hero-bg');
-const wide = matchMedia('(min-width: 1025px)').matches;
+const wide = matchMedia('(min-width: 641px)').matches;
+// Two-column hero: the globe sits top-right; single column (<=1024px): it
+// rises behind the phone, which then sits under the text.
+const twoCol = matchMedia('(min-width: 1025px)').matches;
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function webgl() {
@@ -36,7 +39,8 @@ function build(THREE) {
   const canvas = document.createElement('canvas');
   canvas.className = 'globe';
   canvas.setAttribute('aria-hidden', 'true');
-  bg.appendChild(canvas);
+  const stage = hero.querySelector('.stage');
+  if (twoCol || !stage) bg.appendChild(canvas); else stage.prepend(canvas);
 
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'low-power' });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));

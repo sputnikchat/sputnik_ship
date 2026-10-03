@@ -3,9 +3,9 @@
   var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   if (!reduce) document.documentElement.classList.add('motion');
-  // Desktop with GSAP loaded: the signal track is scroll-scrubbed (see
+  // Tablet and up with GSAP loaded: the signal track is scroll-scrubbed (see
   // below) instead of playing its CSS animation once.
-  var scrub = !reduce && window.gsap && window.ScrollTrigger && matchMedia('(min-width: 1025px)').matches;
+  var scrub = !reduce && window.gsap && window.ScrollTrigger && matchMedia('(min-width: 641px)').matches;
 
   // scroll reveal - items inside a group (cards, features, story rows)
   // arrive one after another instead of all at once
@@ -274,7 +274,7 @@
     });
   })();
 
-  // ---------- 3b · scroll-scrubbed signal track + phone parallax (desktop) ----------
+  // ---------- 3b · scroll-scrubbed signal track + phone parallax (>640px) ----------
   if (scrub) (function(){
     gsap.registerPlugin(ScrollTrigger);
     var track = document.getElementById('track');

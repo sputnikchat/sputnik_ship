@@ -48,7 +48,9 @@ button{font-family:inherit;cursor:pointer;border:0}
 .hero-bg .route{position:absolute;inset:0;width:100%;height:100%;transition:opacity 1.2s}
 /* three.js globe behind the phone (desktop only, see js/globe.js) */
 .hero-bg .globe{position:absolute;width:min(580px,42vw);aspect-ratio:1;right:max(-80px,-5vw);top:-110px;opacity:0;transition:opacity 1.6s var(--ease-out)}
-.has-globe .hero-bg .globe{opacity:1}
+/* single-column hero (tablets, small laptops): the globe rises behind the phone */
+.stage .globe{position:absolute;z-index:-1;width:min(600px,92vw);aspect-ratio:1;left:50%;margin-left:calc(min(600px,92vw) / -2);top:calc(min(600px,92vw) * -.42);opacity:0;transition:opacity 1.6s var(--ease-out)}
+.has-globe .globe{opacity:1}
 .has-globe .hero-bg .route{opacity:0}
 .hero .wrap{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:clamp(32px,5vw,72px);align-items:center;padding-block:clamp(56px,8vh,104px) 0;min-height:min(88vh,860px)}
 .eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#b9bff0;background:var(--accent-soft);border:1px solid rgba(94,106,210,.35);padding:6px 12px;border-radius:999px}
