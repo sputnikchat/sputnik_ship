@@ -45,7 +45,11 @@ button{font-family:inherit;cursor:pointer;border:0}
 .hero-bg .grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:72px 72px;mask-image:radial-gradient(ellipse 70% 60% at 62% 45%,#000 20%,transparent 75%);-webkit-mask-image:radial-gradient(ellipse 70% 60% at 62% 45%,#000 20%,transparent 75%)}
 .hero-bg .glow1{position:absolute;width:900px;height:900px;right:-160px;top:-260px;border-radius:50%;background:radial-gradient(circle,rgba(94,106,210,.28) 0%,rgba(139,124,246,.12) 35%,transparent 70%);filter:blur(30px)}
 .hero-bg .glow2{position:absolute;width:700px;height:700px;left:-260px;bottom:-320px;border-radius:50%;background:radial-gradient(circle,rgba(139,124,246,.14) 0%,transparent 65%);filter:blur(30px)}
-.hero-bg .route{position:absolute;inset:0;width:100%;height:100%}
+.hero-bg .route{position:absolute;inset:0;width:100%;height:100%;transition:opacity 1.2s}
+/* three.js globe behind the phone (desktop only, see js/globe.js) */
+.hero-bg .globe{position:absolute;width:min(580px,42vw);aspect-ratio:1;right:max(-80px,-5vw);top:-110px;opacity:0;transition:opacity 1.6s var(--ease-out)}
+.has-globe .hero-bg .globe{opacity:1}
+.has-globe .hero-bg .route{opacity:0}
 .hero .wrap{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:clamp(32px,5vw,72px);align-items:center;padding-block:clamp(56px,8vh,104px) 0;min-height:min(88vh,860px)}
 .eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#b9bff0;background:var(--accent-soft);border:1px solid rgba(94,106,210,.35);padding:6px 12px;border-radius:999px}
 .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 rgba(62,207,142,.6);animation:pulse 2s infinite}
@@ -320,6 +324,7 @@ html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 .motion .rv.in{opacity:1;transform:none;filter:none}
 .motion .track .stop{opacity:0;transform:translateY(10px);transition:opacity .6s var(--ease-out),transform .6s var(--ease-out)}
 .motion .track.inview .stop{opacity:1;transform:none}
+.track.scrubbed .stop,.track.scrubbed .node{transition:none}
 .track.inview .stop:nth-child(1){transition-delay:.25s}.track.inview .stop:nth-child(2){transition-delay:.75s}.track.inview .stop:nth-child(3){transition-delay:1.25s}.track.inview .stop:nth-child(4){transition-delay:1.75s}.track.inview .stop:nth-child(5){transition-delay:2.35s}
 
 /* 2 · Hero: the phone's route draws itself while the live pin rides its
@@ -495,7 +500,7 @@ html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
       <svg viewBox="0 0 1100 120" aria-hidden="true">
         <path d="M60 60 H1040" stroke="var(--line2)" stroke-width="2" stroke-dasharray="4 8"/>
         <path d="M60 60 H1040" stroke="url(#tg)" stroke-width="3" stroke-linecap="round" class="track-fill"/>
-        <defs><linearGradient id="tg" x1="0" x2="1"><stop offset="0" stop-color="#3ecf8e"/><stop offset=".6" stop-color="#8b7cf6"/><stop offset="1" stop-color="#5e6ad2"/></linearGradient></defs>
+        <defs><linearGradient id="tg" gradientUnits="userSpaceOnUse" x1="60" y1="0" x2="1040" y2="0"><stop offset="0" stop-color="#3ecf8e"/><stop offset=".6" stop-color="#8b7cf6"/><stop offset="1" stop-color="#5e6ad2"/></linearGradient></defs>
         <g class="node"><circle cx="60" cy="60" r="16" fill="#0f1017" stroke="#3ecf8e" stroke-width="2"/><circle cx="60" cy="60" r="5" fill="#3ecf8e"/></g>
         <g class="node"><circle cx="305" cy="60" r="16" fill="#0f1017" stroke="#8b7cf6" stroke-width="2"/><circle cx="305" cy="60" r="5" fill="#8b7cf6"/></g>
         <g class="node"><circle cx="550" cy="60" r="16" fill="#0f1017" stroke="#8b7cf6" stroke-width="2"/><circle cx="550" cy="60" r="5" fill="#8b7cf6"/></g>
@@ -675,6 +680,9 @@ html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
   </div>
 </section>
 <div class="wrap"><div class="foot"><span>© 2026 Sputnik Ship</span><span style="font-family:var(--mono)">sputnikship.app</span></div></div>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js" integrity="sha384-XmJ9SoHtVOHoQUcKvFAzVXwdkKo1Ie3bhmSoIAkcdsHGaIrVJIkmozyq0FJeb/Ly" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/ScrollTrigger.min.js" integrity="sha384-wl5TeDVvOWt30Pbf8aSo2ZrzsOjddu3avOBvHe+p+OhJt9gP6w9YXmDkN5DK2/dF" crossorigin="anonymous"></script>
 <script src="/js/landing.js"></script>
+<script type="module" src="/js/globe.js"></script>
 </body>
 </html>

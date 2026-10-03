@@ -3,6 +3,9 @@
   var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   if (!reduce) document.documentElement.classList.add('motion');
+  // Desktop with GSAP loaded: the signal track is scroll-scrubbed (see
+  // below) instead of playing its CSS animation once.
+  var scrub = !reduce && window.gsap && window.ScrollTrigger && matchMedia('(min-width: 1025px)').matches;
 
   // scroll reveal - items inside a group (cards, features, story rows)
   // arrive one after another instead of all at once
@@ -17,8 +20,10 @@
     var io = new IntersectionObserver(function(en){ en.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} }); },{threshold:.12, rootMargin:'0px 0px -6% 0px'});
     els.forEach(function(el){ io.observe(el); });
     var tr = document.getElementById('track');
-    var io2 = new IntersectionObserver(function(en){ en.forEach(function(e){ if(e.isIntersecting){ tr.classList.add('inview'); io2.disconnect(); } }); },{threshold:.3});
-    io2.observe(tr);
+    if (!scrub) {
+      var io2 = new IntersectionObserver(function(en){ en.forEach(function(e){ if(e.isIntersecting){ tr.classList.add('inview'); io2.disconnect(); } }); },{threshold:.3});
+      io2.observe(tr);
+    }
   } else {
     els.forEach(function(el){ el.classList.add('in'); });
     document.getElementById('track').classList.add('inview');
@@ -266,6 +271,36 @@
           return wait(650);
         }).then(next);
       })();
+    });
+  })();
+
+  // ---------- 3b · scroll-scrubbed signal track + phone parallax (desktop) ----------
+  if (scrub) (function(){
+    gsap.registerPlugin(ScrollTrigger);
+    var track = document.getElementById('track');
+    var fill = track.querySelector('.track-fill');
+    var nodes = track.querySelectorAll('.node');
+    var stops = track.querySelectorAll('.stop');
+    track.classList.add('scrubbed');
+    // The section holds still while the package travels label -> door, one
+    // stop per stretch of scroll; scrolling back rewinds it.
+    var tl = gsap.timeline({
+      defaults: { ease: 'none' },
+      scrollTrigger: { trigger: '.signal', start: 'center center', end: '+=1200', pin: true, scrub: 0.5 },
+    });
+    tl.fromTo(fill, { strokeDashoffset: 1100 }, { strokeDashoffset: 0, duration: 4 }, 0);
+    nodes.forEach(function(n, i){
+      tl.fromTo(n, { opacity: .35, scale: .7, transformOrigin: '50% 50%' }, { opacity: 1, scale: 1, duration: .35, ease: 'power2.out' }, i);
+      tl.fromTo(stops[i], { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: .45, ease: 'power2.out' }, i + .05);
+    });
+    tl.to({}, { duration: .4 }); // a beat at "Delivered" before the pin releases
+
+    // Story phones drift a little slower than the page.
+    document.querySelectorAll('.sphone').forEach(function(el){
+      var phone = el.querySelector('.phone'), halo = el.querySelector('.halo');
+      var st = { trigger: el, start: 'top bottom', end: 'bottom top', scrub: true };
+      if (phone) gsap.fromTo(phone, { y: 50 }, { y: -50, ease: 'none', scrollTrigger: st });
+      if (halo) gsap.fromTo(halo, { y: -30 }, { y: 30, ease: 'none', scrollTrigger: st });
     });
   })();
 
