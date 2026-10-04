@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      SITE: https://sputnik-ship.onrender.com
+      SITE: https://sputnikship.app
     steps:
       - name: Wake the service
         run: curl --silent --max-time 90 --retry 2 -o /dev/null "$SITE/api/health"

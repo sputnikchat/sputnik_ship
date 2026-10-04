@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+# The app, shared shipment threads and the API are private or per-user.
+Disallow: /app
+Disallow: /s/
+Disallow: /api/
+
+Sitemap: https://sputnikship.app/sitemap.xml

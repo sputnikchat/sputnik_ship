@@ -59,6 +59,25 @@ const app = express();
 // IP and either rate-limits everyone together or refuses to start.
 app.set('trust proxy', 1);
 
+// One public address: http, www and the Render hostname all 301 to
+// https://sputnikship.app, so search engines see a single site instead of
+// four copies. /api/* is left alone - the browser extension and the
+// keep-alive ping call the Render hostname directly, and a redirect would
+// break their POSTs. Cloudflare (in front of Render) reports the visitor's
+// own scheme in cf-visitor; Render's x-forwarded-proto is its own hop.
+const CANONICAL_HOST = 'sputnikship.app';
+const ALIAS_HOSTS = new Set(['www.sputnikship.app', 'sputnik-ship.onrender.com']);
+app.use((req, res, next) => {
+  if ((req.method !== 'GET' && req.method !== 'HEAD') || req.path.startsWith('/api/')) return next();
+  const host = (req.hostname || '').toLowerCase();
+  let scheme = req.protocol;
+  try { scheme = JSON.parse(req.get('cf-visitor') || '{}').scheme || scheme; } catch (e) { /* keep req.protocol */ }
+  if (ALIAS_HOSTS.has(host) || (host === CANONICAL_HOST && scheme === 'http')) {
+    return res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl}`);
+  }
+  next();
+});
+
 // Security headers (clickjacking, MIME-sniffing, forced HTTPS, etc.).
 // The default Content-Security-Policy is replaced with one that actually
 // matches what this app loads - Leaflet + its tiles, Google Fonts, the
@@ -155,8 +174,16 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'landing.html'));
 });
 
+// Clean URLs: /privacy and /terms serve their pages (extensions below);
+// the .html spellings and the raw shells redirect to the one public URL.
+const CLEAN = { '/privacy.html': '/privacy', '/terms.html': '/terms', '/landing.html': '/', '/index.html': '/app' };
+app.get(Object.keys(CLEAN), (req, res) => {
+  const q = req.originalUrl.slice(req.path.length);
+  res.redirect(301, CLEAN[req.path] + q);
+});
+
 // Static frontend (PWA)
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 // Express 5 path syntax: a named wildcard ('*' alone is no longer valid).
 app.get('/{*splat}', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
