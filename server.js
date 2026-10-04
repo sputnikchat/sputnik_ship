@@ -59,22 +59,12 @@ const app = express();
 // IP and either rate-limits everyone together or refuses to start.
 app.set('trust proxy', 1);
 
-// One public address: www and the Render hostname 301 to sputnikship.app,
-// so search engines see a single site. http -> https is NOT done here: the
-// custom domain reaches Render through two Cloudflare hops joined over
-// plain http, so every request looks like http from inside and redirecting
-// on that loops forever. Cloudflare's "Always Use HTTPS" plus HSTS cover it.
-// /api/* is left alone - the browser extension and the keep-alive ping call
-// the Render hostname directly, and a redirect would break their POSTs.
-const CANONICAL_HOST = 'sputnikship.app';
-const ALIAS_HOSTS = new Set(['www.sputnikship.app', 'sputnik-ship.onrender.com']);
-app.use((req, res, next) => {
-  if ((req.method !== 'GET' && req.method !== 'HEAD') || req.path.startsWith('/api/')) return next();
-  if (ALIAS_HOSTS.has((req.hostname || '').toLowerCase())) {
-    return res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl}`);
-  }
-  next();
-});
+// No host/scheme redirects in the app: sputnikship.app reaches Render
+// through two Cloudflare hops joined over plain http (and the Host seen
+// here can't be trusted to be the visitor's), so a redirect decided in
+// here looped every page back onto itself. Duplicates are handled by the
+// <link rel="canonical"> on each page; www -> apex and http -> https
+// belong to the DNS/edge settings (Render custom domains, Cloudflare).
 
 // Security headers (clickjacking, MIME-sniffing, forced HTTPS, etc.).
 // The default Content-Security-Policy is replaced with one that actually
