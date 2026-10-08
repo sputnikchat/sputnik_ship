@@ -53,7 +53,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      SITE: https://sputnikship.app
+      # The Render hostname, not sputnikship.app: the custom domain's Cloudflare
+      # answers GitHub's runners with 403 bot challenges, which looked like an
+      # API failure. Same app either way (no host redirects).
+      SITE: https://sputnik-ship.onrender.com
     steps:
       - name: Wake the service
         run: curl --silent --max-time 90 --retry 2 -o /dev/null "$SITE/api/health"
