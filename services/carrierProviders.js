@@ -207,42 +207,107 @@ async function parseShip24Response(data) {
     (a, b) => new Date(a.occurrenceDatetime) - new Date(b.occurrenceDatetime)
   );
 
+  const estimatedDelivery =
+    tracking.shipment?.delivery?.estimatedDeliveryDate ||
+    tracking.shipment?.delivery?.courierEstimatedDeliveryDate?.from ||
+    null;
+
+  return buildResult(
+    status,
+    STATUS_LABELS[status] || milestone,
+    orderedEvents.map((ev) => ({ text: ev.status, location: ev.location, timestamp: ev.occurrenceDatetime })),
+    estimatedDelivery,
+    findCustomsAlert(orderedEvents)
+  );
+}
+
+// Shared by every provider: oldest-first events ({ text, location,
+// timestamp }) become the timeline, and the ones whose place geocodes
+// become the map route.
+async function buildResult(status, statusLabel, events, estimatedDelivery, customsAlert) {
   const geocoded = [];
-  for (const ev of orderedEvents) {
-    const label = ev.status || ev.location || 'Checkpoint';
+  for (const ev of events) {
+    const label = ev.text || ev.location || 'Checkpoint';
     const point = ev.location ? await geocodeLocation(ev.location) : null;
     geocoded.push({
       label: ev.location ? `${label} · ${ev.location}` : label,
       lat: point?.lat ?? null,
       lng: point?.lng ?? null,
-      timestamp: ev.occurrenceDatetime || new Date().toISOString(),
+      timestamp: ev.timestamp || new Date().toISOString(),
     });
   }
 
   // The map needs coordinates: if any couldn't be geocoded, we drop it
   // from the route (but the checkpoint still shows up in the timeline).
   const fullRoute = geocoded.filter((p) => p.lat != null && p.lng != null);
-  const checkpoints = geocoded.map((p) => ({
-    label: p.label,
-    timestamp: p.timestamp,
-    status,
-  }));
-
-  const estimatedDelivery =
-    tracking.shipment?.delivery?.estimatedDeliveryDate ||
-    tracking.shipment?.delivery?.courierEstimatedDeliveryDate?.from ||
-    null;
-
   return {
     status,
-    statusLabel: STATUS_LABELS[status] || milestone,
+    statusLabel,
     checkpointIndex: fullRoute.length - 1,
     fullRoute,
-    checkpoints,
+    checkpoints: geocoded.map((p) => ({ label: p.label, timestamp: p.timestamp, status })),
     currentLocation: fullRoute[fullRoute.length - 1] || null,
     estimatedDelivery,
-    customsAlert: findCustomsAlert(orderedEvents),
+    customsAlert,
   };
+}
+
+// ---------------------------------------------------------------------
+// DHL direct: Shipment Tracking - Unified (developer.dhl.com/api-reference/
+// shipment-tracking). Free, covers Express, eCommerce, Parcel Germany,
+// Freight and Global Forwarding. Used for DHL when DHL_API_KEY is set;
+// anything it can't answer (unknown number, daily limit) falls back to
+// Ship24 so coverage never drops. The free tier allows 250 calls a day and
+// one every 5 s - calls are spaced here; more needs an upgrade request.
+const DHL_BASE = 'https://api-eu.dhl.com/track/shipments';
+const DHL_MIN_GAP_MS = 5100;
+let dhlLastCall = 0;
+
+function dhlStatus(shipment) {
+  const code = shipment.status?.statusCode;
+  const text = `${shipment.status?.status || ''} ${shipment.status?.description || ''}`;
+  if (code === 'delivered') return 'delivered';
+  if (code === 'failure') return 'exception';
+  if (code === 'pre-transit' || code === 'unknown' || !code) return 'label_created';
+  return /out for delivery|with delivery courier|on vehicle for delivery/i.test(text) ? 'out_for_delivery' : 'in_transit';
+}
+
+function dhlPlace(ev) {
+  const a = ev.location?.address || {};
+  return a.addressLocality || [a.postalCode, a.countryCode].filter(Boolean).join(' ') || null;
+}
+
+async function dhlProvider(trackingNumber) {
+  const wait = dhlLastCall + DHL_MIN_GAP_MS - Date.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  dhlLastCall = Date.now();
+  const res = await fetch(`${DHL_BASE}?trackingNumber=${encodeURIComponent(trackingNumber)}`, {
+    headers: { 'DHL-API-Key': process.env.DHL_API_KEY, Accept: 'application/json' },
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!res.ok) throw Object.assign(new Error(`DHL responded ${res.status}`), { status: res.status });
+  const shipment = (await res.json())?.shipments?.[0];
+  if (!shipment) throw Object.assign(new Error('DHL returned no shipment'), { status: 404 });
+
+  const status = dhlStatus(shipment);
+  const events = [...(shipment.events || [])]
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+    .map((ev) => ({ text: ev.description || ev.status, location: dhlPlace(ev), timestamp: ev.timestamp }));
+  const latest = shipment.status || {};
+  const customsAlert = status === 'exception' && /customs|duty|duties|aduana/i.test(`${latest.status} ${latest.description}`)
+    ? { statusCode: 'customs_exception', message: latest.description || latest.status, occurredAt: latest.timestamp || null }
+    : null;
+  return buildResult(status, STATUS_LABELS[status], events, shipment.estimatedTimeOfDelivery || null, customsAlert);
+}
+
+async function dhlOrShip24(trackingNumber) {
+  if (!process.env.DHL_API_KEY) return ship24Provider(trackingNumber);
+  try {
+    return await dhlProvider(trackingNumber);
+  } catch (err) {
+    console.warn(`DHL lookup failed (${err.message}); falling back to Ship24.`);
+    return ship24Provider(trackingNumber);
+  }
 }
 
 async function ship24Provider(trackingNumber) {
@@ -253,7 +318,7 @@ async function ship24Provider(trackingNumber) {
 const liveProviders = {
   async fedex(trackingNumber) { return ship24Provider(trackingNumber); },
   async ups(trackingNumber) { return ship24Provider(trackingNumber); },
-  async dhl(trackingNumber) { return ship24Provider(trackingNumber); },
+  async dhl(trackingNumber) { return dhlOrShip24(trackingNumber); },
   async usps(trackingNumber) { return ship24Provider(trackingNumber); },
   // Air Waybill (air cargo, not last-mile parcel courier): same Ship24
   // aggregator endpoint, which auto-detects the airline from the AWB's
