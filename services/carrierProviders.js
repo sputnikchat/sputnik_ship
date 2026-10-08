@@ -306,20 +306,24 @@ async function dhlProvider(trackingNumber) {
 // USPS_CLIENT_SECRET and are traded for an OAuth token, cached until expiry.
 const USPS_TOKEN_URL = 'https://apis.usps.com/oauth2/v3/token';
 const USPS_TRACK_URL = 'https://apis.usps.com/tracking/v3r2/tracking';
-let uspsToken = { value: null, expiresAt: 0 };
 
-async function uspsAccessToken() {
-  if (uspsToken.value && Date.now() < uspsToken.expiresAt - 60000) return uspsToken.value;
-  const res = await fetch(USPS_TOKEN_URL, {
+// OAuth client-credentials token, cached per carrier until a minute before
+// it expires. USPS takes the credentials as JSON, FedEx as a form.
+const tokens = new Map(); // name -> { value, expiresAt }
+async function clientCredentialsToken(name, url, clientId, clientSecret, asForm = false) {
+  const cached = tokens.get(name);
+  if (cached && Date.now() < cached.expiresAt - 60000) return cached.value;
+  const fields = { grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret };
+  const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ grant_type: 'client_credentials', client_id: process.env.USPS_CLIENT_ID, client_secret: process.env.USPS_CLIENT_SECRET }),
+    headers: { 'Content-Type': asForm ? 'application/x-www-form-urlencoded' : 'application/json' },
+    body: asForm ? new URLSearchParams(fields) : JSON.stringify(fields),
     signal: AbortSignal.timeout(20000),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.access_token) throw new Error(`USPS token: HTTP ${res.status} ${data.error || ''}`.trim());
-  uspsToken = { value: data.access_token, expiresAt: Date.now() + (Number(data.expires_in) || 3600) * 1000 };
-  return uspsToken.value;
+  if (!res.ok || !data.access_token) throw new Error(`${name} token: HTTP ${res.status} ${data.error || ''}`.trim());
+  tokens.set(name, { value: data.access_token, expiresAt: Date.now() + (Number(data.expires_in) || 3600) * 1000 });
+  return data.access_token;
 }
 
 function uspsStatus(item) {
@@ -334,7 +338,7 @@ function uspsStatus(item) {
 async function uspsProvider(trackingNumber) {
   const res = await fetch(USPS_TRACK_URL, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${await uspsAccessToken()}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: { Authorization: `Bearer ${await clientCredentialsToken('USPS', USPS_TOKEN_URL, process.env.USPS_CLIENT_ID, process.env.USPS_CLIENT_SECRET)}`, 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify([{ trackingNumber }]),
     signal: AbortSignal.timeout(20000),
   });
@@ -358,6 +362,55 @@ async function uspsProvider(trackingNumber) {
     eta.expectedDeliveryDate || eta.predictedDeliveryDate || eta.guaranteedDeliveryDate || null, customsAlert);
 }
 
+// ---------------------------------------------------------------------
+// FedEx direct: Track API v1, "Basic Integrated Visibility" - any FedEx
+// tracking number, no shipper account needed per lookup. Project API key /
+// secret go in FEDEX_CLIENT_ID / FEDEX_CLIENT_SECRET (production keys need a
+// FedEx account linked to the project); FEDEX_SANDBOX=1 uses the test host.
+const fedexBase = () => (process.env.FEDEX_SANDBOX === '1' ? 'https://apis-sandbox.fedex.com' : 'https://apis.fedex.com');
+
+// latestStatusDetail.derivedCode / code (FedEx track status codes).
+const FEDEX_STATUS = {
+  OC: 'label_created', IN: 'label_created',
+  PU: 'picked_up', PX: 'picked_up',
+  IT: 'in_transit', AR: 'in_transit', AF: 'in_transit', DP: 'in_transit', AA: 'in_transit', AC: 'in_transit', AD: 'in_transit', OF: 'in_transit', TR: 'in_transit', CC: 'in_transit', FD: 'in_transit',
+  OD: 'out_for_delivery', HL: 'out_for_delivery', HP: 'out_for_delivery',
+  DL: 'delivered',
+  DE: 'exception', SE: 'exception', CD: 'exception', CA: 'exception', RS: 'exception', DY: 'exception', DD: 'exception',
+};
+
+async function fedexProvider(trackingNumber) {
+  const token = await clientCredentialsToken('FedEx', `${fedexBase()}/oauth/token`, process.env.FEDEX_CLIENT_ID, process.env.FEDEX_CLIENT_SECRET, true);
+  const res = await fetch(`${fedexBase()}/track/v1/trackingnumbers`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-locale': 'en_US' },
+    body: JSON.stringify({ includeDetailedScans: true, trackingInfo: [{ trackingNumberInfo: { trackingNumber } }] }),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!res.ok) throw Object.assign(new Error(`FedEx responded ${res.status}`), { status: res.status });
+  const tr = (await res.json())?.output?.completeTrackResults?.[0]?.trackResults?.[0];
+  if (!tr || tr.error) throw new Error(`FedEx: ${tr?.error?.code || 'no result'}`);
+
+  const latest = tr.latestStatusDetail || {};
+  const status = FEDEX_STATUS[latest.derivedCode] || FEDEX_STATUS[latest.code] || 'in_transit';
+  const events = [...(tr.scanEvents || [])]
+    .map((ev) => {
+      const l = ev.scanLocation || {};
+      return {
+        text: ev.eventDescription,
+        location: [l.city, l.stateOrProvinceCode, l.countryCode].filter(Boolean).join(', ') || null,
+        timestamp: ev.date,
+      };
+    })
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const eta = (tr.dateAndTimes || []).find((d) => d.type === 'ESTIMATED_DELIVERY')?.dateTime
+    || tr.estimatedDeliveryTimeWindow?.window?.ends || null;
+  const customsAlert = latest.code === 'CD' || (status === 'exception' && /customs|clearance/i.test(latest.description || ''))
+    ? { statusCode: 'customs_exception', message: latest.description || 'Customs clearance delay', occurredAt: events.at(-1)?.timestamp || null }
+    : null;
+  return buildResult(status, latest.statusByLocale || STATUS_LABELS[status], events, eta, customsAlert);
+}
+
 // A carrier's own API when its credentials are configured, Ship24 when
 // they aren't or when the direct lookup fails (unknown number, limits).
 // ponytail: Ship24 stays the safety net until every carrier has a direct
@@ -374,6 +427,7 @@ function directOrShip24(name, configured, provider) {
   };
 }
 const dhlOrShip24 = directOrShip24('DHL', () => !!process.env.DHL_API_KEY, dhlProvider);
+const fedexOrShip24 = directOrShip24('FedEx', () => !!(process.env.FEDEX_CLIENT_ID && process.env.FEDEX_CLIENT_SECRET), fedexProvider);
 const uspsOrShip24 = directOrShip24('USPS', () => !!(process.env.USPS_CLIENT_ID && process.env.USPS_CLIENT_SECRET), uspsProvider);
 
 async function ship24Provider(trackingNumber) {
@@ -382,7 +436,7 @@ async function ship24Provider(trackingNumber) {
 }
 
 const liveProviders = {
-  async fedex(trackingNumber) { return ship24Provider(trackingNumber); },
+  fedex: fedexOrShip24,
   async ups(trackingNumber) { return ship24Provider(trackingNumber); },
   dhl: dhlOrShip24,
   usps: uspsOrShip24,
