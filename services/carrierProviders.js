@@ -300,15 +300,81 @@ async function dhlProvider(trackingNumber) {
   return buildResult(status, STATUS_LABELS[status], events, shipment.estimatedTimeOfDelivery || null, customsAlert);
 }
 
-async function dhlOrShip24(trackingNumber) {
-  if (!process.env.DHL_API_KEY) return ship24Provider(trackingNumber);
-  try {
-    return await dhlProvider(trackingNumber);
-  } catch (err) {
-    console.warn(`DHL lookup failed (${err.message}); falling back to Ship24.`);
-    return ship24Provider(trackingNumber);
-  }
+// ---------------------------------------------------------------------
+// USPS direct: Tracking 3.2 (developers.usps.com/trackingv3r2). Needs a
+// USPS Business Account app: its Consumer Key/Secret go in USPS_CLIENT_ID /
+// USPS_CLIENT_SECRET and are traded for an OAuth token, cached until expiry.
+const USPS_TOKEN_URL = 'https://apis.usps.com/oauth2/v3/token';
+const USPS_TRACK_URL = 'https://apis.usps.com/tracking/v3r2/tracking';
+let uspsToken = { value: null, expiresAt: 0 };
+
+async function uspsAccessToken() {
+  if (uspsToken.value && Date.now() < uspsToken.expiresAt - 60000) return uspsToken.value;
+  const res = await fetch(USPS_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ grant_type: 'client_credentials', client_id: process.env.USPS_CLIENT_ID, client_secret: process.env.USPS_CLIENT_SECRET }),
+    signal: AbortSignal.timeout(20000),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.access_token) throw new Error(`USPS token: HTTP ${res.status} ${data.error || ''}`.trim());
+  uspsToken = { value: data.access_token, expiresAt: Date.now() + (Number(data.expires_in) || 3600) * 1000 };
+  return uspsToken.value;
 }
+
+function uspsStatus(item) {
+  const text = `${item.statusCategory || ''} ${item.status || ''}`.toLowerCase();
+  if (/delivery attempt|notice left|alert|exception|undeliverable|return to sender|held/.test(text)) return 'exception';
+  if (/delivered/.test(text)) return 'delivered';
+  if (/out for delivery|available for pickup/.test(text)) return 'out_for_delivery';
+  if (/pre-shipment|label created|shipping label|pending|not yet in system/.test(text) || !text.trim()) return 'label_created';
+  return 'in_transit';
+}
+
+async function uspsProvider(trackingNumber) {
+  const res = await fetch(USPS_TRACK_URL, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${await uspsAccessToken()}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify([{ trackingNumber }]),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!res.ok && res.status !== 207) throw Object.assign(new Error(`USPS responded ${res.status}`), { status: res.status });
+  const item = (await res.json())?.[0];
+  if (!item || item.error || !item.trackingNumber) throw new Error('USPS returned no shipment');
+
+  const status = uspsStatus(item);
+  const events = [...(item.trackingEvents || [])]
+    .map((ev) => ({
+      text: ev.eventType,
+      location: [ev.eventCity, ev.eventState, ev.eventCountry].filter(Boolean).join(', ') || null,
+      timestamp: ev.GMTTimestamp || ev.eventTimestamp,
+    }))
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const eta = item.deliveryDateExpectation || {};
+  const customsAlert = status === 'exception' && /customs/i.test(`${item.status} ${item.statusSummary}`)
+    ? { statusCode: 'customs_exception', message: item.statusSummary || item.status, occurredAt: events.at(-1)?.timestamp || null }
+    : null;
+  return buildResult(status, STATUS_LABELS[status], events,
+    eta.expectedDeliveryDate || eta.predictedDeliveryDate || eta.guaranteedDeliveryDate || null, customsAlert);
+}
+
+// A carrier's own API when its credentials are configured, Ship24 when
+// they aren't or when the direct lookup fails (unknown number, limits).
+// ponytail: Ship24 stays the safety net until every carrier has a direct
+// provider; see the plan in memory before switching it off.
+function directOrShip24(name, configured, provider) {
+  return async (trackingNumber) => {
+    if (!configured()) return ship24Provider(trackingNumber);
+    try {
+      return await provider(trackingNumber);
+    } catch (err) {
+      console.warn(`${name} lookup failed (${err.message}); falling back to Ship24.`);
+      return ship24Provider(trackingNumber);
+    }
+  };
+}
+const dhlOrShip24 = directOrShip24('DHL', () => !!process.env.DHL_API_KEY, dhlProvider);
+const uspsOrShip24 = directOrShip24('USPS', () => !!(process.env.USPS_CLIENT_ID && process.env.USPS_CLIENT_SECRET), uspsProvider);
 
 async function ship24Provider(trackingNumber) {
   const data = await ship24Track(trackingNumber);
@@ -318,8 +384,8 @@ async function ship24Provider(trackingNumber) {
 const liveProviders = {
   async fedex(trackingNumber) { return ship24Provider(trackingNumber); },
   async ups(trackingNumber) { return ship24Provider(trackingNumber); },
-  async dhl(trackingNumber) { return dhlOrShip24(trackingNumber); },
-  async usps(trackingNumber) { return ship24Provider(trackingNumber); },
+  dhl: dhlOrShip24,
+  usps: uspsOrShip24,
   // Air Waybill (air cargo, not last-mile parcel courier): same Ship24
   // aggregator endpoint, which auto-detects the airline from the AWB's
   // own 3-digit prefix - no separate integration needed.
