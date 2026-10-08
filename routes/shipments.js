@@ -93,7 +93,27 @@ router.get('/', async (req, res) => {
     .map((s) => sanitizeForFollower(s, req.user.id));
   const shipments = [...owned, ...followed].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   res.json(shipments);
+  refreshIfStale(spaceUserIds, owned);
 });
+
+// On Render's free plan the server sleeps when nobody visits, and the
+// 30-minute cron sleeps with it - so opening the app is often the first
+// moment in hours anything can be refreshed. When the inbox loads with a
+// stale active shipment, refresh this space's shipments in the background
+// (the next inbox load shows the result). At most once per space per
+// refresh interval, so reopening the app doesn't fan out Ship24 lookups.
+const STALE_MS = Number(process.env.TRACKING_REFRESH_MINUTES || 30) * 60 * 1000;
+const lastKick = new Map(); // space key -> ms
+function refreshIfStale(spaceUserIds, owned) {
+  const now = Date.now();
+  const stale = owned.some((s) => s.status !== 'delivered' && !s.archived
+    && (!s.lastCheckedAt || now - new Date(s.lastCheckedAt).getTime() > STALE_MS));
+  const key = spaceUserIds.slice().sort().join(',');
+  if (!stale || now - (lastKick.get(key) || 0) < STALE_MS) return;
+  lastKick.set(key, now);
+  refreshAllShipments((s) => spaceUserIds.includes(s.userId))
+    .catch((err) => console.error('Background refresh on open failed:', err.message));
+}
 
 router.post('/', writeLimiter, async (req, res) => {
   const { carrier, trackingNumber, contactId, label, notes, cost, currency, category, photo } = req.body || {};

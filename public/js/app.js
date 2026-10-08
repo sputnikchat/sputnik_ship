@@ -2843,8 +2843,13 @@
   setInterval(() => {
     if (state.token) {
       loadNotifications().catch(() => {});
+      loadShipments().catch(() => {});
     }
   }, 2 * 60 * 1000);
+  // Opening the inbox with stale data starts a background refresh on the
+  // server (routes/shipments.js, refreshIfStale); pick its result up
+  // shortly after instead of waiting for the next 2-minute poll.
+  setTimeout(() => { if (state.token) loadShipments().catch(() => {}); }, 15 * 1000);
 
   // ---------------- motion: reveal cards as they enter the viewport ----------------
   // Lists re-render via innerHTML, so a MutationObserver picks up every new
