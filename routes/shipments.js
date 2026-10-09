@@ -31,9 +31,9 @@ const writeLimiter = rateLimit({
 });
 
 // Tighter limit specifically for refreshing tracking: each call fans out
-// to the real Ship24 API for every active shipment, so spamming this
+// to the couriers' APIs for every active shipment, so spamming this
 // burns through the account's API quota (and could get the app's own
-// Ship24 account rate-limited or blocked) far faster than any other
+// courier keys rate-limited or blocked) far faster than any other
 // route in the app.
 const refreshLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -101,7 +101,7 @@ router.get('/', async (req, res) => {
 // moment in hours anything can be refreshed. When the inbox loads with a
 // stale active shipment, refresh this space's shipments in the background
 // (the next inbox load shows the result). At most once per space per
-// refresh interval, so reopening the app doesn't fan out Ship24 lookups.
+// refresh interval, so reopening the app doesn't fan out courier lookups.
 const STALE_MS = Number(process.env.TRACKING_REFRESH_MINUTES || 30) * 60 * 1000;
 const lastKick = new Map(); // space key -> ms
 function refreshIfStale(spaceUserIds, owned) {
@@ -474,7 +474,7 @@ router.delete('/:id', async (req, res) => {
 // Manually triggers the refresh cycle for ALL shipments (the same thing
 // the scheduler does every 30 min). Useful for testing without waiting.
 // Only the caller's own space is refreshed: this used to run the global
-// refresh, so any account could make the server call Ship24 for every
+// refresh, so any account could make the server call the courier APIs for every
 // user's shipments (burning the paid quota) just by pressing the button.
 router.post('/refresh-all/now', refreshLimiter, async (req, res) => {
   const before = await readDB();

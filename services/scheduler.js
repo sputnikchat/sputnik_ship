@@ -9,7 +9,7 @@ const { geocodeLocation } = require('./geocode');
 // Delivered shipments are never re-tracked, so one whose places couldn't be
 // geocoded at the time (e.g. the geocoder was refusing Render's IP) kept an
 // empty map forever. This rebuilds the route from the stored checkpoint
-// labels ("<status> · <place>") - geocoding only, no paid Ship24 lookup.
+// labels ("<status> · <place>") - geocoding only, no courier lookup.
 // Returns the fields to apply, or null when no place could be geocoded.
 async function buildMissingRoute(shipment) {
   const points = [];
@@ -72,9 +72,9 @@ function applyTrackingResult(data, shipment, result) {
 // generates a notification whenever the status changes. `filter` narrows
 // it to a subset (e.g. one user's space for the manual "refresh all"
 // button) - without it, any logged-in user pressing that button would
-// fan out a paid Ship24 lookup for EVERY user's shipments.
+// fan out a courier API lookup for EVERY user's shipments.
 //
-// The Ship24 and geocoder calls take seconds each (minutes for a full
+// The courier and geocoder calls take seconds each (minutes for a full
 // run), and update() is the single write queue for the whole app: doing
 // them inside it froze every chat message, login and session rotation
 // until the run finished. So the network work happens against a readDB()

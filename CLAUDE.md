@@ -22,7 +22,7 @@ https://sputnik-ship.onrender.com (GitHub: sputnikchat/sputnik_ship, branch main
 - `routes/*.js` — auth (JWT in httpOnly cookie), shipments (+ per-shipment chat, followers,
   share tokens), contacts, notifications, push, account (spaces/co-owners), stats, public (`/api/public/shipments/:token`).
 - `services/carrierProviders.js` — tracking engine. `CARRIERS` array is the source of truth
-  for courier values (fedex, ups, dhl, usps, air_cargo, ocean_cargo). Live mode = Ship24 aggregator.
+  for courier values (fedex, ups, dhl, usps, air_cargo, ocean_cargo). Live mode = each courier's own API (DHL, FedEx, UPS, USPS); no aggregator.
 - `services/store.js` — Postgres (Supabase), the whole app state is ONE jsonb document;
   `readDB()` / `update(fn)`. No SQL per entity.
 - `public/index.html` — every screen is a `<section class="view">`; `public/js/app.js` switches
