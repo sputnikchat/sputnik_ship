@@ -55,30 +55,29 @@ sputnik-ship/
   public/                     Frontend (framework-free HTML/CSS/JS) + PWA (manifest, service worker)
 ```
 
-## Connecting real tracking (Ship24)
+## Connecting real tracking (each courier's own API)
 
-Instead of creating a separate developer account with each courier (FedEx,
-UPS, DHL, USPS — each with its own OAuth flow), the app uses
-[Ship24](https://www.ship24.com/tracking-api) as an aggregator: **a single
-API key** covers those 4 plus 2500+ more couriers, auto-detecting the
-carrier from the tracking number's format.
+With `TRACKING_MODE=live`, every courier is tracked through its own
+official API, switched on by putting that courier's credentials in the
+environment (see `.env.example`):
 
-1. Sign up at [ship24.com/tracking-api](https://www.ship24.com/tracking-api)
-   (free plan: 10 shipments/month, with a 100-shipment bonus the first month).
-2. Paste your key into `.env`: `SHIP24_API_KEY=...`
-3. Set `TRACKING_MODE=live` in `.env` and restart the server.
+| Courier | API | Variables |
+|---|---|---|
+| DHL (all divisions) | Shipment Tracking – Unified, developer.dhl.com | `DHL_API_KEY` |
+| FedEx | Track API (Basic Integrated Visibility), developer.fedex.com | `FEDEX_CLIENT_ID`, `FEDEX_CLIENT_SECRET` (`FEDEX_SANDBOX=1` for test keys) |
+| UPS | Tracking API, developer.ups.com | `UPS_CLIENT_ID`, `UPS_CLIENT_SECRET` (`UPS_SANDBOX=1` for test keys) |
+| USPS | Tracking 3.2, developers.usps.com | `USPS_CLIENT_ID`, `USPS_CLIENT_SECRET` |
 
-Real couriers only report the place name for each checkpoint
-("Memphis, TN, US"), not coordinates — that's why, in `live` mode, the app
-geocodes each location with Nominatim/OpenStreetMap (the same provider the
-map already uses) so it can keep drawing the route. That adds a small delay
-the first time a new place shows up (it's cached after that).
+A courier without credentials — and air/ocean cargo, which has no free
+unified API — isn't looked up: its shipments keep their last data and the
+thread shows a "Carrier site" button that opens the courier's own tracking
+page. Sandbox/test keys return fake data for any number; use production
+keys for real users.
 
-The integration is written against Ship24's official spec
-([OpenAPI](https://docs.ship24.com/assets/openapi/ship24-tracking-api.yaml)),
-so the field names in `parseShip24Response()`
-(`services/carrierProviders.js`) should match the real response — it's
-still worth testing once you turn on `live` with your key.
+Couriers only report the place name for each checkpoint ("Memphis, TN,
+US"), not coordinates, so in `live` mode each place is geocoded
+(Nominatim, falling back to Photon) to keep drawing the route. That adds a
+small delay the first time a new place shows up (it's cached after that).
 
 ## Email notifications (optional)
 

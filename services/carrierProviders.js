@@ -5,9 +5,11 @@
 // simulated data (so you can test the app without courier accounts) or
 // call each courier's real API (once you've loaded credentials in .env).
 //
-// To connect a real API, fill in the corresponding function in
-// `liveProviders` (fedex, ups, dhl, usps). Each one already has a
-// comment with the general flow and a link to the official docs.
+// In live mode each courier is tracked through its own API (DHL, FedEx,
+// UPS, USPS), enabled by putting that courier's credentials in the
+// environment. A courier without credentials - and air/ocean cargo, which
+// has no free unified API - is simply not looked up: the shipment keeps its
+// last data and the app offers the courier's own tracking page instead.
 
 const CARRIERS = ['fedex', 'ups', 'dhl', 'usps', 'air_cargo', 'ocean_cargo'];
 
@@ -87,8 +89,8 @@ function mockTrackingUpdate(carrier, trackingNumber, shipment) {
   // Test hook, mock mode only: a tracking number containing "CUSTOMS"
   // (e.g. CUSTOMS_TEST_001) simulates a customs hold from the second
   // checkpoint onward, so Fase 4 can be exercised without a real courier
-  // account or an actual held parcel. Nothing to do with Ship24 - that's
-  // handled separately in findCustomsAlert() for TRACKING_MODE=live.
+  // account or an actual held parcel. In live mode each courier's provider
+  // raises its own customs alert.
   const customsAlert =
     /customs/i.test(trackingNumber) && nextIndex >= 1
       ? {
@@ -111,115 +113,11 @@ function mockTrackingUpdate(carrier, trackingNumber, shipment) {
 }
 
 // ---------------------------------------------------------------------
-// LIVE MODE: instead of integrating each courier separately (4 different
-// OAuth flows), we use Ship24 (https://ship24.com) as an aggregator: one
-// API key covers FedEx/UPS/DHL/USPS and 2500+ more couriers, auto-detecting
-// the carrier from the tracking number's format.
-//
-// Flow (documented at https://docs.ship24.com, OpenAPI spec at
-// https://docs.ship24.com/assets/openapi/ship24-tracking-api.yaml):
-//   POST /public/v1/trackers/track  with { trackingNumber }
-//   This endpoint is idempotent: it creates the tracker on the first
-//   call and always returns the current results afterwards - a single
-//   call per refresh is enough, no separate register/query steps.
-//
-// Real couriers only give the place name for each event
-// ("Memphis, TN, US"), not coordinates: we geocode each checkpoint with
-// Nominatim (services/geocode.js) so we can keep drawing the route on
-// the map.
+// LIVE MODE. Couriers only give a place name per event ("Memphis, TN,
+// US"), not coordinates: each checkpoint is geocoded (services/geocode.js)
+// so the route can still be drawn on the map.
 // ---------------------------------------------------------------------
 const { geocodeLocation } = require('./geocode');
-
-const SHIP24_BASE = 'https://api.ship24.com/public/v1';
-
-// The 8 official milestones (docs.ship24.com/status/#statusmilestone,
-// via the ship24-tracking-statuses skill installed in this project).
-const SHIP24_MILESTONE_MAP = {
-  pending: 'label_created',
-  info_received: 'label_created',
-  in_transit: 'in_transit',
-  available_for_pickup: 'out_for_delivery',
-  out_for_delivery: 'out_for_delivery',
-  delivered: 'delivered',
-  failed_attempt: 'exception',
-  exception: 'exception',
-};
-
-// The 2 statusCodes the ship24-tracking-statuses skill calls out as
-// carrying real business meaning under the `customs` category - a hold
-// pending extra documents/payment, or an outright rejection. There's no
-// separate "customs" milestone: these ride alongside whatever milestone
-// the shipment is otherwise at (usually in_transit or exception).
-const CUSTOMS_STATUS_CODES = ['customs_exception', 'customs_rejected'];
-
-// Ship24 doesn't expose a structured "pay duties here" field - only the
-// courier's own free-text status line (`ev.status`). If that text happens
-// to contain a URL we surface it as-is; we never fabricate one.
-function findCustomsAlert(orderedEvents) {
-  const customsEvents = orderedEvents.filter((ev) => CUSTOMS_STATUS_CODES.includes(ev.statusCode));
-  if (!customsEvents.length) return null;
-  const latest = customsEvents[customsEvents.length - 1];
-  return {
-    statusCode: latest.statusCode,
-    message: latest.status || 'The courier flagged a customs issue with this shipment.',
-    occurredAt: latest.occurrenceDatetime || null,
-  };
-}
-
-async function ship24Track(trackingNumber) {
-  const apiKey = process.env.SHIP24_API_KEY;
-  if (!apiKey) {
-    throw new Error('Missing SHIP24_API_KEY in .env. Sign up at https://www.ship24.com/tracking-api to get one.');
-  }
-  const res = await fetch(`${SHIP24_BASE}/trackers/track`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json; charset=utf-8' },
-    body: JSON.stringify({ trackingNumber }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(`Ship24 responded ${res.status}: ${JSON.stringify(data).slice(0, 200)}`);
-  }
-  return data;
-}
-
-async function parseShip24Response(data) {
-  const tracking = data?.data?.trackings?.[0];
-  if (!tracking) {
-    // Just created, the courier hasn't reported anything yet.
-    return {
-      status: 'label_created',
-      statusLabel: STATUS_LABELS.label_created,
-      checkpointIndex: -1,
-      fullRoute: [],
-      checkpoints: [],
-      currentLocation: null,
-      estimatedDelivery: null,
-      customsAlert: null,
-    };
-  }
-
-  const milestone = tracking.shipment?.statusMilestone || 'info_received';
-  const status = SHIP24_MILESTONE_MAP[milestone] || 'in_transit';
-
-  const rawEvents = tracking.events || [];
-  const orderedEvents = [...rawEvents].sort(
-    (a, b) => new Date(a.occurrenceDatetime) - new Date(b.occurrenceDatetime)
-  );
-
-  const estimatedDelivery =
-    tracking.shipment?.delivery?.estimatedDeliveryDate ||
-    tracking.shipment?.delivery?.courierEstimatedDeliveryDate?.from ||
-    null;
-
-  return buildResult(
-    status,
-    STATUS_LABELS[status] || milestone,
-    orderedEvents.map((ev) => ({ text: ev.status, location: ev.location, timestamp: ev.occurrenceDatetime })),
-    estimatedDelivery,
-    findCustomsAlert(orderedEvents)
-  );
-}
 
 // Shared by every provider: oldest-first events ({ text, location,
 // timestamp }) become the timeline, and the ones whose place geocodes
@@ -255,9 +153,8 @@ async function buildResult(status, statusLabel, events, estimatedDelivery, custo
 // ---------------------------------------------------------------------
 // DHL direct: Shipment Tracking - Unified (developer.dhl.com/api-reference/
 // shipment-tracking). Free, covers Express, eCommerce, Parcel Germany,
-// Freight and Global Forwarding. Used for DHL when DHL_API_KEY is set;
-// anything it can't answer (unknown number, daily limit) falls back to
-// Ship24 so coverage never drops. The free tier allows 250 calls a day and
+// Freight and Global Forwarding. Used for DHL when DHL_API_KEY is set.
+// The free tier allows 250 calls a day and
 // one every 5 s - calls are spaced here; more needs an upgrade request.
 const DHL_BASE = 'https://api-eu.dhl.com/track/shipments';
 const DHL_MIN_GAP_MS = 5100;
@@ -308,16 +205,19 @@ const USPS_TOKEN_URL = 'https://apis.usps.com/oauth2/v3/token';
 const USPS_TRACK_URL = 'https://apis.usps.com/tracking/v3r2/tracking';
 
 // OAuth client-credentials token, cached per carrier until a minute before
-// it expires. USPS takes the credentials as JSON, FedEx as a form.
+// it expires. USPS takes the credentials as JSON, FedEx as a form, UPS as
+// HTTP Basic auth with a form body ({ basic: true }).
 const tokens = new Map(); // name -> { value, expiresAt }
-async function clientCredentialsToken(name, url, clientId, clientSecret, asForm = false) {
+async function clientCredentialsToken(name, url, clientId, clientSecret, asForm = false, { basic = false } = {}) {
   const cached = tokens.get(name);
   if (cached && Date.now() < cached.expiresAt - 60000) return cached.value;
-  const fields = { grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret };
+  const fields = basic ? { grant_type: 'client_credentials' } : { grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret };
+  const headers = { 'Content-Type': asForm || basic ? 'application/x-www-form-urlencoded' : 'application/json' };
+  if (basic) headers.Authorization = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': asForm ? 'application/x-www-form-urlencoded' : 'application/json' },
-    body: asForm ? new URLSearchParams(fields) : JSON.stringify(fields),
+    headers,
+    body: asForm || basic ? new URLSearchParams(fields) : JSON.stringify(fields),
     signal: AbortSignal.timeout(20000),
   });
   const data = await res.json().catch(() => ({}));
@@ -411,51 +311,83 @@ async function fedexProvider(trackingNumber) {
   return buildResult(status, latest.statusByLocale || STATUS_LABELS[status], events, eta, customsAlert);
 }
 
-// A carrier's own API when its credentials are configured, Ship24 when
-// they aren't or when the direct lookup fails (unknown number, limits).
-// ponytail: Ship24 stays the safety net until every carrier has a direct
-// provider; see the plan in memory before switching it off.
-function directOrShip24(name, configured, provider) {
-  return async (trackingNumber) => {
-    if (!configured()) return ship24Provider(trackingNumber);
-    try {
-      return await provider(trackingNumber);
-    } catch (err) {
-      console.warn(`${name} lookup failed (${err.message}); falling back to Ship24.`);
-      return ship24Provider(trackingNumber);
-    }
-  };
-}
-const dhlOrShip24 = directOrShip24('DHL', () => !!process.env.DHL_API_KEY, dhlProvider);
-const fedexOrShip24 = directOrShip24('FedEx', () => !!(process.env.FEDEX_CLIENT_ID && process.env.FEDEX_CLIENT_SECRET), fedexProvider);
-const uspsOrShip24 = directOrShip24('USPS', () => !!(process.env.USPS_CLIENT_ID && process.env.USPS_CLIENT_SECRET), uspsProvider);
+// ---------------------------------------------------------------------
+// UPS direct: Tracking API v1 (developer.ups.com). App Client ID / Secret
+// go in UPS_CLIENT_ID / UPS_CLIENT_SECRET (OAuth via HTTP Basic);
+// UPS_SANDBOX=1 uses the CIE test host.
+const upsBase = () => (process.env.UPS_SANDBOX === '1' ? 'https://wwwcie.ups.com' : 'https://onlinetools.ups.com');
 
-async function ship24Provider(trackingNumber) {
-  const data = await ship24Track(trackingNumber);
-  return parseShip24Response(data);
+// "20261008" + "143000" -> "2026-10-08T14:30:00" (UPS local time, no zone)
+function upsTime(date, time = '000000') {
+  if (!/^\d{8}$/.test(date || '')) return null;
+  const t = /^\d{6}$/.test(time || '') ? time : '000000';
+  return `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T${t.slice(0, 2)}:${t.slice(2, 4)}:${t.slice(4, 6)}`;
 }
 
+function upsStatus(status = {}) {
+  const text = `${status.description || ''}`;
+  if (status.type === 'D') return 'delivered';
+  if (status.type === 'X' || /returned to sender|exception/i.test(text)) return 'exception';
+  if (status.type === 'M' || status.type === 'MV') return 'label_created';
+  if (status.type === 'P') return 'picked_up';
+  return /out for delivery/i.test(text) ? 'out_for_delivery' : 'in_transit';
+}
+
+async function upsProvider(trackingNumber) {
+  const token = await clientCredentialsToken('UPS', `${upsBase()}/security/v1/oauth/token`,
+    process.env.UPS_CLIENT_ID, process.env.UPS_CLIENT_SECRET, true, { basic: true });
+  const res = await fetch(`${upsBase()}/api/track/v1/details/${encodeURIComponent(trackingNumber)}?locale=en_US&returnSignature=false`, {
+    headers: { Authorization: `Bearer ${token}`, transId: String(Date.now()), transactionSrc: 'sputnikship', Accept: 'application/json' },
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!res.ok) throw Object.assign(new Error(`UPS responded ${res.status}`), { status: res.status });
+  const shipment = (await res.json())?.trackResponse?.shipment?.[0];
+  const pkg = shipment?.package?.[0];
+  if (!pkg) throw new Error(`UPS: ${shipment?.warnings?.[0]?.message || 'no package'}`);
+
+  const activity = pkg.activity || [];
+  const status = upsStatus(activity[0]?.status || pkg.currentStatus);
+  const events = activity
+    .map((a) => {
+      const ad = a.location?.address || {};
+      return {
+        text: a.status?.description,
+        location: [ad.city, ad.stateProvince, ad.countryCode].filter(Boolean).join(', ') || null,
+        timestamp: upsTime(a.date, a.time),
+      };
+    })
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const eta = (pkg.deliveryDate || []).find((d) => d.type === 'SDD' || d.type === 'RDD');
+  const latest = activity[0]?.status || {};
+  const customsAlert = status === 'exception' && /customs|clearance|brokerage/i.test(latest.description || '')
+    ? { statusCode: 'customs_exception', message: latest.description, occurredAt: events.at(-1)?.timestamp || null }
+    : null;
+  return buildResult(status, STATUS_LABELS[status], events, eta ? upsTime(eta.date) : null, customsAlert);
+}
+
+// Each courier's own API, enabled only when its credentials are set. No
+// aggregator fallback (Ship24 was dropped 2026-10): a courier without a
+// provider here, or without credentials, isn't looked up at all.
 const liveProviders = {
-  fedex: fedexOrShip24,
-  async ups(trackingNumber) { return ship24Provider(trackingNumber); },
-  dhl: dhlOrShip24,
-  usps: uspsOrShip24,
-  // Air Waybill (air cargo, not last-mile parcel courier): same Ship24
-  // aggregator endpoint, which auto-detects the airline from the AWB's
-  // own 3-digit prefix - no separate integration needed.
-  async air_cargo(trackingNumber) { return ship24Provider(trackingNumber); },
-  // Ocean/container freight - tracked by container number (ISO 6346,
-  // e.g. "MSCU1234567") or a carrier's Master Bill of Lading number.
-  // Same Ship24 endpoint again; it auto-detects the shipping line.
-  async ocean_cargo(trackingNumber) { return ship24Provider(trackingNumber); },
+  dhl: { configured: () => !!process.env.DHL_API_KEY, track: dhlProvider },
+  fedex: { configured: () => !!(process.env.FEDEX_CLIENT_ID && process.env.FEDEX_CLIENT_SECRET), track: fedexProvider },
+  ups: { configured: () => !!(process.env.UPS_CLIENT_ID && process.env.UPS_CLIENT_SECRET), track: upsProvider },
+  usps: { configured: () => !!(process.env.USPS_CLIENT_ID && process.env.USPS_CLIENT_SECRET), track: uspsProvider },
 };
 
-async function getTrackingUpdate(carrier, trackingNumber, shipment) {
-  const mode = (process.env.TRACKING_MODE || 'mock').toLowerCase();
-  if (mode === 'live' && liveProviders[carrier]) {
-    return liveProviders[carrier](trackingNumber, shipment);
-  }
-  return mockTrackingUpdate(carrier, trackingNumber, shipment);
+const isLive = () => (process.env.TRACKING_MODE || 'mock').toLowerCase() === 'live';
+
+// Whether this courier can be looked up right now (always true in mock mode).
+function canTrack(carrier) {
+  if (!isLive()) return true;
+  return !!liveProviders[carrier]?.configured();
 }
 
-module.exports = { getTrackingUpdate, CARRIERS, STATUS_FLOW, STATUS_LABELS };
+// Callers check canTrack() first; an unconfigured courier here is a bug.
+async function getTrackingUpdate(carrier, trackingNumber, shipment) {
+  if (!isLive()) return mockTrackingUpdate(carrier, trackingNumber, shipment);
+  if (!canTrack(carrier)) throw new Error(`No live tracking configured for ${carrier}`);
+  return liveProviders[carrier].track(trackingNumber);
+}
+
+module.exports = { getTrackingUpdate, canTrack, CARRIERS, STATUS_FLOW, STATUS_LABELS };

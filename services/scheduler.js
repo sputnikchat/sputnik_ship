@@ -1,6 +1,6 @@
 const cron = require('node-cron');
 const { readDB, update } = require('./store');
-const { getTrackingUpdate } = require('./carrierProviders');
+const { getTrackingUpdate, canTrack } = require('./carrierProviders');
 const { pushNotification, pushSystemMessage, applyCustomsAlert } = require('./notify');
 const { checkDelay } = require('./delayDetector');
 const { sendDailyDigest } = require('./digest');
@@ -82,7 +82,10 @@ function applyTrackingResult(data, shipment, result) {
 // each shipment by id, since it may have been edited or deleted meanwhile.
 async function refreshAllShipments(filter = null) {
   const snapshot = await readDB();
-  const active = snapshot.shipments.filter((s) => s.status !== 'delivered' && !s.archived && (!filter || filter(s)));
+  const open = snapshot.shipments.filter((s) => s.status !== 'delivered' && !s.archived && (!filter || filter(s)));
+  // Couriers without a connected API (no credentials, or air/ocean cargo)
+  // aren't looked up; they keep their last data.
+  const active = open.filter((s) => canTrack(s.carrier));
   const missingRoute = snapshot.shipments.filter(
     (s) => !active.includes(s) && s.checkpoints?.length && !s.fullRoute?.length && (!filter || filter(s))
   );

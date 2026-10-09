@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const { readDB, update } = require('../services/store');
 const { requireAuth } = require('../middleware/auth');
-const { getTrackingUpdate, CARRIERS } = require('../services/carrierProviders');
+const { getTrackingUpdate, canTrack, CARRIERS } = require('../services/carrierProviders');
 const { pushNotification, pushNotificationToUsers, pushSystemMessage, applyCustomsAlert } = require('../services/notify');
 const { refreshAllShipments } = require('../services/scheduler');
 const { getSpaceUserIds } = require('../services/space');
@@ -106,7 +106,7 @@ const STALE_MS = Number(process.env.TRACKING_REFRESH_MINUTES || 30) * 60 * 1000;
 const lastKick = new Map(); // space key -> ms
 function refreshIfStale(spaceUserIds, owned) {
   const now = Date.now();
-  const stale = owned.some((s) => s.status !== 'delivered' && !s.archived
+  const stale = owned.some((s) => s.status !== 'delivered' && !s.archived && canTrack(s.carrier)
     && (!s.lastCheckedAt || now - new Date(s.lastCheckedAt).getTime() > STALE_MS));
   const key = spaceUserIds.slice().sort().join(',');
   if (!stale || now - (lastKick.get(key) || 0) < STALE_MS) return;
@@ -188,6 +188,16 @@ router.post('/', writeLimiter, async (req, res) => {
   // for it. The shipment shows as "Label created" until that finishes
   // (or until the next scheduler cycle / a manual refresh).
   res.status(201).json(decryptForOwner(shipment));
+
+  if (!canTrack(shipment.carrier)) {
+    // No live API for this courier yet: open the thread with its first
+    // message so the shipment card (and its "Carrier site" link) shows.
+    await update((data) => {
+      const s = data.shipments.find((x) => x.id === shipment.id);
+      if (s) pushSystemMessage(s, 'Added. Live updates for this courier aren\'t connected yet - follow it on the courier\'s site.');
+    });
+    return;
+  }
 
   try {
     const result = await getTrackingUpdate(shipment.carrier, shipment.trackingNumber, shipment);
@@ -281,6 +291,9 @@ router.post('/:id/refresh', refreshLimiter, async (req, res) => {
   const spaceUserIds = getSpaceUserIds(db, req.user.id);
   const shipment = db.shipments.find((s) => s.id === req.params.id && spaceUserIds.includes(s.userId));
   if (!shipment) return res.status(404).json({ error: 'Shipment not found.' });
+  if (!canTrack(shipment.carrier)) {
+    return res.status(409).json({ error: 'Live updates for this courier aren\'t connected yet. Use "Carrier site" to follow it on the courier\'s page.' });
+  }
 
   try {
     const result = await getTrackingUpdate(shipment.carrier, shipment.trackingNumber, shipment);

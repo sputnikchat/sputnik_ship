@@ -96,16 +96,21 @@
 
   const CARRIER_LABEL = { fedex: 'FedEx', ups: 'UPS', dhl: 'DHL', usps: 'USPS', air_cargo: 'Air Cargo (AWB)', ocean_cargo: 'Ocean Cargo (MBL)' };
 
-  // Ship24 covers almost no airlines and only Maersk among shipping lines, so
-  // air/ocean cargo gets a hand-off to track-trace.com, which routes any AWB
-  // or container number to the carrier's own site. It doesn't take the
-  // number in the URL, so the button copies it first.
-  // ponytail: link-out only; a real feed (DCSA for ocean, a paid AWB API)
-  // would bring cargo onto the map.
-  const CARGO_SITE = {
-    air_cargo: 'https://www.track-trace.com/aircargo',
-    ocean_cargo: 'https://www.track-trace.com/container',
+  // Every shipment links to its courier's own tracking page - the fallback
+  // whenever a courier's live API isn't connected. Parcel couriers take the
+  // number in the URL; air/ocean cargo goes to track-trace.com, which routes
+  // any AWB or container number to the airline/line but doesn't take it in
+  // the URL, so for cargo the button copies the number first.
+  const enc = encodeURIComponent;
+  const CARRIER_SITE = {
+    fedex: (n) => `https://www.fedex.com/fedextrack/?trknbr=${enc(n)}`,
+    ups: (n) => `https://www.ups.com/track?tracknum=${enc(n)}`,
+    dhl: (n) => `https://www.dhl.com/es-es/home/tracking.html?submit=1&tracking-id=${enc(n)}`,
+    usps: (n) => `https://tools.usps.com/go/TrackConfirmAction?tLabels=${enc(n)}`,
+    air_cargo: () => 'https://www.track-trace.com/aircargo',
+    ocean_cargo: () => 'https://www.track-trace.com/container',
   };
+  const COPY_FIRST = new Set(['air_cargo', 'ocean_cargo']);
 
   // Kept in sync by hand with CATEGORIES in routes/shipments.js.
   const CATEGORIES = [
@@ -1757,10 +1762,12 @@
     $('.th-card-share', list)?.addEventListener('click', () => shareShipment(s.id));
     $('.th-card-reply', list)?.addEventListener('click', () => $('#chat-input').focus());
     $('.th-card-site', list)?.addEventListener('click', async () => {
+      const url = CARRIER_SITE[s.carrier](s.trackingNumber);
+      if (!COPY_FIRST.has(s.carrier)) { window.open(url, '_blank', 'noopener'); return; }
       // Copy before opening the tab: once it opens, this page loses focus
       // and the clipboard write is refused.
       const copied = await navigator.clipboard.writeText(s.trackingNumber).then(() => true, () => false);
-      window.open(CARGO_SITE[s.carrier], '_blank', 'noopener');
+      window.open(url, '_blank', 'noopener');
       toast(copied ? 'Tracking number copied. Paste it on the page.' : `Paste this number on the page: ${s.trackingNumber}`);
     });
     if (wasNearBottom) list.scrollTop = list.scrollHeight;
@@ -1770,7 +1777,7 @@
 
   function milestoneCard(s, fresh = false) {
     const owner = s.viewerRole !== 'follower';
-    const site = CARGO_SITE[s.carrier] ? '<button type="button" class="btn-secondary small th-card-site">Carrier site ↗</button>' : '';
+    const site = CARRIER_SITE[s.carrier] ? '<button type="button" class="btn-secondary small th-card-site">Carrier site ↗</button>' : '';
     const eta = s.estimatedDelivery ? (isToday(s.estimatedDelivery) ? fmtShort(s.estimatedDelivery) + ' today' : fmtDate(s.estimatedDelivery)) : null;
     const share = owner && s.status !== 'delivered' ? '<button type="button" class="btn-secondary small th-card-share">Share link</button>' : '';
     const reply = s.status !== 'delivered' ? '<button type="button" class="btn-primary small th-card-reply">Reply</button>' : '';
@@ -1853,7 +1860,7 @@
     }
 
     if (!route) {
-      container.innerHTML = CARGO_SITE[shipment.carrier]
+      container.innerHTML = COPY_FIRST.has(shipment.carrier)
         ? '<div class="empty" style="padding:20px;">Live map isn\'t available for this carrier yet. Use “Carrier site” below.</div>'
         : '<div class="empty" style="padding:20px;">The map will appear as soon as the courier reports the first checkpoint.</div>';
       return;

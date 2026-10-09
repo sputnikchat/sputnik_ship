@@ -16,7 +16,7 @@ services:
         value: 30
       - key: TRACKING_MODE
         value: live
-      - key: SHIP24_API_KEY
+      - key: DHL_API_KEY
         sync: false
       - key: NOTIFY_EMAIL_ENABLED
         value: false
