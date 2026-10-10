@@ -86,7 +86,7 @@ async function refreshAllShipments(filter = null) {
   const open = snapshot.shipments.filter((s) => s.status !== 'delivered' && !s.archived && (!filter || filter(s)));
   // Couriers without a connected API (no credentials, or air/ocean cargo)
   // aren't looked up; they keep their last data.
-  const active = open.filter((s) => canTrack(s.carrier));
+  const active = open.filter((s) => canTrack(s.carrier, s.trackingNumber));
   const missingRoute = snapshot.shipments.filter(
     (s) => !active.includes(s) && s.checkpoints?.length && !s.fullRoute?.length && (!filter || filter(s))
   );

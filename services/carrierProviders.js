@@ -654,15 +654,21 @@ const ROUTING = {
 const isLive = () => (process.env.TRACKING_MODE || 'mock').toLowerCase() === 'live';
 const chainFor = (carrier) => (ROUTING[carrier] || []).filter((name) => PROVIDERS[name].configured());
 
-// Whether this courier can be looked up right now (always true in mock mode).
-function canTrack(carrier) {
-  if (!isLive()) return true;
+// Demo numbers ("DEMO-..." with any courier) always use the simulator, even
+// in live mode: they let you try the app - timeline, map, notifications,
+// a customs hold with "DEMO-CUSTOMS-..." - without a real parcel and
+// without using any tracking quota. Each refresh moves them one step on.
+const isDemo = (trackingNumber) => /^DEMO[-_]/i.test(String(trackingNumber || '').trim());
+
+// Whether this shipment can be looked up right now (always true in mock mode).
+function canTrack(carrier, trackingNumber) {
+  if (!isLive() || isDemo(trackingNumber)) return true;
   return chainFor(carrier).length > 0;
 }
 
 // Callers check canTrack() first; an unconfigured courier here is a bug.
 async function getTrackingUpdate(carrier, trackingNumber, shipment = {}) {
-  if (!isLive()) return mockTrackingUpdate(carrier, trackingNumber, shipment);
+  if (!isLive() || isDemo(trackingNumber)) return mockTrackingUpdate(carrier, trackingNumber, shipment);
   const chain = chainFor(carrier);
   if (!chain.length) throw new Error(`No live tracking configured for ${carrier}`);
 
