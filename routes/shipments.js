@@ -212,6 +212,7 @@ router.post('/', writeLimiter, async (req, res) => {
         checkpoints: result.checkpoints,
         currentLocation: result.currentLocation,
         estimatedDelivery: result.estimatedDelivery,
+        providerRef: result.providerRef || s.providerRef,
         lastCheckedAt: new Date().toISOString(),
       });
       pushSystemMessage(s, `Initial status: ${result.statusLabel}`);
@@ -309,6 +310,7 @@ router.post('/:id/refresh', refreshLimiter, async (req, res) => {
         checkpoints: result.checkpoints,
         currentLocation: result.currentLocation,
         estimatedDelivery: result.estimatedDelivery,
+        providerRef: result.providerRef || s.providerRef,
         lastCheckedAt: new Date().toISOString(),
       });
       if (statusChanged) {

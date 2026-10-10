@@ -55,24 +55,25 @@ sputnik-ship/
   public/                     Frontend (framework-free HTML/CSS/JS) + PWA (manifest, service worker)
 ```
 
-## Connecting real tracking (each courier's own API)
+## Connecting real tracking
 
-With `TRACKING_MODE=live`, every courier is tracked through its own
-official API, switched on by putting that courier's credentials in the
-environment (see `.env.example`):
+With `TRACKING_MODE=live`, shipments are looked up through two tracking
+services (see `.env.example`):
 
-| Courier | API | Variables |
+| What | Service | Variable |
 |---|---|---|
-| DHL (all divisions) | Shipment Tracking – Unified, developer.dhl.com | `DHL_API_KEY` |
-| FedEx | Track API (Basic Integrated Visibility), developer.fedex.com | `FEDEX_CLIENT_ID`, `FEDEX_CLIENT_SECRET` (`FEDEX_SANDBOX=1` for test keys) |
-| UPS | Tracking API, developer.ups.com | `UPS_CLIENT_ID`, `UPS_CLIENT_SECRET` (`UPS_SANDBOX=1` for test keys) |
-| USPS | Tracking 3.2, developers.usps.com | `USPS_CLIENT_ID`, `USPS_CLIENT_SECRET` |
+| Parcels: FedEx, UPS, DHL, USPS, Correos, SEUR, GLS and 1,500+ more ("Other courier" auto-detects) | Ship24 Tracking API, ship24.com | `SHIP24_API_KEY` |
+| Air cargo (AWB, 160+ airlines) and ocean cargo (container / booking / MBL) | ShipsGo API v2, shipsgo.com | `SHIPSGO_API_KEY` |
 
-A courier without credentials — and air/ocean cargo, which has no free
-unified API — isn't looked up: its shipments keep their last data and the
-thread shows a "Carrier site" button that opens the courier's own tracking
-page. Sandbox/test keys return fake data for any number; use production
-keys for real users.
+Each service is a backup for the other's cargo: if ShipsGo has nothing yet
+for an AWB or container, Ship24 is tried. A courier's own API (optional,
+`DHL_API_KEY`, `FEDEX_CLIENT_ID`/`_SECRET`, `UPS_CLIENT_ID`/`_SECRET`,
+`USPS_CLIENT_ID`/`_SECRET`) is used as a backup for that courier when Ship24
+fails. Sandbox/test courier keys return fake data - leave them empty in
+production.
+
+A shipment with no configured service isn't looked up: it keeps its last
+data and the thread shows a "Carrier site" button instead.
 
 Couriers only report the place name for each checkpoint ("Memphis, TN,
 US"), not coordinates, so in `live` mode each place is geocoded

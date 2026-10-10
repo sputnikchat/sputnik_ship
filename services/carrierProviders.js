@@ -3,15 +3,18 @@
 // The app always calls `getTrackingUpdate(carrier, trackingNumber, shipment)`.
 // This function decides, based on TRACKING_MODE, whether to return
 // simulated data (so you can test the app without courier accounts) or
-// call each courier's real API (once you've loaded credentials in .env).
+// look the shipment up for real.
 //
-// In live mode each courier is tracked through its own API (DHL, FedEx,
-// UPS, USPS), enabled by putting that courier's credentials in the
-// environment. A courier without credentials - and air/ocean cargo, which
-// has no free unified API - is simply not looked up: the shipment keeps its
-// last data and the app offers the courier's own tracking page instead.
+// In live mode:
+//   - parcels (FedEx, UPS, DHL, USPS and any other courier) go through
+//     Ship24, one key for every courier; each courier's own API, if its
+//     keys are set, is the backup.
+//   - air cargo (AWB) and ocean cargo (container / MBL) go through ShipsGo,
+//     with Ship24 as the backup.
+// A courier with no configured service isn't looked up: the shipment keeps
+// its last data and the app offers the courier's own tracking page instead.
 
-const CARRIERS = ['fedex', 'ups', 'dhl', 'usps', 'air_cargo', 'ocean_cargo'];
+const CARRIERS = ['fedex', 'ups', 'dhl', 'usps', 'other', 'air_cargo', 'ocean_cargo'];
 
 const STATUS_FLOW = [
   'label_created',
@@ -365,29 +368,221 @@ async function upsProvider(trackingNumber) {
   return buildResult(status, STATUS_LABELS[status], events, eta ? upsTime(eta.date) : null, customsAlert);
 }
 
-// Each courier's own API, enabled only when its credentials are set. No
-// aggregator fallback (Ship24 was dropped 2026-10): a courier without a
-// provider here, or without credentials, isn't looked up at all.
-const liveProviders = {
+// ---------------------------------------------------------------------
+// Ship24 (docs.ship24.com): one key covers FedEx, UPS, DHL, USPS, Correos,
+// SEUR, GLS and 1,500+ more couriers, auto-detecting the courier from the
+// number. POST /trackers/track is idempotent: it creates the tracker on the
+// first call and returns the current results on every later one, without
+// using quota again - so one call per refresh is enough.
+const SHIP24_BASE = 'https://api.ship24.com/public/v1';
+
+// The 8 official milestones (docs.ship24.com/status).
+const SHIP24_MILESTONE = {
+  pending: 'label_created',
+  info_received: 'label_created',
+  in_transit: 'in_transit',
+  available_for_pickup: 'out_for_delivery',
+  out_for_delivery: 'out_for_delivery',
+  delivered: 'delivered',
+  failed_attempt: 'exception',
+  exception: 'exception',
+};
+const SHIP24_CUSTOMS = ['customs_exception', 'customs_rejected'];
+
+async function ship24Provider(trackingNumber) {
+  const res = await fetch(`${SHIP24_BASE}/trackers/track`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.SHIP24_API_KEY}`, 'Content-Type': 'application/json; charset=utf-8' },
+    body: JSON.stringify({ trackingNumber }),
+    signal: AbortSignal.timeout(70000), // the first call can take up to a minute
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const code = data?.errors?.[0]?.code || '';
+    throw Object.assign(new Error(`Ship24 responded ${res.status} ${code}`.trim()), { status: res.status });
+  }
+
+  const tracking = data?.data?.trackings?.[0];
+  const rawEvents = tracking?.events || [];
+  if (!tracking || !rawEvents.length) {
+    // Tracker just created, or the courier hasn't reported anything yet.
+    return { ...(await buildResult('label_created', 'Waiting for the courier\'s first scan', [], null, null)), empty: true };
+  }
+
+  const milestone = tracking.shipment?.statusMilestone || 'in_transit';
+  const status = SHIP24_MILESTONE[milestone] || 'in_transit';
+  const ordered = [...rawEvents].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)
+    || new Date(a.occurrenceDatetime) - new Date(b.occurrenceDatetime));
+  const customs = ordered.filter((ev) => SHIP24_CUSTOMS.includes(ev.statusCode)).at(-1);
+  const customsAlert = customs
+    ? { statusCode: customs.statusCode, message: customs.status || 'The courier flagged a customs issue.', occurredAt: customs.occurrenceDatetime || null }
+    : null;
+  const delivery = tracking.shipment?.delivery || {};
+  const eta = delivery.estimatedDeliveryDate || delivery.courierEstimatedDeliveryDate?.from || null;
+  return buildResult(
+    status,
+    STATUS_LABELS[status],
+    ordered.map((ev) => ({ text: ev.status, location: ev.location, timestamp: ev.occurrenceDatetime })),
+    eta,
+    customsAlert
+  );
+}
+
+// ---------------------------------------------------------------------
+// ShipsGo (shipsgo.com, API v2): air cargo by AWB from 160+ airlines and
+// ocean cargo by container / booking / MBL number - the cargo Ship24 barely
+// covers. A shipment is created once (that's what spends a credit) and then
+// read by its ShipsGo id, which is kept on our shipment as `providerRef`.
+const SHIPSGO_BASE = 'https://api.shipsgo.com/v2';
+
+async function shipsgo(method, path, body) {
+  const res = await fetch(`${SHIPSGO_BASE}${path}`, {
+    method,
+    headers: {
+      'X-Shipsgo-User-Token': process.env.SHIPSGO_API_KEY,
+      Accept: 'application/json',
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(30000),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(`ShipsGo responded ${res.status} ${data?.message || ''}`.trim()), { status: res.status });
+  return data;
+}
+
+// Returns the ShipsGo shipment id for this number, creating it the first
+// time. A 409 means this account already tracks it: look it up instead.
+async function shipsgoShipmentId(mode, field, number, known) {
+  if (known && known.startsWith(`shipsgo:${mode}:`)) return known.split(':')[2];
+  try {
+    const created = await shipsgo('POST', `/${mode}/shipments`, { [field]: number, reference: 'Sputnik Ship' });
+    return String(created.shipment.id);
+  } catch (err) {
+    if (err.status !== 409) throw err;
+    const q = new URLSearchParams({ skip: '0', take: '1', [`filters[${field}]`]: `eq:${number}` });
+    const list = await shipsgo('GET', `/${mode}/shipments?${q}`);
+    const id = list?.shipments?.[0]?.id;
+    if (!id) throw err;
+    return String(id);
+  }
+}
+
+const place = (loc) => (loc ? [loc.name, loc.country?.name].filter(Boolean).join(', ') || null : null);
+
+const AIR_EVENT = { RCS: 'Received from shipper', MAN: 'Manifested on flight', DEP: 'Departed', ARR: 'Arrived', RCF: 'Received from flight', DLV: 'Delivered' };
+const AIR_STATUS = {
+  NEW: ['label_created', 'Waiting for the airline\'s first update'],
+  INPROGRESS: ['label_created', 'Waiting for the airline\'s first update'],
+  BOOKED: ['label_created', 'Booked on a flight'],
+  EN_ROUTE: ['in_transit', 'In the air / in transit'],
+  LANDED: ['out_for_delivery', 'Landed at destination airport'],
+  DELIVERED: ['delivered', 'Delivered'],
+  UNTRACKED: ['exception', 'The airline isn\'t reporting this AWB'],
+};
+
+async function shipsgoAirProvider(trackingNumber, shipment) {
+  const awb = trackingNumber.replace(/\s+/g, '');
+  const id = await shipsgoShipmentId('air', 'awb_number', awb, shipment?.providerRef);
+  const s = (await shipsgo('GET', `/air/shipments/${id}`)).shipment || {};
+  const [status, statusLabel] = AIR_STATUS[s.status] || ['in_transit', 'In transit'];
+  const events = (s.movements || [])
+    .filter((m) => m.status !== 'EST')
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+    .map((m) => ({
+      text: [AIR_EVENT[m.event] || m.event, m.flight].filter(Boolean).join(' · '),
+      location: place(m.location),
+      timestamp: m.timestamp,
+    }));
+  const result = await buildResult(status, statusLabel, events, s.route?.destination?.date_of_rcf || null, null);
+  return { ...result, providerRef: `shipsgo:air:${id}`, empty: !events.length };
+}
+
+const OCEAN_EVENT = { EMSH: 'Empty container to shipper', GTIN: 'Gate in at port', LOAD: 'Loaded on vessel', DEPA: 'Vessel departed', ARRV: 'Vessel arrived', DISC: 'Discharged', GTOT: 'Gate out', EMRT: 'Empty container returned' };
+const OCEAN_STATUS = {
+  NEW: ['label_created', 'Waiting for the shipping line\'s first update'],
+  INPROGRESS: ['label_created', 'Waiting for the shipping line\'s first update'],
+  BOOKED: ['label_created', 'Booked'],
+  LOADED: ['picked_up', 'Loaded on vessel'],
+  SAILING: ['in_transit', 'Sailing'],
+  ARRIVED: ['out_for_delivery', 'Arrived at destination port'],
+  DISCHARGED: ['delivered', 'Discharged at destination port'],
+  UNTRACKED: ['exception', 'The shipping line isn\'t reporting this number'],
+};
+
+async function shipsgoOceanProvider(trackingNumber, shipment) {
+  const number = trackingNumber.replace(/\s+/g, '').toUpperCase();
+  const field = /^[A-Z]{3}[UJZ]\d{7}$/.test(number) ? 'container_number' : 'booking_number';
+  const id = await shipsgoShipmentId('ocean', field, number, shipment?.providerRef);
+  const s = (await shipsgo('GET', `/ocean/shipments/${id}`)).shipment || {};
+  const [status, statusLabel] = OCEAN_STATUS[s.status] || ['in_transit', 'In transit'];
+  const events = (s.containers?.[0]?.movements || [])
+    .filter((m) => m.status !== 'EST')
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+    .map((m) => ({
+      text: [OCEAN_EVENT[m.event] || m.event, m.vessel?.name].filter(Boolean).join(' · '),
+      location: place(m.location),
+      timestamp: m.timestamp,
+    }));
+  const result = await buildResult(status, statusLabel, events, s.route?.port_of_discharge?.date_of_discharge || null, null);
+  return { ...result, providerRef: `shipsgo:ocean:${id}`, empty: !events.length };
+}
+
+// ---------------------------------------------------------------------
+// Which services look up which shipments, in order. The first configured
+// one that answers with events wins; if it fails or has nothing yet, the
+// next one is tried. Ship24 leads for parcels (one key, every courier); a
+// courier's own API, if its keys are set, is the backup. ShipsGo leads for
+// air/ocean cargo, with Ship24 as the backup.
+const PROVIDERS = {
+  ship24: { configured: () => !!process.env.SHIP24_API_KEY, track: ship24Provider },
+  shipsgo_air: { configured: () => !!process.env.SHIPSGO_API_KEY, track: shipsgoAirProvider },
+  shipsgo_ocean: { configured: () => !!process.env.SHIPSGO_API_KEY, track: shipsgoOceanProvider },
   dhl: { configured: () => !!process.env.DHL_API_KEY, track: dhlProvider },
   fedex: { configured: () => !!(process.env.FEDEX_CLIENT_ID && process.env.FEDEX_CLIENT_SECRET), track: fedexProvider },
   ups: { configured: () => !!(process.env.UPS_CLIENT_ID && process.env.UPS_CLIENT_SECRET), track: upsProvider },
   usps: { configured: () => !!(process.env.USPS_CLIENT_ID && process.env.USPS_CLIENT_SECRET), track: uspsProvider },
 };
 
+const ROUTING = {
+  fedex: ['ship24', 'fedex'],
+  ups: ['ship24', 'ups'],
+  dhl: ['ship24', 'dhl'],
+  usps: ['ship24', 'usps'],
+  other: ['ship24'],
+  air_cargo: ['shipsgo_air', 'ship24'],
+  ocean_cargo: ['shipsgo_ocean', 'ship24'],
+};
+
 const isLive = () => (process.env.TRACKING_MODE || 'mock').toLowerCase() === 'live';
+const chainFor = (carrier) => (ROUTING[carrier] || []).filter((name) => PROVIDERS[name].configured());
 
 // Whether this courier can be looked up right now (always true in mock mode).
 function canTrack(carrier) {
   if (!isLive()) return true;
-  return !!liveProviders[carrier]?.configured();
+  return chainFor(carrier).length > 0;
 }
 
 // Callers check canTrack() first; an unconfigured courier here is a bug.
-async function getTrackingUpdate(carrier, trackingNumber, shipment) {
+async function getTrackingUpdate(carrier, trackingNumber, shipment = {}) {
   if (!isLive()) return mockTrackingUpdate(carrier, trackingNumber, shipment);
-  if (!canTrack(carrier)) throw new Error(`No live tracking configured for ${carrier}`);
-  return liveProviders[carrier].track(trackingNumber);
+  const chain = chainFor(carrier);
+  if (!chain.length) throw new Error(`No live tracking configured for ${carrier}`);
+
+  let fallback = null;
+  let lastError = null;
+  for (const name of chain) {
+    try {
+      const result = await PROVIDERS[name].track(trackingNumber, shipment);
+      if (!result.empty) return { ...result, provider: name };
+      fallback = fallback || { ...result, provider: name };
+    } catch (err) {
+      lastError = err;
+      console.error(`[tracking] ${name} failed for ${carrier} ${trackingNumber}: ${err.message}`);
+    }
+  }
+  if (fallback) return fallback;
+  throw lastError || new Error(`No tracking data for ${trackingNumber}`);
 }
 
 module.exports = { getTrackingUpdate, canTrack, CARRIERS, STATUS_FLOW, STATUS_LABELS };

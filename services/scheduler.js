@@ -37,6 +37,7 @@ function applyTrackingResult(data, shipment, result) {
     checkpoints: result.checkpoints,
     currentLocation: result.currentLocation,
     estimatedDelivery: result.estimatedDelivery,
+    providerRef: result.providerRef || shipment.providerRef,
     lastCheckedAt: new Date().toISOString(),
   });
 

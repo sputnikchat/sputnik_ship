@@ -94,7 +94,7 @@
     });
   }
 
-  const CARRIER_LABEL = { fedex: 'FedEx', ups: 'UPS', dhl: 'DHL', usps: 'USPS', air_cargo: 'Air Cargo (AWB)', ocean_cargo: 'Ocean Cargo (MBL)' };
+  const CARRIER_LABEL = { fedex: 'FedEx', ups: 'UPS', dhl: 'DHL', usps: 'USPS', other: 'Other courier', air_cargo: 'Air Cargo (AWB)', ocean_cargo: 'Ocean Cargo (MBL)' };
 
   // Every shipment links to its courier's own tracking page - the fallback
   // whenever a courier's live API isn't connected. Parcel couriers take the
@@ -107,6 +107,7 @@
     ups: (n) => `https://www.ups.com/track?tracknum=${enc(n)}`,
     dhl: (n) => `https://www.dhl.com/es-es/home/tracking.html?submit=1&tracking-id=${enc(n)}`,
     usps: (n) => `https://tools.usps.com/go/TrackConfirmAction?tLabels=${enc(n)}`,
+    other: (n) => `https://www.ship24.com/tracking?p=${enc(n)}`,
     air_cargo: () => 'https://www.track-trace.com/aircargo',
     ocean_cargo: () => 'https://www.track-trace.com/container',
   };
@@ -208,6 +209,9 @@
     if (/^[A-Z]{3}[UJZ]\d{7}$/.test(t)) return 'ocean_cargo';
     if (/^\d{10}$|^\d{11}$/.test(t)) return 'dhl';
     if (/^\d{12}$|^\d{15}$|^96\d{20}$/.test(t)) return 'fedex';
+    // Anything else that looks like a tracking number (Correos, SEUR, GLS,
+    // Amazon, AliExpress...): Ship24 works out the courier by itself.
+    if (/^(?=(?:[^0-9]*[0-9]){6})[A-Z0-9-]{10,40}$/.test(t)) return 'other';
     return null;
   }
 
@@ -764,7 +768,7 @@
     const loc = s.currentLocation?.label ? ' · ' + escapeHtml(String(s.currentLocation.label).split(':').pop().trim()) : '';
     return { html: escapeHtml(s.statusLabel || s.status || 'Label created') + loc, cls: 'sys ' + cls, at: s.lastCheckedAt || s.createdAt };
   }
-  const COURIER_CHIP = { fedex: 'FDX', ups: 'UPS', dhl: 'DHL', usps: 'USPS', air_cargo: 'AWB', ocean_cargo: 'MBL' };
+  const COURIER_CHIP = { fedex: 'FDX', ups: 'UPS', dhl: 'DHL', usps: 'USPS', other: 'PKG', air_cargo: 'AWB', ocean_cargo: 'MBL' };
   function dotClass(s) {
     if (s.delayFlagged) return 'warn';
     if (s.status === 'delivered') return 'ok';
