@@ -7,10 +7,11 @@
 //
 // In live mode:
 //   - parcels (FedEx, UPS, DHL, USPS and any other courier) go through
-//     Ship24, one key for every courier; each courier's own API, if its
-//     keys are set, is the backup.
+//     17TRACK or Ship24 - one key covers every courier; each courier's own
+//     API, if its keys are set, is the backup.
 //   - air cargo (AWB) and ocean cargo (container / MBL) go through ShipsGo,
-//     with Ship24 as the backup.
+//     with 17TRACK / Ship24 as the backup.
+// See ROUTING near the end of this file.
 // A courier with no configured service isn't looked up: the shipment keeps
 // its last data and the app offers the courier's own tracking page instead.
 
@@ -429,6 +430,86 @@ async function ship24Provider(trackingNumber) {
 }
 
 // ---------------------------------------------------------------------
+// 17TRACK (api.17track.net, API v2.4): 3,500+ couriers (FedEx, UPS, DHL,
+// USPS, Correos, SEUR, GLS...) with carrier auto-detection. A number is
+// registered once - that is what uses quota (new accounts get 200 free) -
+// and then read for free with /gettrackinfo, which 17TRACK keeps updating.
+const SEVENTEEN_BASE = 'https://api.17track.net/track/v2.4';
+let seventeenLastCall = 0; // 3 requests per second at most
+
+async function seventeen(path, body) {
+  const wait = seventeenLastCall + 350 - Date.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  seventeenLastCall = Date.now();
+  const res = await fetch(`${SEVENTEEN_BASE}/${path}`, {
+    method: 'POST',
+    headers: { '17token': process.env.SEVENTEEN_TRACK_API_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30000),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.code !== 0) {
+    throw Object.assign(new Error(`17TRACK responded ${res.status} ${data.code ?? ''}`.trim()), { status: res.status });
+  }
+  return data.data || {};
+}
+
+const SEVENTEEN_STATUS = {
+  NotFound: 'label_created',
+  InfoReceived: 'label_created',
+  InTransit: 'in_transit',
+  AvailableForPickup: 'out_for_delivery',
+  OutForDelivery: 'out_for_delivery',
+  Delivered: 'delivered',
+  DeliveryFailure: 'exception',
+  Exception: 'exception',
+  Expired: 'exception',
+};
+
+function seventeenPlace(ev) {
+  const a = ev.address || {};
+  return ev.location || [a.city, a.state, a.country].filter(Boolean).join(', ') || null;
+}
+
+async function seventeenProvider(trackingNumber, shipment) {
+  const number = trackingNumber.replace(/\s+/g, '');
+  const registered = shipment?.providerRef === `17track:${number}`;
+  if (!registered) {
+    const reg = await seventeen('register', [{ number }]);
+    const rejected = reg.rejected?.[0]?.error;
+    // -18019901: already registered on this account - fine.
+    if (rejected && rejected.code !== -18019901) {
+      throw new Error(`17TRACK can't track this number (${rejected.code}: ${rejected.message})`);
+    }
+  }
+
+  const info = await seventeen('gettrackinfo', [{ number }]);
+  const ti = info.accepted?.[0]?.track_info;
+  const providerRef = `17track:${number}`;
+  const latest = ti?.latest_status || {};
+  const rawEvents = (ti?.tracking?.providers || []).flatMap((p) => p.events || []);
+  if (!ti || !rawEvents.length) {
+    const result = await buildResult('label_created', 'Waiting for the courier\'s first scan', [], null, null);
+    return { ...result, providerRef, empty: true };
+  }
+
+  let status = SEVENTEEN_STATUS[latest.status] || 'in_transit';
+  if (status === 'in_transit' && latest.sub_status === 'InTransit_PickedUp') status = 'picked_up';
+  const statusLabel = latest.status === 'Expired' ? 'Tracking stopped (no updates for a long time)' : STATUS_LABELS[status];
+
+  const events = rawEvents
+    .map((ev) => ({ text: ev.description, location: seventeenPlace(ev), timestamp: ev.time_utc || ev.time_iso }))
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const last = ti.latest_event || {};
+  const customsAlert = status === 'exception' && /customs|aduana|douane|zoll|duty|duties/i.test(last.description || '')
+    ? { statusCode: 'customs_exception', message: last.description, occurredAt: last.time_utc || last.time_iso || null }
+    : null;
+  const eta = ti.time_metrics?.estimated_delivery_date?.from || null;
+  const result = await buildResult(status, statusLabel, events, eta, customsAlert);
+  return { ...result, providerRef };
+}
+
+// ---------------------------------------------------------------------
 // ShipsGo (shipsgo.com, API v2): air cargo by AWB from 160+ airlines and
 // ocean cargo by container / booking / MBL number - the cargo Ship24 barely
 // covers. A shipment is created once (that's what spends a credit) and then
@@ -531,10 +612,11 @@ async function shipsgoOceanProvider(trackingNumber, shipment) {
 // ---------------------------------------------------------------------
 // Which services look up which shipments, in order. The first configured
 // one that answers with events wins; if it fails or has nothing yet, the
-// next one is tried. Ship24 leads for parcels (one key, every courier); a
-// courier's own API, if its keys are set, is the backup. ShipsGo leads for
-// air/ocean cargo, with Ship24 as the backup.
+// next one is tried. Only services whose key is set take part, so the app
+// works with any one of them: 17TRACK (free to start) or Ship24 for parcels,
+// a courier's own API as a backup, ShipsGo first for air/ocean cargo.
 const PROVIDERS = {
+  seventeen: { configured: () => !!process.env.SEVENTEEN_TRACK_API_KEY, track: seventeenProvider },
   ship24: { configured: () => !!process.env.SHIP24_API_KEY, track: ship24Provider },
   shipsgo_air: { configured: () => !!process.env.SHIPSGO_API_KEY, track: shipsgoAirProvider },
   shipsgo_ocean: { configured: () => !!process.env.SHIPSGO_API_KEY, track: shipsgoOceanProvider },
@@ -545,13 +627,13 @@ const PROVIDERS = {
 };
 
 const ROUTING = {
-  fedex: ['ship24', 'fedex'],
-  ups: ['ship24', 'ups'],
-  dhl: ['ship24', 'dhl'],
-  usps: ['ship24', 'usps'],
-  other: ['ship24'],
-  air_cargo: ['shipsgo_air', 'ship24'],
-  ocean_cargo: ['shipsgo_ocean', 'ship24'],
+  fedex: ['seventeen', 'ship24', 'fedex'],
+  ups: ['seventeen', 'ship24', 'ups'],
+  dhl: ['seventeen', 'ship24', 'dhl'],
+  usps: ['seventeen', 'ship24', 'usps'],
+  other: ['seventeen', 'ship24'],
+  air_cargo: ['shipsgo_air', 'seventeen', 'ship24'],
+  ocean_cargo: ['shipsgo_ocean', 'seventeen', 'ship24'],
 };
 
 const isLive = () => (process.env.TRACKING_MODE || 'mock').toLowerCase() === 'live';

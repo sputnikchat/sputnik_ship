@@ -57,16 +57,18 @@ sputnik-ship/
 
 ## Connecting real tracking
 
-With `TRACKING_MODE=live`, shipments are looked up through two tracking
+With `TRACKING_MODE=live`, shipments are looked up through these tracking
 services (see `.env.example`):
 
 | What | Service | Variable |
 |---|---|---|
-| Parcels: FedEx, UPS, DHL, USPS, Correos, SEUR, GLS and 1,500+ more ("Other courier" auto-detects) | Ship24 Tracking API, ship24.com | `SHIP24_API_KEY` |
+| Parcels: FedEx, UPS, DHL, USPS, Correos, SEUR, GLS and 3,500+ more ("Other courier" auto-detects) | 17TRACK API v2.4, api.17track.net (200 free numbers for new accounts) | `SEVENTEEN_TRACK_API_KEY` |
+| Same, alternative / backup | Ship24 Tracking API, ship24.com (Pro plan) | `SHIP24_API_KEY` |
 | Air cargo (AWB, 160+ airlines) and ocean cargo (container / booking / MBL) | ShipsGo API v2, shipsgo.com | `SHIPSGO_API_KEY` |
 
 Each service is a backup for the other's cargo: if ShipsGo has nothing yet
-for an AWB or container, Ship24 is tried. A courier's own API (optional,
+for an AWB or container, 17TRACK / Ship24 are tried. Only services whose
+key is set are used, so any one of them is enough to start. A courier's own API (optional,
 `DHL_API_KEY`, `FEDEX_CLIENT_ID`/`_SECRET`, `UPS_CLIENT_ID`/`_SECRET`,
 `USPS_CLIENT_ID`/`_SECRET`) is used as a backup for that courier when Ship24
 fails. Sandbox/test courier keys return fake data - leave them empty in

@@ -16,6 +16,8 @@ services:
         value: 30
       - key: TRACKING_MODE
         value: live
+      - key: SEVENTEEN_TRACK_API_KEY
+        sync: false
       - key: SHIP24_API_KEY
         sync: false
       - key: SHIPSGO_API_KEY
