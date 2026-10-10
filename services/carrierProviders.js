@@ -471,21 +471,36 @@ function seventeenPlace(ev) {
   return ev.location || [a.city, a.state, a.country].filter(Boolean).join(', ') || null;
 }
 
-async function seventeenProvider(trackingNumber, shipment) {
+// 17TRACK carrier codes (res.17track.net/asset/carrier/info/apicarrier.all.json),
+// used when auto-detection can't tell which courier a number belongs to.
+const SEVENTEEN_CARRIER = { fedex: 100003, ups: 100002, dhl: 100001, usps: 21051 };
+
+async function seventeenRegister(number, carrierCode) {
+  const reg = await seventeen('register', [carrierCode ? { number, carrier: carrierCode } : { number }]);
+  const error = reg.rejected?.[0]?.error;
+  // -18019901: already registered on this account - fine.
+  return error && error.code !== -18019901 ? error : null;
+}
+
+async function seventeenProvider(trackingNumber, shipment, carrier) {
   const number = trackingNumber.replace(/\s+/g, '');
-  const registered = shipment?.providerRef === `17track:${number}`;
-  if (!registered) {
-    const reg = await seventeen('register', [{ number }]);
-    const rejected = reg.rejected?.[0]?.error;
-    // -18019901: already registered on this account - fine.
-    if (rejected && rejected.code !== -18019901) {
-      throw new Error(`17TRACK can't track this number (${rejected.code}: ${rejected.message})`);
+  const ref = shipment?.providerRef || '';
+  let carrierCode = ref.startsWith(`17track:${number}`) ? Number(ref.split(':')[2]) || null : undefined;
+  if (carrierCode === undefined) {
+    // Not registered yet: let 17TRACK detect the courier, and if it can't,
+    // tell it the courier the user picked.
+    carrierCode = null;
+    let error = await seventeenRegister(number, null);
+    if (error?.code === -18019903 && SEVENTEEN_CARRIER[carrier]) {
+      carrierCode = SEVENTEEN_CARRIER[carrier];
+      error = await seventeenRegister(number, carrierCode);
     }
+    if (error) throw new Error(`17TRACK can't track this number (${error.code}: ${error.message})`);
   }
 
-  const info = await seventeen('gettrackinfo', [{ number }]);
+  const info = await seventeen('gettrackinfo', [carrierCode ? { number, carrier: carrierCode } : { number }]);
   const ti = info.accepted?.[0]?.track_info;
-  const providerRef = `17track:${number}`;
+  const providerRef = carrierCode ? `17track:${number}:${carrierCode}` : `17track:${number}`;
   const latest = ti?.latest_status || {};
   const rawEvents = (ti?.tracking?.providers || []).flatMap((p) => p.events || []);
   if (!ti || !rawEvents.length) {
@@ -655,7 +670,7 @@ async function getTrackingUpdate(carrier, trackingNumber, shipment = {}) {
   let lastError = null;
   for (const name of chain) {
     try {
-      const result = await PROVIDERS[name].track(trackingNumber, shipment);
+      const result = await PROVIDERS[name].track(trackingNumber, shipment, carrier);
       if (!result.empty) return { ...result, provider: name };
       fallback = fallback || { ...result, provider: name };
     } catch (err) {
